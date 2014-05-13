@@ -64,8 +64,8 @@ bool pmm_Init()
 	{
 		if(map->type == 1)
 			for(i = map->base_addr; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-				if(i != (uintptr_t)(pmm_FirstStack) ||
-						i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
+				if(i != (uintptr_t)(pmm_FirstStack) &&
+						(i < vmm_getPhysAddress(&kernel_start) || i >= vmm_getPhysAddress(&kernel_end)))
 					pmm_Free(i);
 		map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
