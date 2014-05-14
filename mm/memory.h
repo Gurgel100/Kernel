@@ -10,7 +10,7 @@
 
 //Kernelspace
 #define KERNELSPACE_START	0x0							//Kernelspace Anfang
-#define KERNELSPACE_END		(0x100000000 - 1)			//Kernelspace Ende (4GB)
+#define KERNELSPACE_END		(0x8000000000 - 1)			//Kernelspace Ende (512GB)
 
 //Userspace
 #define USERSPACE_START		KERNELSPACE_END + 1			//Userspace Anfang
