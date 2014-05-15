@@ -13,9 +13,10 @@
 #include "stdbool.h"
 #include "multiboot.h"
 #include "stddef.h"
+#include "list.h"
 
 typedef struct{
-	uint64_t physAddress;
+	uintptr_t physAddress;
 	void *virtualAddress;
 }context_t;
 
@@ -27,6 +28,7 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore);
 void vmm_SysFree(uintptr_t vAddress, uint64_t Length);
 
 void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys);
+list_t vmm_getTables(context_t *context);
 
 void vmm_MapModule(mods *mod);
 void vmm_UnMapModule(mods *mod);

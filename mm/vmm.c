@@ -31,6 +31,7 @@
 #define VMM_POINTER_TO_PML4	0x2
 
 static uint16_t PML4e, PDPe, PDe, PTe;
+context_t kernel_context;
 
 //Funktionen, die nur in dieser Datei aufgerufen werden sollen
 //Mapt eine phys. auf eine virt. Speicherst.
@@ -62,6 +63,10 @@ bool vmm_Init(uint64_t Speicher, uintptr_t Stack)
 
 	//Lasse den letzten Eintrag der PML4 auf die PML4 selber zeigen
 	setPML4Entry(511, PML4, 1, 1, 0, 1, 0, 0, VMM_POINTER_TO_PML4, 1, (uintptr_t)PML4);
+
+	//PML4 in Kernelkontext eintragen
+	kernel_context.physAddress = (uintptr_t)PML4;
+	kernel_context.virtualAddress = VMM_PML4_ADDRESS;
 
 	//Page-Tables für den Adressraum 0 bis 4GB erstellen, für Kernel
 	//Wieviele Einträge müssen für den Kernel reserviert werden?
@@ -371,6 +376,59 @@ void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys)
 	}
 	return NULL;
 }
+
+list_t vmm_getTables(context_t *context)
+{
+	list_t list = list_create();
+	PML4_t *PML4 = context->virtualAddress;
+	PDP_t *PDP;
+	PD_t *PD;
+	PT_t *PT;
+	void *address;
+
+	//PML4 eintragen
+	list_push(list, context->physAddress);
+
+	uint16_t PML4i, PDPi, PDi, PTi;
+	//PML4 durchsuchen dabei aber den letzten Eintrag auslassen: er zeigt auf PML4 selber
+	for(PML4i = 0; PML4i < 511; PML4i++)
+	{
+		//Wenn PDP nicht vorhanden dann auch nicht auflisten
+		if(!(PML4->PML4E[PML4i] & PG_P))
+			continue;
+		//PDP auf die Liste setzen
+		list_push(list, PML4->PML4E[PML4i] & PG_ADDRESS);
+
+		PDP = VMM_PDP_ADDRESS + (PML4i << 12);
+
+		//Danach die PDP nach Einträgen durchsuchen
+		for(PDPi = 0; PDPi < 512; PDPi++)
+		{
+			//Wenn PD nicht vorhanden dann auch nicht auflisten
+			if(!(PDP->PDPE[PDPi] & PG_P))
+				continue;
+
+			//PD auf die Liste setzen
+			list_push(list, PDP->PDPE[PDPi] & PG_ADDRESS);
+
+			PD = VMM_PD_ADDRESS + ((PML4i << 21) | (PDPi << 12));
+
+			//Danach PD durchsuchen
+			for(PDi = 0; PDi < 512; PDi++)
+			{
+				//Wenn PT nicht vorhanden dann auch nicht auflisten
+				if(!(PD->PDE[PDi] & PG_P))
+					continue;
+
+				//PT auf die Liste setzen
+				list_push(list, PD->PDE[PDi] & PG_ADDRESS);
+			}
+		}
+	}
+
+	return list;
+}
+
 //----------------------Allgemeine Funktionen------------------------
 
 /*

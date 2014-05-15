@@ -97,6 +97,17 @@ bool pmm_Init()
 		Map[Address / (8 * MM_BLOCK_SIZE)] |= (1 << ((Address / MM_BLOCK_SIZE) % 8));
 	}
 
+	//Liste mit reservierten Pages
+	extern context_t kernel_context;
+	list_t reservedPages = vmm_getTables(&kernel_context);
+	//Liste durchgehen und Bits in der BitMap löschen
+	uintptr_t Address;
+	while((Address = list_pop(reservedPages)))
+	{
+		Map[Address / (8 * MM_BLOCK_SIZE)] &=
+				~(1 << ((((uintptr_t)Address) / MM_BLOCK_SIZE) % 8));
+	}
+
 	SysLog("PMM", "Initialisierung abgeschlossen");
 	return true;
 }
