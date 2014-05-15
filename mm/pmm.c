@@ -107,6 +107,7 @@ bool pmm_Init()
 		Map[Address / (8 * MM_BLOCK_SIZE)] &=
 				~(1 << ((((uintptr_t)Address) / MM_BLOCK_SIZE) % 8));
 	}
+	list_destroy(reservedPages);
 
 	SysLog("PMM", "Initialisierung abgeschlossen");
 	return true;
