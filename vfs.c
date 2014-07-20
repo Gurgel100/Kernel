@@ -18,9 +18,47 @@
 #define VFS_MODE_WRITE	0x2
 #define VFS_MODE_APPEND	0x4
 
+#define PT_VOID			0x00
+#define PT_FAT12		0x01
+#define PT_FAT16S		0x04
+#define PT_EXTENDED		0x05
+#define PT_FAT16B		0x06
+#define PT_NTFS			0x07
+#define PT_FAT32		0x0B
+#define PT_FAT32LBA		0x0C
+#define PT_FAT16BLBA	0x0E
+#define PT_EXTENDEDLBA	0x0F
+#define PT_OEM			0x12
+#define PT_DYNAMIC		0x42
+#define PT_SWAP			0x82
+#define PT_NATIVE		0x83
+#define PT_LVM			0x8E
+#define PT_FBSD			0xA5
+#define PT_OBSD			0XA6
+#define PT_NBSD			0xA9
+#define PT_LEGACY		0xEE
+#define PT_EFI			0xEF
+
 typedef enum{
 	TYPE_DIR, TYPE_FILE, TYPE_MOUNT, TYPE_LINK, TYPE_DEV
 }vfs_node_type_t;
+
+typedef struct{
+	struct{
+		uint8_t Bootflag;
+		uint8_t Head;
+		uint8_t Sector : 6;
+		uint8_t CylinderHi : 2;
+		uint8_t CylinderLo;
+		uint8_t Type;
+		uint8_t lastHead;
+		uint8_t lastSector : 5;
+		uint8_t lastCylinderHi : 2;
+		uint8_t lastCylinderLo;
+		uint32_t firstLBA;
+		uint32_t Length;
+	}__attribute__((packed))entry[4];
+}__attribute__((packed))PartitionTable_t;
 
 typedef struct vfs_node{
 		char *Name;
@@ -261,7 +299,11 @@ void vfs_RegisterDevice(struct cdi_device *dev)
 	vfs_node_t *Node, *tmp;
 	//ist der Ordner schon vorhanden?
 	if(!(tmp = getNode(Path))) return;	//Fehler
-	//ansonsten Gerätedatei anlegen
+
+	//ansonsten nach Partitonen suchen
+	//PartitionTable_t *PartitionTable = 0x1BE;	//Offset der Partitionstabelle
+
+	//Gerätedatei anlegen
 	//wird vorne angelegt
 	Node = malloc(sizeof(*Node));
 	Node->Type = TYPE_DEV;
@@ -287,7 +329,7 @@ void vfs_RegisterDevice(struct cdi_device *dev)
 	{
 		struct cdi_storage_driver *stdriver = dev->driver;
 		struct cdi_storage_device *stdev = dev;
-		void *Buffer = malloc(stdriver);
+		void *Buffer = malloc(stdev->block_size);
 		stdriver->read_blocks(stdev, 0, 1, Buffer);
 		free(Buffer);
 	}
@@ -308,7 +350,7 @@ void vfs_RegisterDevice(struct cdi_device *dev)
 		struct cdi_storage_driver *stdriver = dev->driver;
 		struct cdi_storage_device *stdev = dev;
 		//static uint8_t Buffer[4096];
-		void *Buffer = malloc(2048);
+		void *Buffer = malloc(stdev->block_size);
 		stdriver->read_blocks(stdev, 0, 1, Buffer);
 		free(Buffer);
 	}
