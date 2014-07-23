@@ -137,7 +137,7 @@ void vfs_Read(const char *Path, const void *Buffer)
 	if(Path[0] == VFS_SEPARATOR)
 		root = true;
 
-	length = getDirs(Dirs, Path);
+	length = getDirs(&Dirs, Path);
 
 	//Ausgeben
 	if(root)
@@ -163,7 +163,7 @@ void vfs_Write(const char *Path, const void *Buffer)
 	if(Path[0] == VFS_SEPARATOR)
 		root = true;
 
-	length = getDirs(Dirs, Path);
+	length = getDirs(&Dirs, Path);
 
 	//Ausgeben
 	if(root)
