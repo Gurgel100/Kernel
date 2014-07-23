@@ -129,7 +129,7 @@ void vfs_Read(const char *Path, const void *Buffer)
 {
 	bool root = false;
 	size_t i, length;
-	char **Dirs;
+	char **Dirs = NULL;
 
 	if(Buffer == NULL || Path == NULL)
 		return;
@@ -155,7 +155,7 @@ void vfs_Write(const char *Path, const void *Buffer)
 {
 	bool root = false;
 	size_t i, length;
-	char **Dirs;
+	char **Dirs = NULL;
 
 	if(Buffer == NULL || Path == NULL)
 		return;
@@ -253,14 +253,14 @@ size_t getDirs(char ***Dirs, const char *Path)
 	if(!*Dirs)
 		*Dirs = malloc(sizeof(char*));
 
-	*Dirs[0] = strtok(Path, VFS_ROOT);
+	(*Dirs)[0] = strtok(Path, VFS_ROOT);
 	for(i = 1; ; i++)
 	{
 		if((tmp = strtok(NULL, VFS_ROOT)) ==
 		 NULL)
 			break;
 		*Dirs = realloc(*Dirs, sizeof(char*) * (i + 1));
-		*Dirs[i] = tmp;
+		(*Dirs)[i] = tmp;
 	}
 	return i;
 }
