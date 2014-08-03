@@ -93,6 +93,7 @@ typedef struct {
  * \endenglish
  */
 typedef struct {
+	struct cdi_device *dev;
 } cdi_fs_osdep;
 
 #endif
