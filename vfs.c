@@ -375,30 +375,5 @@ void vfs_RegisterDevice(struct cdi_device *dev)
 		free(DevPath);
 	}
 
-	//Testen ob es funktioniert
-	Sleep(1000);
-	if(dev->driver->type == CDI_STORAGE)
-	{
-		struct cdi_storage_driver *stdriver = dev->driver;
-		struct cdi_storage_device *stdev = dev;
-		//static uint8_t Buffer[4096];
-		void *Buffer = malloc(stdev->block_size);
-		stdriver->read_blocks(stdev, 0, 1, Buffer);
-		free(Buffer);
-	}
-	else if(dev->driver->type == CDI_SCSI)
-	{
-		struct cdi_scsi_driver *scsidriver = dev->driver;
-		struct cdi_scsi_device *scsidev = dev;
-		struct cdi_scsi_packet scsi_packet = {
-				.buffer = malloc(2048),
-				.bufsize = 2048,
-				.direction = CDI_SCSI_READ,
-				.cmdsize = 16
-		};
-		scsidriver->request(scsidev, &scsi_packet);
-		free(scsi_packet.buffer);
-	}
-
 	printf("Treibername: %s --> Geraet: %s\n", dev->driver->name, dev->name);
 }
