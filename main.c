@@ -92,6 +92,7 @@ void Init()
 	//isr_Init();
 	vfs_Init();			//VFS initialisieren
 	pci_Init();			//PCI-Treiber initialisieren
+	dmng_Init();
 	cdi_init();			//CDI und -Treiber initialisieren
 	pm_Init();			//Tasks initialisieren
 	SysLog("SYSTEM", "Initialisierung abgeschlossen");

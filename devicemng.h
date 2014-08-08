@@ -9,11 +9,14 @@
 #define DEVICEMNG_H_
 
 #include "cdi.h"
+#include "list.h"
 
 typedef struct{
-		struct cdi_device_t *device;
-}partition_t;
+	struct cdi_device *device;
+	list_t partitions;
+}device_t;
 
 void dmng_Init(void);
+void dmng_registerDevice(struct cdi_device *dev);
 
 #endif /* DEVICEMNG_H_ */

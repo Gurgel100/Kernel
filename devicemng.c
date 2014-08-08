@@ -8,20 +8,21 @@
 #include "devicemng.h"
 #include "lists.h"
 
-extern drivers;
+static list_t devices;
 
 void dmng_Init()
 {
-	struct cdi_driver *driver;
-	uint64_t i;
-	//Durchsuche Treiberliste
-	for(i = 0; i < cdi_list_size(drivers); i++)
-	{
-		driver = cdi_list_get(drivers, i);
-		if(!driver)
-			break;
-		if(driver->type == CDI_STORAGE)
-		{
-		}
-	}
+	//Initialisiere Geräteliste
+	devices = list_create();
+}
+
+void dmng_registerDevice(struct cdi_device *dev)
+{
+	device_t *device = malloc(sizeof(device_t));
+	device->partitions = list_create();
+	device->device = dev;
+
+	partition_getPartitions(device);
+
+	list_push(devices, device);
 }
