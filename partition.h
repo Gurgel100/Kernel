@@ -11,7 +11,11 @@
 #include "cdi.h"
 #include "devicemng.h"
 
-#define TYPE_NONE	0x0
+typedef enum{
+	PART_TYPE_NONE = 0x00,
+	PART_TYPE_ISO9660 = 0xCD,
+	PART_TYPE_LAST = 0xFF
+}part_type_t;
 
 typedef struct{
 	struct{
@@ -20,7 +24,7 @@ typedef struct{
 		uint8_t Sector : 6;
 		uint8_t CylinderHi : 2;
 		uint8_t CylinderLo;
-		uint8_t Type;
+		part_type_t Type;
 		uint8_t lastHead;
 		uint8_t lastSector : 5;
 		uint8_t lastCylinderHi : 2;
@@ -38,9 +42,10 @@ typedef struct{
 
 typedef struct{
 	struct cdi_device *dev;
-	struct cdi_fs_driver *fs;
+	struct cdi_fs_filesystem *fs;
 	size_t lbaStart;
 	size_t size;
+	part_type_t type;
 }partition_t;
 
 void partition_getPartitions(device_t *dev);

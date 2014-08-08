@@ -8,6 +8,11 @@
 #include "partition.h"
 #include "storage.h"
 #include "scsi.h"
+#include "fs.h"
+#include "lists.h"
+
+struct cdi_fs_filesystem *getFilesystem(partition_t *part);
+struct cdi_fs_driver *getFSDriver(const char *name);
 
 void partition_getPartitions(device_t *dev)
 {
@@ -28,13 +33,15 @@ void partition_getPartitions(device_t *dev)
 		struct cdi_scsi_driver *scdrv = dev->device->driver;
 		struct cdi_scsi_packet *packet = malloc(sizeof(*packet));
 
-		buffer = packet->buffer = malloc(4096);
-		packet->bufsize = 4096;
-		packet->cmdsize = 4;
-		packet->command[0]= 'R';
-		packet->command[1]= 'E';
-		packet->command[2]= 'A';
-		packet->command[3]= 'D';
+		buffer = packet->buffer = malloc(512);
+		packet->bufsize = 512;
+		packet->cmdsize = 12;
+		packet->command[0] = 0xA8;	//Wir wollen lesen
+		packet->command[2] = 0;
+		packet->command[3] = 0;
+		packet->command[4] = 0;
+		packet->command[5] = 0;
+		packet->command[9] = 1;		//1 Sektor
 		packet->direction = CDI_SCSI_READ;
 		scdrv->request(scdev, packet);
 	}
@@ -51,16 +58,50 @@ void partition_getPartitions(device_t *dev)
 			partition_t *part = malloc(sizeof(partition_t));
 			part->lbaStart = ptable->entry[i].firstLBA;
 			part->size = ptable->entry[i].Length;
+			part->type = ptable->entry[i].Type;
 			part->dev = dev->device;
-			part->fs = getPartitionFS(part);
+			part->fs = getFilesystem(part);
 			list_push(dev->partitions, part);
 		}
 	}
 }
 
-struct cdi_fs_driver *getPartitionFS(partition_t *part)
+struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 {
-	struct cdi_fs_driver *fs = malloc(sizeof(*fs));
+	struct cdi_fs_filesystem *fs = malloc(sizeof(*fs));
+	struct cdi_fs_driver *driver;
+
+	switch(part->type)
+	{
+		case PART_TYPE_ISO9660:
+			if(!(driver = getFSDriver("iso9660")))
+				goto exit_error;
+			driver->fs_init(fs);
+			fs->driver = driver;
+		break;
+		default:
+			goto exit_error;
+	}
 
 	return fs;
+
+	exit_error:
+	free(fs);
+	return NULL;
+}
+
+struct cdi_fs_driver *getFSDriver(const char *name)
+{
+	struct cdi_driver *driver;
+
+	size_t i = 0;
+	extern drivers;
+	while((driver = cdi_list_get(drivers, i)))
+	{
+		if(driver->type == CDI_FILESYSTEM && strcmp(name, driver->name) == 0)
+			return (struct cdi_fs_driver*)driver;
+		i++;
+	}
+
+	return NULL;
 }
