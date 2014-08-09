@@ -53,7 +53,7 @@ void partition_getPartitions(device_t *dev)
 	dev->partitions = list_create();
 	for(i = 0; i < 4; i++)
 	{
-		if(ptable->entry[i].firstLBA)
+		if(ptable->entry[i].Type)
 		{
 			partition_t *part = malloc(sizeof(partition_t));
 			part->lbaStart = ptable->entry[i].firstLBA;
