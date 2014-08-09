@@ -10,12 +10,13 @@
 
 #include "cdi.h"
 #include "devicemng.h"
+#include "stdint.h"
 
 typedef enum{
 	PART_TYPE_NONE = 0x00,
 	PART_TYPE_ISO9660 = 0xCD,
 	PART_TYPE_LAST = 0xFF
-}part_type_t;
+}__attribute__((packed))part_type_t;
 
 typedef struct{
 	struct{
@@ -41,6 +42,7 @@ typedef struct{
 }chs_t;
 
 typedef struct{
+	uint64_t id;
 	struct cdi_device *dev;
 	struct cdi_fs_filesystem *fs;
 	size_t lbaStart;
@@ -48,6 +50,6 @@ typedef struct{
 	part_type_t type;
 }partition_t;
 
-void partition_getPartitions(device_t *dev);
+int partition_getPartitions(device_t *dev);
 
 #endif /* PARTITION_H_ */
