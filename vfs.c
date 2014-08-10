@@ -10,9 +10,8 @@
 #include "stddef.h"
 #include "string.h"
 #include "stdlib.h"
-#include "cdi/storage.h"
-#include "cdi/scsi.h"
 #include "list.h"
+#include "partition.h"
 
 #define VFS_MODE_READ	0x1
 #define VFS_MODE_WRITE	0x2
@@ -43,23 +42,6 @@ typedef enum{
 	TYPE_DIR, TYPE_FILE, TYPE_MOUNT, TYPE_LINK, TYPE_DEV
 }vfs_node_type_t;
 
-typedef struct{
-	struct{
-		uint8_t Bootflag;
-		uint8_t Head;
-		uint8_t Sector : 6;
-		uint8_t CylinderHi : 2;
-		uint8_t CylinderLo;
-		uint8_t Type;
-		uint8_t lastHead;
-		uint8_t lastSector : 5;
-		uint8_t lastCylinderHi : 2;
-		uint8_t lastCylinderLo;
-		uint32_t firstLBA;
-		uint32_t Length;
-	}__attribute__((packed))entry[4];
-}__attribute__((packed))PartitionTable_t;
-
 typedef struct vfs_node{
 		char *Name;
 		vfs_node_type_t Type;
@@ -67,10 +49,9 @@ typedef struct vfs_node{
 		struct vfs_node *Child;	//Ungültig wenn kein TYPE_DIR oder TYPE_MOUNT. Bei TYPE_LINK -> Link zum Verknüpften Element
 		struct vfs_node *Next;
 		union{
-			vfs_fs_t *fs;
-			list_t Filesystems;
+			partition_t *partition;
+			device_t *dev;
 		};
-		vfs_dev_t *dev;
 }vfs_node_t;
 
 size_t getDirs(char ***Dirs, const char *Path);
@@ -88,7 +69,6 @@ void vfs_Init(void)
 	root.Child = NULL;
 	root.Parent = &root;
 	root.Type = TYPE_DIR;
-	root.fs = NULL;
 
 	//Virtuelle Ordner anlegen
 	vfs_node_t *Node;
@@ -182,50 +162,37 @@ void vfs_Write(const char *Path, const void *Buffer)
  * Mountet ein Dateisystem (fs) an den entsprechenden Mountpoint (Mount)
  * Parameter:	Mount = Mountpoint (Pfad)
  * 				Dev = Pfad zum Gerät
+ * Rückgabe:	!0 bei Fehler
  */
 int vfs_Mount(const char *Mountpath, const char *Dev)
 {
-	vfs_node_t *MountPoint, *DevNode;
-	char *Mount, *tmp;
-	//Überprüfen, ob Gerät überhaupt verfügbar
-	DevNode = getNode(Dev);
-	if(DevNode == NULL) return 1;
+	vfs_node_t *mount;
+	vfs_node_t *devNode;
+	if((devNode = getNode(Dev)) == NULL)
+		return 1;
 
-	//Mountpoint suchen
-	MountPoint = getNode(Mountpath);
-	if(MountPoint == NULL) return 2;
+	if((mount = getNode(Mountpath)) == NULL)
+		return 1;
 
-	//Neuer Mountpoint anlegen
-	MountPoint = malloc(sizeof(vfs_node_t));
-	if(!MountPoint) return 3;
+	device_t *device = devNode->dev;
 
-	Mount = malloc(strlen(Mountpath) + 1);
-	strcpy(Mount, Mountpath);
-	tmp = strrchr(Mount, VFS_SEPARATOR);
-	tmp[0] = '\0';
-
-	vfs_node_t *Parent = getNode(Mount);
-
-	MountPoint->Name = tmp + 1;
-	MountPoint->Next = Parent->Child;
-	Parent->Child = MountPoint;
-	MountPoint->Parent = Parent;
-	MountPoint->Child = NULL;
-	MountPoint->Type = TYPE_MOUNT;
-	//Passendes Dateisystem suchen
-	size_t i;
-	extern cdi_list_t drivers;
-	for(i = 0; i < cdi_list_size(drivers); i++)
+	//Jede Partition durchgehen
+	partition_t *part;
+	size_t i = 0;
+	while((part = list_get(device->partitions, i++)))
 	{
-		struct cdi_driver *driver = cdi_list_get(drivers, i);
-		if(driver->bus == CDI_FILESYSTEM)
-		{
-			struct cdi_fs_driver *fs_driver = driver;
-			struct cdi_fs_filesystem *filesystem;
-			fs_driver->fs_init(filesystem);
-		}
+		vfs_node_t *new = malloc(sizeof(vfs_node_t));
+		asprintf(&new->Name, "%s%u", device->device->name, part->id);
+		new->Type = TYPE_MOUNT;
+		new->Parent = mount;
+		new->Next = mount->Child;
+		mount->Child = new;
+		new->partition = part;
+		//Dateisystem initialisieren
+		((struct cdi_fs_driver*)part->dev->driver)->fs_init(part->fs);
 	}
-	MountPoint->fs = DevNode->dev;
+	if(!i)
+		return 1;
 
 	return 0;
 }
@@ -322,18 +289,16 @@ vfs_node_t *getNode(const char *Path)
 }
 
 /*
- * Registriert einen Gerätetreiber. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
+ * Registriert ein Gerät. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
  * Parameter:	dev = Gerätestruktur
  */
-void vfs_RegisterDevice(struct cdi_device *dev)
+void vfs_RegisterDevice(device_t *dev)
 {
+	static bool first = false;
 	const char *Path = "/dev";	//Pfad zu den Gerätendateien
 	vfs_node_t *Node, *tmp;
 	//ist der Ordner schon vorhanden?
 	if(!(tmp = getNode(Path))) return;	//Fehler
-
-	//ansonsten nach Partitonen suchen
-	//PartitionTable_t *PartitionTable = 0x1BE;	//Offset der Partitionstabelle
 
 	//Gerätedatei anlegen
 	//wird vorne angelegt
@@ -342,38 +307,16 @@ void vfs_RegisterDevice(struct cdi_device *dev)
 	Node->dev = dev;
 	Node->Next = tmp->Child;
 	tmp->Child = Node;
-	Node->Name = dev->name;
+	Node->Name = dev->device->name;
 	Node->Parent = tmp;
 
-	//Sind schon andere Dateien vorhanden?
-	/*if(tmp->Child)
-	{
-		vfs_node_t *child = tmp->Child;
-		while(child->Next)
-			child = child->Next;
-		child->Next = Node;
-	}
-	else
-		tmp->Child = Node;*/
-
-	//Gerät nach Partitionen durchsuchen
-	if(dev->driver->type == CDI_STORAGE)
-	{
-		struct cdi_storage_driver *stdriver = dev->driver;
-		struct cdi_storage_device *stdev = dev;
-		void *Buffer = malloc(stdev->block_size);
-		stdriver->read_blocks(stdev, 0, 1, Buffer);
-		free(Buffer);
-	}
-
 	//Wenn es das erste Gerät ist, dann mounten
-	if(Node->Next == NULL)
+	if(!first)
 	{
+		first = true;
 		char *DevPath;
-		asprintf(DevPath, "%s/%s", Path, Node->Name);
+		asprintf(&DevPath, "%s/%s", Path, Node->Name);
 		vfs_Mount("/mount", DevPath);
 		free(DevPath);
 	}
-
-	printf("Treibername: %s --> Geraet: %s\n", dev->driver->name, dev->name);
 }

@@ -11,13 +11,12 @@
 #include "cdi/fs.h"
 #include "cdi.h"
 #include "stdbool.h"
-#include "cdi.h"
+#include "devicemng.h"
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
 
 typedef struct cdi_fs_filesystem vfs_fs_t;
-typedef struct cdi_device vfs_dev_t;
 
 void vfs_Init(void);
 
@@ -33,11 +32,11 @@ void vfs_Write(const char *Path, const void *Buffer);
  * Gerät anmelden
  * Parameter:	dev = CDI-Gerät
  */
-void vfs_RegisterDevice(struct cdi_device *dev);
+void vfs_RegisterDevice(device_t *dev);
 
 /*
  * Gerät abmelden
  */
-void vfs_UnregisterDevice(struct cdi_device *dev);
+void vfs_UnregisterDevice(device_t *dev);
 
 #endif /* VFS_H_ */
