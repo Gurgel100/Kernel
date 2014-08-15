@@ -42,5 +42,6 @@ void cdi_fs_driver_destroy(struct cdi_fs_driver* driver)
 size_t cdi_fs_data_read(struct cdi_fs_filesystem* fs, uint64_t start,
     size_t size, void* buffer)
 {
-	return 0;
+	vfs_Read(fs->osdep.devPath, start, size, buffer);
+	return size;
 }

@@ -63,6 +63,7 @@ struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 			if(!(driver = getFSDriver("iso9660")))
 				goto exit_error;
 			fs->driver = driver;
+			asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
 		break;
 		default:
 			goto exit_error;
