@@ -62,5 +62,5 @@ void cdi_storage_device_init(struct cdi_storage_device* device)
 {
 	device->dev.bus_data = malloc(sizeof(struct cdi_bus_data));
 	device->dev.bus_data->bus_type = CDI_STORAGE;
-	vfs_RegisterDevice((struct cdi_device*)device);
+	dmng_registerDevice((struct cdi_device*)device);
 }
