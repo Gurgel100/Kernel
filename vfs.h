@@ -25,8 +25,8 @@ void vfs_Init(void);
  * Parameter:	Path = Pfad zur Datei
  * 				Buffer = Puffer in dem die Daten reingeschrieben werden bzw. gelesen werden
  */
-void vfs_Read(const char *Path, const void *Buffer);
-void vfs_Write(const char *Path, const void *Buffer);
+size_t vfs_Read(const char *Path, uint64_t start, size_t length, const void *Buffer);
+size_t vfs_Write(const char *Path, uint64_t start, size_t length, const void *Buffer);
 
 /*
  * Gerät anmelden
