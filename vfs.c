@@ -103,43 +103,37 @@ void vfs_Init(void)
 }
 
 /*
- * In eine Datei schreiben
+ * Eine Datei lesen
  * Parameter:	Path = Pfad zur Datei als String
+ * 				start = Anfangsbyte, an dem angefangen werden soll zu lesen
+ * 				length = Anzahl der Bytes, die gelesen werden sollen
+ * 				Buffer = Buffer in den die Bytes geschrieben werden
  */
-void vfs_Read(const char *Path, const void *Buffer)
+size_t vfs_Read(const char *Path, uint64_t start, size_t length, const void *Buffer)
 {
-	bool root = false;
-	size_t i, length;
-	char **Dirs = NULL;
+	if(Buffer == NULL || Path == NULL || strlen(Path) == 0)
+		return 0;
 
-	if(Buffer == NULL || Path == NULL)
-		return;
+	vfs_node_t *node = getLastNode(Path);
+	if(node == NULL) return 0;
 
-	if(Path[0] == VFS_SEPARATOR)
-		root = true;
-
-	length = getDirs(&Dirs, Path);
-
-	//Ausgeben
-	if(root)
-		printf("VFS: 0 = /\n");
-	for(i = 0; i < length; i++)
+	switch(node->Type)
 	{
-		if(Dirs[i] == NULL)
-			break;
-		printf("VFS: %u = %s\n", i + 1, Dirs[i]);
+		case TYPE_DEV:
+			return dmng_Read(node->dev, start, length, Buffer);
+		break;
 	}
-	free(Dirs);
+	return 0;
 }
 
-void vfs_Write(const char *Path, const void *Buffer)
+size_t vfs_Write(const char *Path, const void *Buffer)
 {
 	bool root = false;
 	size_t i, length;
 	char **Dirs = NULL;
 
 	if(Buffer == NULL || Path == NULL)
-		return;
+		return 0;
 
 	if(Path[0] == VFS_SEPARATOR)
 		root = true;
@@ -189,7 +183,8 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 		mount->Child = new;
 		new->partition = part;
 		//Dateisystem initialisieren
-		((struct cdi_fs_driver*)part->dev->driver)->fs_init(part->fs);
+		if(!part->fs->driver->fs_init(part->fs))
+			return 1;
 	}
 	if(!i)
 		return 1;
@@ -262,6 +257,34 @@ size_t getDirs(char ***Dirs, const char *Path)
 		(*Dirs)[i] = tmp;
 	}
 	return i;
+}
+
+/*
+ * Finde die letzte Node, die sich im Pfad befindet. Der Pfad muss absolut abgeben werden.
+ * Parameter:	Path = Absoluter Pfad
+ */
+vfs_node_t *getLastNode(const char *Path)
+{
+	vfs_node_t *Node = &root;
+	vfs_node_t *oldNode;
+	char **Dirs = NULL;
+	size_t NumDirs, i;
+
+	//Welche Ordner?
+	NumDirs = getDirs(&Dirs, Path);
+	for(i = 0; i < NumDirs; i++)
+	{
+		oldNode = Node;
+		Node = Node->Child;
+		while(Node && strcmp(Node->Name, Dirs[i]))
+			Node = Node->Next;
+		if(!Node) break;
+	}
+	if(!Node)
+		Node = oldNode;
+
+	free(Dirs);
+	return Node;
 }
 
 /*de
