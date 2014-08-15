@@ -30,6 +30,8 @@ void dmng_registerDevice(struct cdi_device *dev)
 	partition_getPartitions(device);
 
 	list_push(devices, device);
+
+	vfs_RegisterDevice(device);
 }
 
 /*
@@ -65,16 +67,16 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
 		struct cdi_scsi_driver *driver = dev->device->driver;
 		struct cdi_scsi_device *device = dev->device;
 
-		uint32_t lba = start / 512;
-		uint64_t tmp_size = MIN(size, 512);
+		uint32_t lba = start / 2048;
+		uint64_t tmp_size = MIN(size, 2048);
 		uint64_t offset = 0;
-		void *tmp_buffer = malloc(512);
+		void *tmp_buffer = malloc(2048);
 		do
 		{
 			uint32_t length = 1;
 			struct cdi_scsi_packet packet = {
 				.buffer = tmp_buffer,
-				.bufsize = 512,
+				.bufsize = 2048,
 				.cmdsize = 12,
 				.command = {0xA8, 0, GET_BYTE(lba, 0x18), GET_BYTE(lba, 0x10), GET_BYTE(lba, 0x08), GET_BYTE(lba, 0x00),
 						GET_BYTE(length, 0x18), GET_BYTE(length, 0x10), GET_BYTE(length, 0x08), GET_BYTE(length, 0x00), 0, 0},
@@ -84,9 +86,9 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
 			if(driver->request(device, &packet))
 				return 0;
 
-			memcpy(buffer + offset, tmp_buffer, tmp_size);
+			memcpy(buffer + offset, tmp_buffer + start % 2048 + offset, tmp_size);
 			offset += tmp_size;
-			tmp_size = MIN(size - offset, 512);
+			tmp_size = MIN(size - offset, 2048);
 		}
 		while(offset < size);
 		free(tmp_buffer);
