@@ -7,6 +7,7 @@
 
 #include "cache.h"
 #include "stdbool.h"
+#include "lists.h"
 
 typedef struct{
 		struct cdi_cache_block block;
@@ -73,21 +74,25 @@ struct cdi_cache* cdi_cache_create(size_t block_size, size_t blkpriv_len,
 
 /**
  * Cache zerstoeren
- *///TODO
+ */
 void cdi_cache_destroy(struct cdi_cache* cache)
 {
 	cache_t *c;
 	c = (cache_t*)cache;
 
+	cdi_cache_sync(cache);
+
 	//Erst reservierte Blocks freigeben
-	if(c->block_used)
+	while(c->block_used)
 	{
-		size_t i;
-		for(i = 0; i < c->block_used; i++)
-		{
-		}
+		block_t *b = (block_t*)cdi_list_pop(c->blocks);
+		free(b->block.data);
+		free(b->block.private);
+		free(b);
+		c->block_used--;
 	}
 
+	cdi_list_destroy(c->blocks);
 	free(c);
 }
 
