@@ -13,8 +13,7 @@ typedef struct{
 
 		bool dirty;
 
-		void *Prev;
-		void *Next;
+		size_t ref_count;
 }block_t;
 
 typedef struct{
@@ -25,7 +24,7 @@ typedef struct{
 		size_t block_used;
 
 		//Liste aller Blöcke
-		block_t *blocks;
+		cdi_list_t *blocks;
 
 		/** Callback zum Lesen eines Blocks */
 		cdi_cache_read_block_t* read_block;
