@@ -219,3 +219,15 @@ int cdi_cache_sync(struct cdi_cache* cache)
 	}
 	return 1;
 }
+
+/**
+ * Cache-Block als veraendert markieren
+ *
+ * @param cache Cache-Handle
+ * @param block Block-Handle
+ */
+void cdi_cache_block_dirty(struct cdi_cache* cache, struct cdi_cache_block* block)
+{
+	block_t *b = (cache_t*)block;
+	b->dirty = true;
+}
