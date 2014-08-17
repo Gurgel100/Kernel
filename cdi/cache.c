@@ -114,10 +114,43 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
     uint64_t blocknum, int noread)
 {
 	cache_t *c;
+	block_t *b;
 	void *buffer;
 	c = (cache_t*)cache;
 
-	return NULL;
+	if(c->block_used < c->block_count)
+	{
+		//Neuen Block in Cache legen
+		b = calloc(1, sizeof(*b));
+		b->block.data = malloc(c->cache.block_size);
+		b->block.private = malloc(c->private_len);
+		b->block.number = blocknum;
+		c->block_used++;
+	}
+	else
+	{
+		//Nach einem Block suchen, der nicht mehr verwendet wird
+		size_t i = 0;
+		while((b = cdi_list_get(c->blocks, i)))
+		{
+			if(!b->ref_count)
+				break;
+		}
+		if(b == NULL)
+			return NULL;
+
+		if(b->dirty)
+			cdi_cache_sync(cache);
+		b->block.number = blocknum;
+	}
+
+	//Block einlesen, wenn nötig
+	if(!noread)
+		c->read_block(cache, blocknum, 1, b->block.data, c->prv_data);
+
+	b->ref_count++;
+
+	return b;
 }
 
 /**
