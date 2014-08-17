@@ -68,6 +68,7 @@ struct cdi_cache* cdi_cache_create(size_t block_size, size_t blkpriv_len,
 
 		cache->block_count = 256;
 		cache->block_used = 0;
+		cache->blocks = cdi_list_create();
 
 		return (struct cdi_cache*)cache;
 }
