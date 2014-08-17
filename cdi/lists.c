@@ -148,6 +148,50 @@ void* cdi_list_get(cdi_list_t list, size_t index)
 
 /**
  * \german
+ * Loescht ein Listenelement
+ *
+ * @param list Liste, aus der entfernt werden soll
+ * @param index Index des zu entfernenden Elements
+ *
+ * @return Das entfernte Element oder NULL, wenn kein Element mit dem
+ * angegebenen Index existiert.
+ * \endgerman
+ *
+ * \english
+ * Removes an element from a list.
+ *
+ * @param list The list to remove an element from
+ * @param index The index in the list that will be removed
+ *
+ * @return The element that was removed, or NULL if the element at the
+ * specified index does not exist.
+ * \endenglish
+ */
+void* cdi_list_remove(cdi_list_t list, size_t index)
+{
+	struct cdi_list_node *prevNode, *Node;
+	void *value;
+
+	if(index == 0)
+		return cdi_list_pop(list);
+
+	Node = cdi_list_get(list, index);
+	if(Node == NULL)
+		return NULL;
+
+	prevNode = cdi_list_get(list, index - 1);
+
+	prevNode->Next = Node->Next;
+	value = Node->Value;
+	free(Node);
+
+	list->Size--;
+
+	return value;
+}
+
+/**
+ * \german
  * Gibt die Laenge der Liste zurueck
  *
  * @param list Liste, deren Laenge zurueckgegeben werden soll
