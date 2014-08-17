@@ -175,3 +175,26 @@ void cdi_cache_block_release(struct cdi_cache* cache,
 	block_t *b = (block_t*)block;
 	b->ref_count--;
 }
+
+/**
+ * Veraenderte Cache-Blocks auf die Platte schreiben
+ *
+ * @return 1 bei Erfolg, 0 im Fehlerfall
+ */
+int cdi_cache_sync(struct cdi_cache* cache)
+{
+	cache_t *c = (cache_t*)cache;
+	block_t *b;
+	size_t i = 0;
+
+	while((b = (block_t*)cdi_list_get(c->blocks, i++)))
+	{
+		if(b->dirty)
+		{
+			if(!c->write_block(cache, b->block.number, 1, b->block.data, c->prv_data))
+				return 0;
+			b->dirty = false;
+		}
+	}
+	return 1;
+}
