@@ -119,6 +119,14 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 	void *buffer;
 	c = (cache_t*)cache;
 
+	//Erst suchen, ob er nicht schon vorhanden ist
+	size_t i = 0;
+	while((b = cdi_list_get(c->blocks, i++)))
+	{
+		if(b->block.number == blocknum)
+			goto end;
+	}
+
 	if(c->block_used < c->block_count)
 	{
 		//Neuen Block in Cache legen
@@ -149,6 +157,7 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 	if(!noread)
 		c->read_block(cache, blocknum, 1, b->block.data, c->prv_data);
 
+	end:
 	b->ref_count++;
 
 	return b;
