@@ -134,6 +134,7 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 		b->block.data = malloc(c->cache.block_size);
 		b->block.private = malloc(c->private_len);
 		b->block.number = blocknum;
+		cdi_list_push(c->blocks, b);
 		c->block_used++;
 	}
 	else
@@ -155,7 +156,27 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 
 	//Block einlesen, wenn nötig
 	if(!noread)
-		c->read_block(cache, blocknum, 1, b->block.data, c->prv_data);
+	{
+		if(!c->read_block(cache, blocknum, 1, b->block.data, c->prv_data))
+		{
+			//Fehler: Cacheblock wieder freigeben
+			cache_t *tmp;
+			size_t i = 0;
+			while((tmp = cdi_list_get(c->blocks, i)))
+			{
+				if(tmp == b)
+				{
+					free(b->block.data);
+					free(b->block.private);
+					free(b);
+					cdi_list_remove(c->blocks, i);
+					c->block_used--;
+					return NULL;
+				}
+				i++;
+			}
+		}
+	}
 
 	end:
 	b->ref_count++;
