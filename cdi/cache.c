@@ -162,4 +162,6 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 void cdi_cache_block_release(struct cdi_cache* cache,
     struct cdi_cache_block* block)
 {
+	block_t *b = (block_t*)block;
+	b->ref_count--;
 }
