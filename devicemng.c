@@ -27,11 +27,11 @@ void dmng_registerDevice(struct cdi_device *dev)
 	device->partitions = list_create();
 	device->device = dev;
 
+	vfs_RegisterDevice(device);
+
 	partition_getPartitions(device);
 
 	list_push(devices, device);
-
-	vfs_RegisterDevice(device);
 }
 
 /*

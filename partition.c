@@ -10,6 +10,7 @@
 #include "scsi.h"
 #include "fs.h"
 #include "lists.h"
+#include "vfs.h"
 
 struct cdi_fs_filesystem *getFilesystem(partition_t *part);
 struct cdi_fs_driver *getFSDriver(const char *name);
@@ -63,7 +64,15 @@ struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 			if(!(driver = getFSDriver("iso9660")))
 				goto exit_error;
 			fs->driver = driver;
-			asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
+			vfs_mode_t mode = {
+					.read = true,
+					.write = true
+			};
+			char *path;
+			asprintf(&path, "dev/%s", part->dev->name);
+			fs->osdep.fp = vfs_Open(path, mode);
+			free(path);
+			//asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
 		break;
 		default:
 			goto exit_error;
