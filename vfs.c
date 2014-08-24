@@ -11,7 +11,6 @@
 #include "string.h"
 #include "stdlib.h"
 #include "list.h"
-#include "partition.h"
 
 #define VFS_MODE_READ	0x1
 #define VFS_MODE_WRITE	0x2
@@ -38,28 +37,15 @@
 #define PT_LEGACY		0xEE
 #define PT_EFI			0xEF
 
-typedef enum{
-	TYPE_DIR, TYPE_FILE, TYPE_MOUNT, TYPE_LINK, TYPE_DEV
-}vfs_node_type_t;
-
-typedef struct vfs_node{
-		char *Name;
-		vfs_node_type_t Type;
-		struct vfs_node *Parent;
-		struct vfs_node *Child;	//Ungültig wenn kein TYPE_DIR oder TYPE_MOUNT. Bei TYPE_LINK -> Link zum Verknüpften Element
-		struct vfs_node *Next;
-		union{
-			partition_t *partition;
-			device_t *dev;
-		};
-}vfs_node_t;
-
 size_t getDirs(char ***Dirs, const char *Path);
+vfs_node_t *getLastNode(const char *Path, char **remPath);
 vfs_node_t *getNode(const char *Path);
 char *splitPath(const char *path, char **file, char **dev);
+struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path);
 
 static vfs_node_t root;
 static vfs_node_t *lastNode;
+static uint8_t nextPartID = 0;
 
 void vfs_Init(void)
 {
@@ -103,53 +89,120 @@ void vfs_Init(void)
 }
 
 /*
+ * Eine Datei öffnen
+ * Parameter:	path = Pfad zur Datei
+ * 				mode = Modus, in der die Datei geöffnet werden soll
+ */
+vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
+{
+	if(path == NULL || strlen(path) == 0 || (!mode.read && !mode.write))
+		return NULL;
+
+	char *remPath;
+	vfs_stream_t *stream = calloc(1, sizeof(*stream));
+	stream->mode = mode;
+
+	vfs_node_t *node = getLastNode(path, &remPath);
+	stream->node = node;
+	switch(node->Type)
+	{
+		case TYPE_MOUNT:
+			stream->stream.fs = node->partition->fs;
+			stream->stream.res = getRes(&stream->stream, remPath);
+		break;
+		case TYPE_DIR:	//Ordner kann man nicht öffnen
+			printf("Versucht Ordner zu öffnen!\n");
+			return NULL;
+		break;
+	}
+
+	if(mode.empty)
+	{
+		if(stream->stream.fs->read_only && !stream->stream.res->flags.write)
+		{
+			stream->stream.res->res->unload(&stream->stream);
+			free(stream);
+			return NULL;
+		}
+		stream->stream.res->file->truncate(&stream->stream, 0);
+	}
+	if(remPath)
+		free(remPath);
+
+	return stream;
+}
+
+/*
+ * Eine Datei schliessen
+ * Parameter:	stream = Stream der geschlossen werden soll
+ */
+void vfs_Close(vfs_stream_t *stream)
+{
+	if(stream != NULL)
+		return;
+
+	switch(stream->node->Type)
+	{
+		case TYPE_MOUNT:
+			stream->stream.res->res->unload(&stream->stream);
+		break;
+	}
+	free(stream);
+}
+
+/*
  * Eine Datei lesen
  * Parameter:	Path = Pfad zur Datei als String
  * 				start = Anfangsbyte, an dem angefangen werden soll zu lesen
  * 				length = Anzahl der Bytes, die gelesen werden sollen
  * 				Buffer = Buffer in den die Bytes geschrieben werden
  */
-size_t vfs_Read(const char *Path, uint64_t start, size_t length, const void *Buffer)
+size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
 {
-	if(Buffer == NULL || Path == NULL || strlen(Path) == 0)
+	if(stream == NULL || buffer == NULL)
 		return 0;
 
-	vfs_node_t *node = getLastNode(Path);
-	if(node == NULL) return 0;
+	size_t sizeRead = 0;
 
-	switch(node->Type)
+	//Erst überprüfen ob der Stream zum lesen geöffnet wurde
+	if(!stream->mode.read)
+		return 0;
+
+	switch(stream->node->Type)
 	{
 		case TYPE_DEV:
-			return dmng_Read(node->dev, start, length, Buffer);
+			sizeRead = dmng_Read(stream->node->dev, start, length, buffer);
+		break;
+		case TYPE_MOUNT:
+			sizeRead = stream->stream.res->file->read(&stream->stream, start, length, buffer);
 		break;
 	}
-	return 0;
+	return sizeRead;
 }
 
-size_t vfs_Write(const char *Path, const void *Buffer)
+size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
 {
-	bool root = false;
-	size_t i, length;
-	char **Dirs = NULL;
-
-	if(Buffer == NULL || Path == NULL)
+	if(stream == NULL || buffer == NULL)
 		return 0;
 
-	if(Path[0] == VFS_SEPARATOR)
-		root = true;
+	size_t sizeWritten = 0;
 
-	length = getDirs(&Dirs, Path);
+	//Erst überprüfen ob der Stream zum schreiben geöffnet wurde
+	if(!stream->mode.write)
+		return 0;
 
-	//Ausgeben
-	if(root)
-		printf("VFS: 0 = /\n");
-	for(i = 0; i < length; i++)
+	switch(stream->node->Type)
 	{
-		if(Dirs[i] == NULL)
-			break;
-		printf("VFS: %u = %s\n", i + 1, Dirs[i]);
+		case TYPE_DEV:
+			sizeWritten = dmng_Read(stream->node->dev, start, length, buffer);
+		break;
+		case TYPE_MOUNT:
+			//Überprüfen, ob auf das Dateisystem geschrieben werden darf
+			if(!stream->stream.fs->read_only && stream->stream.res->flags.write)
+				sizeWritten = stream->stream.res->file->read(&stream->stream, start, length, buffer);
+		break;
 	}
-	free(Dirs);
+	return sizeWritten;
 }
 
 /*
@@ -175,8 +228,8 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	size_t i = 0;
 	while((part = list_get(device->partitions, i++)))
 	{
-		vfs_node_t *new = malloc(sizeof(vfs_node_t));
-		asprintf(&new->Name, "%s%u", device->device->name, part->id);
+		vfs_node_t *new = calloc(1, sizeof(vfs_node_t));
+		asprintf(&new->Name, "%u", nextPartID++);
 		new->Type = TYPE_MOUNT;
 		new->Parent = mount;
 		new->Next = mount->Child;
@@ -195,17 +248,52 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 /*
  * Unmountet ein Dateisystem am entsprechenden Mountpoint (Mount)
  * Parameter:	Mount = Mountpoint (Pfad)
- *///TODO
-bool vfs_Unmount(const char *Mount)
+ * Rückgabe:	!0 bei Fehler
+ */
+int vfs_Unmount(const char *Mount)
 {
-	//Liste aller Mountpoints durchsuchen
-	/*vfs_mount_t *MountPoint;
-	for(MountPoint = &root; MountPoint; MountPoint = MountPoint->Next)
-	{
-		if(MountPoint == Mount)	//Mount gefunden
-			return true;
-	}*/
-	return false;
+	vfs_node_t *mount = getNode(Mount);
+	if(!mount || mount->Type != TYPE_MOUNT)
+		return 1;
+
+	vfs_node_t *parentNode;
+	parentNode = mount->Parent;
+	if(parentNode->Child == mount)
+		parentNode->Child = mount->Next;
+	else
+		parentNode->Child->Next = mount->Next;
+
+	//FS deinitialisieren
+	mount->partition->fs->driver->fs_destroy(mount->partition->fs);
+
+	free(mount->Name);
+	free(mount);
+
+	return 0;
+}
+
+/*
+ * Mountet das erste Gerät
+ * Rückgabe:	!0 bei Fehler
+ */
+int vfs_MountRoot(void)
+{
+	char *DevPath;
+	int status;
+	vfs_node_t *node = getNode("dev");
+	asprintf(&DevPath, "dev/%s", node->Child->Name);
+	status = vfs_Mount("/mount", DevPath);
+	free(DevPath);
+	return status;
+}
+
+/*
+ * Unmountet root
+ * Rückgabe:	!0 bei Fehler
+ */
+int vfs_UnmountRoot(void)
+{
+	return vfs_Unmount("/mount/0");
 }
 
 /*
@@ -243,27 +331,39 @@ size_t getDirs(char ***Dirs, const char *Path)
 {
 	size_t i;
 	char *tmp;
+	//Erst Pfad sichern
+	char *tmpPath = strdup(Path);
 
 	if(!*Dirs)
 		*Dirs = malloc(sizeof(char*));
 
-	(*Dirs)[0] = strtok(Path, VFS_ROOT);
+	(*Dirs)[0] = strdup(strtok(tmpPath, VFS_ROOT));
 	for(i = 1; ; i++)
 	{
 		if((tmp = strtok(NULL, VFS_ROOT)) ==
 		 NULL)
 			break;
 		*Dirs = realloc(*Dirs, sizeof(char*) * (i + 1));
-		(*Dirs)[i] = tmp;
+		(*Dirs)[i] = strdup(tmp);
 	}
+	free(tmpPath);
 	return i;
+}
+
+void freeDirs(char ***Dirs, size_t size)
+{
+	size_t i;
+	for(i = 0; i < size; i++)
+		free((*Dirs)[i]);
+	free(*Dirs);
 }
 
 /*
  * Finde die letzte Node, die sich im Pfad befindet. Der Pfad muss absolut abgeben werden.
  * Parameter:	Path = Absoluter Pfad
+ * 				remPath = restlicher Pfad
  */
-vfs_node_t *getLastNode(const char *Path)
+vfs_node_t *getLastNode(const char *Path, char **remPath)
 {
 	vfs_node_t *Node = &root;
 	vfs_node_t *oldNode;
@@ -281,9 +381,21 @@ vfs_node_t *getLastNode(const char *Path)
 		if(!Node) break;
 	}
 	if(!Node)
+	{
 		Node = oldNode;
+		i--;
+	}
+	if(remPath != NULL)
+	{
+		*remPath = NULL;
+		for(;i < NumDirs; i++)
+		{
+			*remPath = realloc(*remPath, strlen(Dirs[i]));
+			strcpy(*remPath, Dirs[i]);
+		}
+	}
 
-	free(Dirs);
+	freeDirs(&Dirs, NumDirs);
 	return Node;
 }
 
@@ -307,7 +419,7 @@ vfs_node_t *getNode(const char *Path)
 		if(!Node) return NULL;
 	}
 
-	free(Dirs);
+	freeDirs(&Dirs, NumDirs);
 	return Node;
 }
 
@@ -317,7 +429,6 @@ vfs_node_t *getNode(const char *Path)
  */
 void vfs_RegisterDevice(device_t *dev)
 {
-	static bool first = false;
 	const char *Path = "/dev";	//Pfad zu den Gerätendateien
 	vfs_node_t *Node, *tmp;
 	//ist der Ordner schon vorhanden?
@@ -325,21 +436,43 @@ void vfs_RegisterDevice(device_t *dev)
 
 	//Gerätedatei anlegen
 	//wird vorne angelegt
-	Node = malloc(sizeof(*Node));
+	Node = calloc(1, sizeof(*Node));
 	Node->Type = TYPE_DEV;
 	Node->dev = dev;
 	Node->Next = tmp->Child;
 	tmp->Child = Node;
 	Node->Name = dev->device->name;
 	Node->Parent = tmp;
+}
 
-	//Wenn es das erste Gerät ist, dann mounten
-	if(!first)
+struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
+{
+	struct cdi_fs_res *res;
+	struct cdi_fs_res *prevRes = stream->fs->root_res;
+	struct cdi_fs_stream tmpStream = {
+		.fs = stream->fs,
+		.res = prevRes
+	};
+
+	char **dirs = NULL;
+	size_t dirSize = getDirs(&dirs, path);
+
+	if(!prevRes->loaded)
+		prevRes->res->load(&tmpStream);
+
+	size_t i = 0;
+	size_t j = 0;
+	while(j < dirSize && (res = cdi_list_get(prevRes->children, i++)))
 	{
-		first = true;
-		char *DevPath;
-		asprintf(&DevPath, "%s/%s", Path, Node->Name);
-		vfs_Mount("/mount", DevPath);
-		free(DevPath);
+		if(!strcmp(res->name, dirs[j]))
+		{
+			tmpStream.res = res;
+			res->res->load(&tmpStream);
+			prevRes = res;
+			j++;
+		}
 	}
+	freeDirs(&dirs, dirSize);
+
+	return res;
 }
