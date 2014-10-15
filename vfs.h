@@ -38,7 +38,7 @@ typedef struct vfs_node{
 }vfs_node_t;
 
 typedef struct{
-	bool read, write, append, empty;
+	bool read, write, append, empty, create;
 }vfs_mode_t;
 
 typedef struct{
@@ -48,15 +48,6 @@ typedef struct{
 
 	vfs_node_t *node;
 }vfs_stream_t;
-
-typedef struct{
-	vfs_stream_t *stream;
-
-	char *buffer;
-	size_t bufSize;
-	size_t posRead, posWrite;
-	uint8_t flags;
-}vfs_filehandle_t;
 
 void vfs_Init(void);
 
