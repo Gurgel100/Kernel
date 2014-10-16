@@ -10,6 +10,7 @@
 
 #include "stddef.h"
 #include "stdarg.h"
+#include "stdbool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,18 +20,47 @@ extern "C" {
 #define EOF		(-1)
 #endif
 
-typedef struct
-{
-		int				_cnt;	//Anzahl der Bytes im Buffer
-		unsigned char	*_ptr;	//next character from/to here in buffer */
-		unsigned char	*_base;	//Der Buffer
-		unsigned char	_flag;	//Status des Streams
-		unsigned char	_file;	//UNIX System Datei-Descriptor
-}FILE;
+#define _IONBF	0
+#define _IOLBF	1
+#define _IOFBF	2
+
+#define BUFSIZ	65536
+
+typedef enum{
+	IO_MODE_NO_BUFFER, IO_MODE_LINE_BUFFER, IO_MODE_FULL_BUFFER
+}bufMode_t;
+
+typedef enum{
+	IO_NO_ERROR
+}io_error_t;
+
+
+typedef struct{
+	void *stream;
+
+	char *buffer;
+	size_t bufSize, bufStart, bufPos;
+	size_t posRead, posWrite;
+	bufMode_t bufMode;
+	bool intBuf;
+	bool eof;
+	io_error_t error;
+	struct{
+		bool write, read, binary;
+	} mode;
+} FILE;
 
 extern FILE* stderr;
 extern FILE* stdin;
 extern FILE* stdout;
+
+extern FILE *fopen(const char *filename, const char *mode);
+int fclose(FILE *stream);
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+int fflush(FILE *stream);
+void setbuf(FILE *stream, char *buffer);
+int setvbuf(FILE *stream, char *buffer, int mode, size_t size);
 
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int fprintf(FILE *stream, const char *format, ...);

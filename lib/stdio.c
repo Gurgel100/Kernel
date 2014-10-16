@@ -6,10 +6,14 @@
  */
 
 #include "stdio.h"
+#include "stdlib.h"
 #include "stdint.h"
 #include "stdbool.h"
+#include "vfs.h"
 
 #define ASPRINTF_INITIAL_BUFFER_SIZE 64
+
+#define MIN(x,y) ((x < y) ? x : y)
 
 struct asprintf_args{
 		char *buffer;
@@ -28,6 +32,295 @@ char *itoa(int64_t x, char *s);							//Int nach String
 char *utoa(uint64_t x, char *s);						//UInt nach String
 char *ftoa(float x, char *s);							//Float nach String
 char *i2hex(uint64_t val, char* dest, uint64_t len);	//Int nach Hexadezimal
+
+//Dateifunktionen
+FILE *fopen(const char *filename, const char *mode)
+{
+	vfs_mode_t m;
+	bool binary = false;
+
+	//Modus analysieren
+	switch(*mode++)
+	{
+	case 'r':
+		m.read = true;
+		while(*mode != '\0')
+		{
+			switch(*mode++)
+			{
+			case '+':
+				m.write = true;
+				break;
+			case 'b':
+				binary = true;
+			}
+		}
+		break;
+	case 'w':
+		m.write = true;
+		m.empty = true;
+		m.create = true;
+		while(*mode != '\0')
+		{
+			switch(*mode++)
+			{
+			case '+':
+				m.read = true;
+				break;
+			case 'b':
+				binary = true;
+			}
+		}
+		break;
+	case 'a':
+		m.append = true;
+		m.create = true;
+		m.write = true;
+		while(*mode != '\0')
+		{
+			switch(*mode++)
+			{
+			case '+':
+				m.read = true;
+				break;
+			case 'b':
+				binary = true;
+			}
+		}
+		break;
+	default:
+		return NULL;
+	}
+
+	FILE *file = calloc(sizeof(FILE), 1);
+	file->error = IO_NO_ERROR;
+	file->mode.read = m.read;
+	file->mode.write = m.write;
+	file->mode.binary = binary;
+	file->stream = vfs_Open(filename, m);
+	if(file->stream == NULL)
+	{
+		free(file);
+		return NULL;
+	}
+	setvbuf(file, malloc(BUFSIZ), _IOFBF, BUFSIZ);
+
+	return file;
+}
+
+int fclose(FILE *stream)
+{
+	if(stream == NULL)
+		return EOF;
+
+	//Buffer noch löschen, bevor wir den Stream schliessen
+	if(stream->mode.write)
+		fflush(stream);
+
+	if(setvbuf(stream, NULL, _IONBF, 0))
+		return EOF;
+
+	vfs_Close(stream->stream);
+	free(stream);
+
+	return 0;
+}
+
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	size_t length = size * nmemb;
+	size_t readData = 0;
+	//Überprüfen, ob erlaubt ist, diesen Stream zu lesen
+	if(!stream->mode.read)
+		return 0;
+
+	//Schauen, ob die angeforderten Daten im Cache sind
+	if(stream->bufMode != IO_MODE_NO_BUFFER)
+	{
+		if(stream->bufMode == IO_MODE_LINE_BUFFER)
+		{
+			if(stream->bufStart <= stream->posRead && stream->bufStart + stream->bufPos >= stream->posRead + length)
+			{
+				//Alles im Buffer
+				memcpy(ptr, stream->buffer, length);
+				stream->posRead += length;
+				readData += length;
+			}
+			else
+			{
+				//Nicht alles im Buffer
+				//Wir lesen hier einfach noch mal alles aus
+				//TODO: Besserer Algorithmus finden
+				stream->bufPos = 0;
+				stream->bufStart = stream->posRead;
+
+				uint8_t tmp;
+				size_t i;
+				for(i = 0; i < length; i++)
+				{
+					size_t size = vfs_Read(stream->stream, stream->posRead++, 1, &tmp);
+					stream->buffer[stream->bufPos++] = tmp;
+					if(tmp == '\n' && i < length)
+					{
+						memcpy(ptr, stream->buffer, stream->bufPos);
+						stream->bufPos = 0;
+						stream->bufStart = stream->posRead;
+					}
+				}
+				if(tmp != '\n')
+					memcpy(ptr, stream->buffer, stream->bufPos);
+			}
+		}
+		else
+		{
+			if(stream->bufStart <= stream->posRead && stream->bufPos >= length)
+			{
+				memcpy(ptr, stream->buffer + stream->bufStart - stream->posRead, length);
+				readData = length;
+			}
+			//Ansonsten einfach den ganzen Buffer nochmal laden
+			else
+			{
+				size_t size = 0;
+				size_t i, tmp;
+				for(i = 0; i < length || tmp != 0; i += stream->bufSize)
+				{
+					tmp = vfs_Read(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
+					stream->bufPos = tmp;
+					stream->bufStart = stream->posRead;
+					stream->posRead += tmp;
+					memcpy(ptr + i, stream->buffer, tmp);
+					size += tmp;
+				}
+				if(size < length)
+					stream->eof = true;
+				readData = size;
+			}
+		}
+	}
+	else
+	{
+		readData = vfs_Read(stream->stream, stream->posRead, length, ptr);
+		stream->posRead += length;
+	}
+
+	//Wenn nicht im binary modus, dann letztes Zeichen durch '\0' ersetzen
+	if(!stream->mode.binary)
+		((char*)ptr)[size] = '\0';
+
+	return readData / size;
+}
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	size_t length = size * nmemb;
+	size_t writeData = 0;
+
+	//Überprüfen, ob es erlaubt ist, diese Datei zu schreiben
+	if(!stream->mode.write)
+		return 0;
+
+	if(stream->bufMode == IO_MODE_NO_BUFFER)
+	{
+		writeData = vfs_Write(stream->stream, stream->posWrite, length, ptr);
+	}
+	else if(stream->bufMode == IO_MODE_LINE_BUFFER)
+	{
+		//Eine Zeile in Buffer schreiben und wenn nötig schreiben
+		uint8_t *source = ptr;
+		size_t i;
+		for(i = 0; i < length; i++)
+		{
+			stream->buffer[stream->bufPos++] = source[i];
+			if(source[i] == '\n')
+			{
+				size_t size = 0;
+				size = vfs_Write(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
+				stream->bufPos = 0;
+				stream->bufStart += size;
+				writeData += size;
+			}
+		}
+	}
+	else	//Full buffer
+	{
+		//Alles in den Buffer schreiben
+		memcpy(stream->buffer + stream->bufPos, ptr, length);
+		stream->bufPos += length;
+	}
+
+	return writeData / size;
+}
+
+int fflush(FILE *stream)
+{
+	///TODO: wenn stream = NULL, dann sollten alle Buffer geflusht werden
+	if(stream == NULL)
+		return 0;
+
+	if(stream->bufMode != IO_MODE_NO_BUFFER)
+		vfs_Write(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
+
+	return 0;
+}
+
+void setbuf(FILE *stream, char *buffer)
+{
+	return (void)setvbuf(stream, buffer, (buffer == NULL) ? _IONBF : _IOFBF, BUFSIZ);
+}
+
+int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
+{
+	if(stream == NULL)
+		return -1;
+
+	switch(mode)
+	{
+		//Kein buffering
+	case _IONBF:
+		if(stream->buffer && stream->intBuf)
+			free(stream->buffer);
+		stream->buffer = NULL;
+		stream->intBuf = false;
+		stream->bufSize = 0;
+		stream->posRead = 0;
+		stream->posWrite = 0;
+		stream->bufMode = IO_MODE_NO_BUFFER;
+		break;
+	case _IOLBF:
+		if(buffer == NULL)
+		{
+			stream->intBuf = true;
+			buffer = malloc(size);
+		}
+		stream->buffer = buffer;
+		stream->bufSize = size;
+		stream->bufStart = EOF;
+		stream->bufPos = 0;
+		stream->posRead = 0;
+		stream->posWrite = 0;
+		stream->bufMode = IO_MODE_LINE_BUFFER;
+		break;
+	case _IOFBF:
+		if(buffer == NULL)
+		{
+			stream->intBuf = true;
+			buffer = malloc(size);
+		}
+		stream->buffer = buffer;
+		stream->bufSize = size;
+		stream->bufStart = EOF;
+		stream->bufPos = 0;
+		stream->posRead = 0;
+		stream->posWrite = 0;
+		stream->bufMode = IO_MODE_FULL_BUFFER;
+		break;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
 
 //TODO: alle print-Funktionen fertigstellen
 
