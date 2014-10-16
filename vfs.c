@@ -443,6 +443,7 @@ void vfs_RegisterDevice(device_t *dev)
 	tmp->Child = Node;
 	Node->Name = dev->device->name;
 	Node->Parent = tmp;
+	printf("Eingehaengt in: /dev/%s\n", Node->Name);
 }
 
 struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
