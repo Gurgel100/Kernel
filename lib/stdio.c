@@ -322,6 +322,41 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 	return 0;
 }
 
+int fseek(FILE *stream, long int offset, int whence)
+{
+	if(!stream)
+		return -1;
+
+	if(stream->mode.binary)
+	{
+		switch (whence)
+		{
+			case SEEK_CUR:
+				stream->posRead += offset;
+				stream->posWrite += offset;
+			break;
+			case SEEK_SET:
+				stream->posRead = offset;
+				stream->posWrite = offset;
+			break;
+			//TODO: SEEK_END implementation
+			case SEEK_END:
+		}
+	}
+	else
+	{
+		if(whence == SEEK_SET && offset >= 0)
+		{
+			stream->posRead = offset;
+			stream->posWrite = offset;
+		}
+	}
+
+	stream->eof = false;
+
+	return 0;
+}
+
 //TODO: alle print-Funktionen fertigstellen
 
 int fprintf(FILE *stream, const char *format, ...)

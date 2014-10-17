@@ -24,6 +24,10 @@ extern "C" {
 #define _IOLBF	1
 #define _IOFBF	2
 
+#define SEEK_SET 0xFFFF
+#define SEEK_CUR 0xFFF0
+#define SEEK_END 0xFF0F
+
 #define BUFSIZ	65536
 
 typedef enum{
@@ -61,6 +65,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
 int fflush(FILE *stream);
 void setbuf(FILE *stream, char *buffer);
 int setvbuf(FILE *stream, char *buffer, int mode, size_t size);
+int fseek(FILE *stream, long int offset, int whence);
 
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int fprintf(FILE *stream, const char *format, ...);
