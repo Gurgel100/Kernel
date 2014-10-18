@@ -9,6 +9,9 @@
 #include "loader.h"
 
 
-void loader_load(FILE *fp)
+int loader_load(FILE *fp)
 {
+	if(elfLoad(fp) != 0)
+		return -1;
+	return 0;
 }

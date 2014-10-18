@@ -10,6 +10,6 @@
 
 #include "stdio.h"
 
-void loader_load(FILE *fp);
+int loader_load(FILE *fp);
 
 #endif /* LOADER_H_ */
