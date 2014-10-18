@@ -380,6 +380,14 @@ int fsetpos(FILE *stream, const fpos_t *pos)
 	return 0;
 }
 
+int fgetpos(FILE *stream, fpos_t *pos)
+{
+	if(stream == NULL || pos == NULL)
+		return -1;
+	*pos = stream->posRead;
+	return 0;
+}
+
 
 //TODO: alle print-Funktionen fertigstellen
 
