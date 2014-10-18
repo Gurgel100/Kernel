@@ -342,9 +342,13 @@ int fseek(FILE *stream, long int offset, int whence)
 				stream->posRead = offset;
 				stream->posWrite = offset;
 			break;
-			//TODO: SEEK_END implementation
 			case SEEK_END:
-				break;
+			{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
+				//Grösse der Datei ermitteln
+				size_t filesize = vfs_getFileinfo(stream->stream, VFS_INFO_FILESIZE);
+				stream->posRead = stream->posWrite = filesize - offset;
+			}
+			break;
 		}
 	}
 	else
