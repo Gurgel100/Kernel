@@ -39,6 +39,9 @@ FILE *fopen(const char *filename, const char *mode)
 	vfs_mode_t m;
 	bool binary = false;
 
+	//m auf 0 setzen weil sonst können dort irgendwelche Werte drinnen stehen
+	memset(&m, false, sizeof(vfs_mode_t));
+
 	//Modus analysieren
 	switch(*mode++)
 	{
