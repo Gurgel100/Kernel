@@ -372,6 +372,14 @@ long int ftell(FILE *stream)
 	return stream->posRead;
 }
 
+int fsetpos(FILE *stream, const fpos_t *pos)
+{
+	if(stream == NULL || pos == NULL)
+		return -1;
+	stream->posRead = stream->posWrite = *pos;
+	return 0;
+}
+
 
 //TODO: alle print-Funktionen fertigstellen
 

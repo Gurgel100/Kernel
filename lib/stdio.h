@@ -74,6 +74,7 @@ void setbuf(FILE *stream, char *buffer);
 int setvbuf(FILE *stream, char *buffer, int mode, size_t size);
 int fseek(FILE *stream, long int offset, int whence);
 long int ftell(FILE *stream);
+int fsetpos(FILE *stream, const fpos_t *pos);
 
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int fprintf(FILE *stream, const char *format, ...);
