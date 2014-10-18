@@ -11,8 +11,9 @@
 #define ELF_H_
 
 #include "stdint.h"
+#include "stdio.h"
 
 //Funktionen
-char elfLoad(void *Datei, uint16_t Segment);	//Par.: Datei = Addresse der Datei im Speicher; Segment = Segment in das kopiert werden soll (GDT)
+char elfLoad(FILE *fp);	//Par.: Datei = Addresse der Datei im Speicher; Segment = Segment in das kopiert werden soll (GDT)
 
 #endif /* ELF_H_ */

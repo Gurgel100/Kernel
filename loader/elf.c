@@ -137,13 +137,27 @@ uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse 
 	return ElfHeader->e_entry;
 }
 
-char elfLoad(void *Datei, uint16_t Segment)
+char elfLoad(FILE *fp)
 {
-	elf_header *Header = Datei;
+	elf_header *Header;
 	char *Speicher;
 	char *Ziel;
 
-	elf_program_header_entry *ProgramHeader = ((void*)Header) + Header->e_phoff;
+	//Zurücksetzen des Dateizeigers
+	fseek(fp, 0, SEEK_SET);
+
+	Header = malloc(sizeof(elf_header));
+	if(fread(Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
+		return -1;
+
+	//Header überprüfen
+	if(elfCheck(Header) != -1)
+		return -1;
+
+	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
+	fseek(fp, Header->e_phoff, SEEK_SET);
+	if(fread(ProgramHeader, 1, sizeof(elf_program_header_entry), fp) < sizeof(elf_program_header_entry))
+		return -1;
 
 	register int i;
 	for(i = 0; i < Header->e_phnum; i++)
@@ -151,23 +165,17 @@ char elfLoad(void *Datei, uint16_t Segment)
 		//Wenn kein ladbares Segment, dann Springe zum nächsten Segment
 		if(ProgramHeader[i].p_type != ELF_PT_LOAD) continue;
 
-		Ziel = (char*)ProgramHeader[i].p_vaddr;								//Zieladdresse (virtuell)
-		Speicher = (char*)(Datei + ((uintptr_t)ProgramHeader[i].p_offset));	//Position der Datei im Speicher
+		//TODO: noch an den richtigen Ort im Userspace laden
+		Ziel = malloc(ProgramHeader[i].p_memsz);
+		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
+		fread(Ziel, 1, ProgramHeader[i].p_filesz, fp);
 
-		//Segment in den Speicher laden und eventuell mit nullen auffüllen
-		elf64_xword filesz = ProgramHeader[i].p_filesz;
-		elf64_xword memsz = ProgramHeader[i].p_memsz;
-		register int j;
-		for(j = 0; j < filesz; j++)
-		{
-			Ziel[j] = Speicher[j];
-		}
-
-		if(filesz < memsz)
-		{
-			for(j = filesz; j < (memsz - filesz); j++)
-				Ziel[j] = 0;
-		}
+		//Eventuell mit nullen auffüllen
+		memset(Ziel + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
 	}
+
+	//Temporäre Daten wieder freigeben
+	free(ProgramHeader);
+	free(Header);
 	return 0;
 }
