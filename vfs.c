@@ -206,6 +206,42 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
 }
 
 /*
+ * Gibt die Metainformationen einer Datei zurück
+ * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)
+ * Rückgabe:	Grösse des Streams oder 0 bei Fehler
+ */
+uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info)
+{
+	if(stream->node->Type == TYPE_FILE)
+	{
+		switch(info)
+		{
+			case VFS_INFO_FILESIZE:
+				return stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_SIZE);
+			break;
+			case VFS_INFO_USEDBLOCKS:
+				return stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_USEDBLOCKS);
+			break;
+			case VFS_INFO_BLOCKSIZE:
+				return stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_BLOCKSZ);
+			break;
+			case VFS_INFO_CREATETIME:
+				return stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_CREATETIME);
+			break;
+			case VFS_INFO_ACCESSTIME:
+				return stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_ACCESSTIME);
+			break;
+			case VFS_INFO_CHANGETIME:
+				return stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_CHANGETIME);
+			break;
+		}
+	}
+
+	return 0;
+}
+
+
+/*
  * Mountet ein Dateisystem (fs) an den entsprechenden Mountpoint (Mount)
  * Parameter:	Mount = Mountpoint (Pfad)
  * 				Dev = Pfad zum Gerät

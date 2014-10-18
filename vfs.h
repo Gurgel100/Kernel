@@ -49,6 +49,10 @@ typedef struct{
 	vfs_node_t *node;
 }vfs_stream_t;
 
+typedef enum{
+	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
+}vfs_fileinfo_t;
+
 void vfs_Init(void);
 
 vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode);
@@ -61,6 +65,8 @@ void vfs_Close(vfs_stream_t *stream);
  */
 size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
 size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
+
+uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info);
 
 int vfs_Mount(const char *Mountpath, const char *Dev);
 int vfs_Unmount(const char *Mount);
