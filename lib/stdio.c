@@ -173,7 +173,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 		}
 		else
 		{
-			if(stream->bufStart <= stream->posRead && stream->bufPos >= length)
+			if(stream->bufStart + stream->bufPos < stream->posRead && stream->bufPos >= length)
 			{
 				memcpy(ptr, stream->buffer + stream->bufStart - stream->posRead, length);
 				readData = length;
@@ -183,7 +183,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			{
 				size_t size = 0;
 				size_t i, tmp;
-				for(i = 0; i < length || tmp != 0; i += stream->bufSize)
+				for(i = 0; i < length && tmp != 0; i += stream->bufSize)
 				{
 					tmp = vfs_Read(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
 					stream->bufPos = tmp;
@@ -341,6 +341,7 @@ int fseek(FILE *stream, long int offset, int whence)
 			break;
 			//TODO: SEEK_END implementation
 			case SEEK_END:
+				break;
 		}
 	}
 	else
