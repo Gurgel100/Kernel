@@ -73,6 +73,7 @@ int fflush(FILE *stream);
 void setbuf(FILE *stream, char *buffer);
 int setvbuf(FILE *stream, char *buffer, int mode, size_t size);
 int fseek(FILE *stream, long int offset, int whence);
+long int ftell(FILE *stream);
 
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int fprintf(FILE *stream, const char *format, ...);

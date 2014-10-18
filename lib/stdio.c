@@ -365,6 +365,14 @@ int fseek(FILE *stream, long int offset, int whence)
 	return 0;
 }
 
+long int ftell(FILE *stream)
+{
+	if(stream == NULL)
+		return -1L;
+	return stream->posRead;
+}
+
+
 //TODO: alle print-Funktionen fertigstellen
 
 int fprintf(FILE *stream, const char *format, ...)
