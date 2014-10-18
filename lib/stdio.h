@@ -30,6 +30,11 @@ extern "C" {
 
 #define BUFSIZ	65536
 
+#ifndef SIZE_T
+#define SIZE_T
+typedef unsigned long	size_t;
+#endif
+
 typedef enum{
 	IO_MODE_NO_BUFFER, IO_MODE_LINE_BUFFER, IO_MODE_FULL_BUFFER
 }bufMode_t;
@@ -53,6 +58,8 @@ typedef struct{
 		bool write, read, binary;
 	} mode;
 } FILE;
+
+typedef size_t fpos_t;
 
 extern FILE* stderr;
 extern FILE* stdin;
