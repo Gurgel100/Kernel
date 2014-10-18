@@ -212,7 +212,7 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
  */
 uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info)
 {
-	if(stream->node->Type == TYPE_FILE)
+	if(stream->node->Type == TYPE_MOUNT && stream->stream.res->file != NULL)
 	{
 		switch(info)
 		{
