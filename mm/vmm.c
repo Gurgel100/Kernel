@@ -38,6 +38,8 @@ context_t kernel_context;
 uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t US);
 uint8_t vmm_UnMap(uintptr_t vAddress);
 
+void *getFreePages(void *start, void *end, size_t pages);
+
 bool vmm_getPageStatus(uintptr_t Address);
 //Ende der Funktionendeklaration
 
@@ -663,6 +665,40 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 	}
 	else
 		return 1;
+}
+
+/*
+ * Sucht im Bereich zwischen 'start' und 'end' nach einem freien Raum, der 'pages' gross ist
+ * Parameter:	start = Startpunkt
+ * 				end = Endpunkt
+ * 				pages = Wie gross der Raum sein soll in Anzahl Pages
+ */
+void *getFreePages(void *start, void *end, size_t pages)
+{
+	//Speichert, wieviele zusammenhängende Pages schon gefunden wurden
+	size_t num = 0;
+	void *i, *startAddress;
+	for(i = (uintptr_t)start & 0x1000; i <= end; i += VMM_SIZE_PER_PAGE)
+	{
+		if(vmm_getPageStatus((uintptr_t)i))
+		{
+			if(num == 0)			//wenn num = 0 ist,
+			{
+				startAddress = i;	//dann speichere die Addresse (i) in startAddress
+				num = 1;
+			}
+			else if(num < pages)
+			{
+				if(i == startAddress + num * VMM_SIZE_PER_PAGE)
+					num++;
+				else
+					num = 0;
+			}
+			else	//Wenn zusammenhängende Speicherseiten gefunden, dann zurückgeben
+				return startAddress;	//Virtuelle Addresse zurückgeben
+		}
+	}
+	return NULL;
 }
 
 /*
