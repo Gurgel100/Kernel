@@ -12,6 +12,7 @@
 #include "multiboot.h"
 #include "display.h"
 #include "mm.h"
+#include "string.h"
 #ifdef DEBUGMODE
 #include "stdio.h"
 #endif
