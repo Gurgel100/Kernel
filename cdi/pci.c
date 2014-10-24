@@ -6,7 +6,7 @@
  */
 
 #include "pci.h"
-#include <pci.h>
+#include "../pci.h"
 #include "lists.h"
 
 /**
