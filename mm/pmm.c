@@ -63,7 +63,7 @@ bool pmm_Init()
 	{
 		if(map->type == 1)
 			for(i = map->base_addr;pages > 0 && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-				if(i < vmm_getPhysAddress(&kernel_start) || i >= vmm_getPhysAddress(&kernel_end))
+				if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
 				{
 					pmm_Free(i);
 					pages--;
@@ -82,7 +82,7 @@ bool pmm_Init()
 		{
 			if(map->type == 1)
 				for(i = map->base_addr; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-					if(i < vmm_getPhysAddress(&kernel_start) || i >= vmm_getPhysAddress(&kernel_end))
+					if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
 					{
 						pmm_Free(i);
 					}
