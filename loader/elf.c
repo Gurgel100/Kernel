@@ -5,6 +5,7 @@
  *      Author: pascal
  */
 #include "elf.h"
+#include "pm.h"
 
 typedef uint64_t	elf64_addr;
 typedef uint16_t 	elf64_half;
@@ -158,6 +159,9 @@ char elfLoad(FILE *fp)
 	fseek(fp, Header->e_phoff, SEEK_SET);
 	if(fread(ProgramHeader, 1, sizeof(elf_program_header_entry), fp) < sizeof(elf_program_header_entry))
 		return -1;
+
+	//Jetzt erst einen neuen Prozess anlegen
+	process_t *task = pm_getTask(pm_InitTask(0, Header->e_entry));
 
 	register int i;
 	for(i = 0; i < Header->e_phnum; i++)
