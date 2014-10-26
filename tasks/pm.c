@@ -62,7 +62,7 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
-			.rsp = (stack == 0) ? STACK_PT : stack,
+			.rsp = STACK_PT,
 
 			//IRQs einschalten (IF = 1)
 			.rflags = 0x202,
