@@ -51,7 +51,7 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-pid_t pm_InitTask(void *entry, void *stack)
+pid_t pm_InitTask(pid_t parent, void *entry)
 {
 	processlist_t *newProcess = malloc(sizeof(processlist_t));
 	numTasks++;
