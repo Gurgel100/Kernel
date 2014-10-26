@@ -668,6 +668,32 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 }
 
 /*
+ * Mappt eine virtuelle Adresse an eine andere Adresse
+ * Die src Addresse wird nicht auf Gültigkeit überprüft
+ * Params:			src = virt. Addresse der Speicherstelle
+ * 					dst = virt. Addresse an die remappt werden soll
+ * 					length = Anzahl Pages, die die Speicherstelle lang ist
+ * 					us = ist das Ziel ein Userspace?
+ *
+ * Rückgabewert:	0 = Speicherstelle wurde erfolgreich virt. verschoben
+ * 					1 = zu wenig phys. Speicherplatz vorhanden
+ * 					2 = Destinationaddresse ist schon belegt
+ *///TODO: Bei Fehler alles Rückgängig machen
+uint8_t vmm_ReMap(uintptr_t src, uintptr_t dst, size_t length, bool us)
+{
+	size_t i;
+	for(i = 0; i < length; i++)
+	{
+		uint8_t r;
+		if((r = vmm_Map(dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE), us)) != 0)
+			return r;
+		if(vmm_UnMap(src + i * VMM_SIZE_PER_PAGE) == 2)
+			return 1;
+	}
+	return 0;
+}
+
+/*
  * Sucht im Bereich zwischen 'start' und 'end' nach einem freien Raum, der 'pages' gross ist
  * Parameter:	start = Startpunkt
  * 				end = Endpunkt
