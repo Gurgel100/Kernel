@@ -49,7 +49,7 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 
 	newProcess->Process.PID = nextPID++;
 	newProcess->Process.PPID = parent;
-	newProcess->Process.Active = true;
+	newProcess->Process.Active = false;
 	newProcess->Process.Sleeping = false;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
