@@ -12,15 +12,6 @@
 #define STACK_PT	0xFFFFFEFFFFFFFFFF	//Stackpointer an höchste Adresse setzen
 
 typedef struct{
-		ihs_t *State;
-		context_t *Context;
-		pid_t PID;
-		pid_t PPID;
-		bool Active;
-		bool Sleeping;
-}process_t;
-
-typedef struct{
 	process_t Process;
 	void *Next;
 }processlist_t;							//Prozessliste
@@ -157,6 +148,24 @@ void pm_WakeTask(pid_t PID)
 		if(Process->Process.PID == PID)
 			Process->Process.Sleeping = false;
 }
+
+/*
+ * Gibt die Prozessstruktur mit der angebenen PID zurück
+ * Parameter:	PID: PID des Tasks
+ * Rückgabe:	Prozessstruktur
+ */
+process_t *pm_getTask(pid_t PID)
+{
+	uint64_t i;
+	processlist_t *oldProcess, *prevProcess;
+
+	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, prevProcess = oldProcess, oldProcess = ProcessList->Next)
+		if(oldProcess->Process.PID == PID)
+			return oldProcess;
+
+	return NULL;
+}
+
 
 /*
  * Scheduler. Gibt den Prozessorzustand des nächsten Tasks zurück. Der aktuelle

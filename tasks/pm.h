@@ -14,11 +14,21 @@
 
 typedef uint64_t pid_t;
 
+typedef struct{
+		ihs_t *State;
+		context_t *Context;
+		pid_t PID;
+		pid_t PPID;
+		bool Active;
+		bool Sleeping;
+}process_t;
+
 void pm_Init(void);
 pid_t pm_InitTask(pid_t parent, void *entry);
 void pm_DestroyTask(pid_t PID);
 void pm_HaltTask(pid_t PID);
 void pm_SleepTask(pid_t PID);
 void pm_WakeTask(pid_t PID);
+process_t *pm_getTask(pid_t PID);
 
 #endif /* PM_H_ */
