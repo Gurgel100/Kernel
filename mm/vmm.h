@@ -33,6 +33,8 @@ list_t vmm_getTables(context_t *context);
 void vmm_MapModule(mods *mod);
 void vmm_UnMapModule(mods *mod);
 
+uint64_t vmm_getPhysAddress(uint64_t virtualAddress);
+
 context_t *createContext(void);
 void deleteContext(context_t *context);
 
