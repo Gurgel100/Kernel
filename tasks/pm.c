@@ -122,6 +122,20 @@ void pm_HaltTask(pid_t PID)
 }
 
 /*
+ * Hält einen Task an ohne ihn zu beenden
+ * Params:	PID = PID des Tasks
+ */
+void pm_ActivateTask(pid_t PID)
+{
+	uint64_t i;
+	processlist_t *Process;
+
+	for(i = 0, Process = ProcessList; i < numTasks; i++, Process = ProcessList->Next)
+		if(Process->Process.PID == PID)
+			Process->Process.Active = true;
+}
+
+/*
  * Legt einen Task schlafen
  * Params:	PID = PID des Tasks
  */
