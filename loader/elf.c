@@ -168,10 +168,6 @@ char elfLoad(FILE *fp)
 	if(fread(ProgramHeader, 1, sizeof(elf_program_header_entry), fp) < sizeof(elf_program_header_entry))
 		return -1;
 
-	//Jetzt erst einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, Header->e_entry);
-	process_t *task = pm_getTask(taskID);
-
 	register int i;
 	for(i = 0; i < Header->e_phnum; i++)
 	{
@@ -193,6 +189,10 @@ char elfLoad(FILE *fp)
 	//Temporäre Daten wieder freigeben
 	free(ProgramHeader);
 	free(Header);
+
+	//Jetzt erst einen neuen Prozess anlegen
+	pid_t taskID = pm_InitTask(0, Header->e_entry);
+	process_t *task = pm_getTask(taskID);
 	//Prozess aktivieren
 	pm_ActivateTask(taskID);
 	return 0;
