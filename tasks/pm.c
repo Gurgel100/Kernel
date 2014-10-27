@@ -209,9 +209,12 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 	}
 	else if(ProcessList != NULL)
 	{
-		currentProcess = ProcessList;
-		activateContext(currentProcess->Process.Context);
-		memmove(cpu, currentProcess->Process.State, sizeof(ihs_t));
+		if(ProcessList->Process.Active && !ProcessList->Process.Sleeping)
+		{
+			currentProcess = ProcessList;
+			activateContext(currentProcess->Process.Context);
+			memmove(cpu, currentProcess->Process.State, sizeof(ihs_t));
+		}
 	}
 	return cpu;
 }
