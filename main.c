@@ -26,6 +26,8 @@
 #include "pit.h"
 #include "sound.h"
 
+#include "stdio.h"
+
 void Init(void);
 
 /*static uint64_t StackA[1000];
@@ -44,27 +46,7 @@ void main(void *mbsAdresse)
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 	sound_Play(10000, 1000);
-	while(1)
-	{
-		printf("%u Interrupts pro Sekunde\r", Counter);
-		Counter = 0;
-		Sleep(1000);
-	}
-	cmos_Reboot();
-	/*if(MBS->mbs_flags & 0x1)
-		printf("Startgeraet: %X", MBS->mbs_bootdevice);*/
 
-	//Test
-	/*void *tmp[3];
-	tmp[1] = malloc(0x1000 - 0x20);
-	tmp[2] = (void*)vmm_SysAlloc(0, 1, true);
-	tmp[3] = malloc(0x1500);
-	free(tmp[1]);
-	free(tmp[3]);*/
-	//vfs_Read("./home/pascal/Dokumente/YourOS/Git/tyndur/src/modules/lib/stdlibc/math/fmod.c", StackC);
-	//pm_InitTask(TaskA, StackA);
-	//pm_InitTask(TaskB, StackB);
-	//Ende Test
 	//Der Kernel wird durch ein Interrupt aufgeweckt
 	while(1) asm volatile("hlt;");	//Wir wollen diese Funktion nicht verlassen
 }
