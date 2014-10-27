@@ -22,6 +22,8 @@ extern void *strdup(const char *s);
 extern char *strtok(char *string, const char *delimiters);
 extern char *strchr(const char *string, int c);
 extern char *strrchr(const char *string, int c);
+extern char *strcat(char *str1, const char *str2);
+extern char *strncat(char *str1, const char *str2, size_t n);
 
 extern void *memset(void *block, int c, size_t n);
 extern void *memmove(void *to, const void *from, size_t size);

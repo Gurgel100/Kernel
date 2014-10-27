@@ -119,6 +119,31 @@ extern char *strrchr(const char *string, int c)
 	return NULL;
 }
 
+char *strcat(char *str1, const char *str2)
+{
+	size_t i;
+	size_t length = strlen(str1);
+	for(i = 0; str2[i] != '\0'; i++)
+	{
+		str1[length + i] = str2[i];
+	}
+	str1[length + i] = '\0';
+	return str1;
+}
+
+char *strncat(char *str1, const char *str2, size_t n)
+{
+	size_t i;
+	size_t length = strlen(str1);
+	for(i = 0; str2[i] != '\0' && i < n; i++)
+	{
+		str1[length + i] = str2[i];
+	}
+	str1[length + i] = '\0';
+	return str1;
+}
+
+
 void *memset(void *block, int c, size_t n)
 {
 	unsigned char volatile *i;
