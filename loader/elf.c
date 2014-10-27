@@ -7,6 +7,7 @@
 #include "elf.h"
 #include "pm.h"
 #include "mm.h"
+#include "memory.h"
 
 typedef uint64_t	elf64_addr;
 typedef uint16_t 	elf64_half;
@@ -155,6 +156,12 @@ char elfLoad(FILE *fp)
 	//Header überprüfen
 	if(elfCheck(Header) != -1)
 		return -1;
+
+	if(Header->e_entry < USERSPACE_START)
+	{
+		free(Header);
+		return -1;
+	}
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
 	fseek(fp, Header->e_phoff, SEEK_SET);
