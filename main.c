@@ -30,7 +30,7 @@
 
 void Init(void);
 
-void main(void *mbsAdresse)
+void __attribute__((noreturn)) main(void *mbsAdresse)
 {
 	MBS = mbsAdresse;
 	initLib();	//Library initialisieren
