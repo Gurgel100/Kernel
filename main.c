@@ -30,14 +30,6 @@
 
 void Init(void);
 
-/*static uint64_t StackA[1000];
-static uint64_t StackB[1000];
-static uint64_t StackC[1000];
-void TaskA();
-void TaskB();
-void TaskC();*/
-extern uint64_t Counter;
-
 void main(void *mbsAdresse)
 {
 	MBS = mbsAdresse;
@@ -84,35 +76,3 @@ void Init()
 	#endif
 	asm volatile("sti");	//Interrupts aktivieren
 }
-
-//Testbereich
-/*lock_t prt;
-void TaskA(void)
-{
-	while(true)
-	{
-		lock(&prt);
-		printf("Task A: Ich gehe jetzt schlafen...\n");
-		unlock(&prt);
-		Sleep(10);
-		lock(&prt);
-		printf("Task A: So, bin wieder wach...\n");
-		unlock(&prt);
-		Sleep(6);
-	}
-}
-
-void TaskB(uint64_t PID)
-{
-	while(true)
-	{
-		lock(&prt);
-		printf("Task B: Ich gehe jetzt schlafen...\n");
-		unlock(&prt);
-		Sleep(4);
-		lock(&prt);
-		printf("Task B: So, bin wieder wach...\n");
-		unlock(&prt);
-		Sleep(8);
-	}
-}*/
