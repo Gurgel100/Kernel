@@ -52,18 +52,49 @@ double atan(double x)
 /*double atan2(double x, double y);
 double sinh(double x);
 double cosh(double x);
-double tanh(double x);
+double tanh(double x);*/
 
+/*
+ * e hoch x
+ */
 double exp(double x)
-{}
+{
+	return x;
+}
 
-double log(double x);	//Natürlicher Logarithmus von x ln(x)
+double log(double x)	//Natürlicher Logarithmus von x ln(x)
+{
+	if(x <= 0) return NAN;
+	double Ergebnis;
+	asm(
+			"fld1;"
+			"fyl2x;"
+			"fldl2e;"
+			"fdiv %%st0,%%st1"
+			:"=t"(Ergebnis) :"0"(x)
+	);
+	return Ergebnis;
+}
 
-double log10(double x);	//Logarithmus zur Basis 10 von x lg(x)
+double log10(double x)	//Logarithmus zur Basis 10 von x lg(x)
+{
+	if(x <= 0) return NAN;
+	double Ergebnis;
+	asm(
+			"fld1;"
+			"fyl2x;"
+			"fldl2t;"
+			"fdiv %%st0,%%st1"
+			:"=t"(Ergebnis) :"0"(x)
+	);
+	return Ergebnis;
+}
 
 double pow(double x, double y)
-{}
-*/
+{
+	return exp(y * log(x));
+}
+
 double sqrt(double x)
 {
 	double Ergebnis;
