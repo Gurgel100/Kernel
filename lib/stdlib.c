@@ -8,7 +8,13 @@
 #include "stdlib.h"
 #include "stdint.h"
 #include "stdbool.h"
+#include "string.h"
+#ifdef BUILD_KERNEL
+#include "mm.h"
 #include "cpu.h"
+#else
+#include "syscall.h"
+#endif
 
 #define HEAP_RESERVED	0x01
 #define HEAP_FLAGS		0xAA
@@ -352,22 +358,26 @@ int32_t rand()
 int64_t lrand()
 {
 	int64_t Number = 0;
+#ifdef BUILD_KERNEL
 	if(cpuInfo.rdrand)
 	{
 	}
+#endif
 	return Number;
 }
 
 //Hilfsfunktionen
+#ifdef BUILD_KERNEL
 inline void *AllocPage(size_t Pages)
 {
-	return vmm_SysAlloc(0, Pages, true);
+	return mm_SysAlloc(Pages);
 }
 
 inline void FreePage(void *Address, size_t Pages)
 {
-	vmm_SysFree(Address, Pages);
+	mm_SysFree(Address, Pages);
 }
+#endif
 
 void setupNewHeapEntry(heap_t *old, heap_t *new)
 {
