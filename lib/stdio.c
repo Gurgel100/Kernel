@@ -9,7 +9,14 @@
 #include "stdlib.h"
 #include "stdint.h"
 #include "stdbool.h"
+#include "stdarg.h"
+#include "string.h"
+#include "userlib.h"
+#ifdef BUILD_KERNEL
 #include "vfs.h"
+#else
+#include "syscall.h"
+#endif
 
 #define ASPRINTF_INITIAL_BUFFER_SIZE 64
 
@@ -647,8 +654,11 @@ int getc(FILE *stream)
 {
 	if(stream == stdin)
 	{
-		unsigned char zeichen = getch();
-		return (int)zeichen;
+#ifdef BUILD_KERNEL
+		return (int)getch();
+#else
+		return (int)syscall_getch();
+#endif
 	}
 	else
 		return EOF;
@@ -688,7 +698,11 @@ int putc(int zeichen, FILE *stream)
 {
 	if(stream == stdout)
 	{
+#ifdef BUILD_KERNEL
 		putch(zeichen);
+#else
+		syscall_putch(zeichen);
+#endif
 		return zeichen;
 	}
 	else
@@ -699,7 +713,11 @@ int putchar(int zeichen)
 {
 	if(stdout == NULL)
 	{
-		putch((char)zeichen);
+#ifdef BUILD_KERNEL
+		putch(zeichen);
+#else
+		syscall_putch(zeichen);
+#endif
 		return zeichen;
 	}
 	else
