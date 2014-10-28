@@ -59,7 +59,14 @@ double tanh(double x);*/
  */
 double exp(double x)
 {
-	return x;
+	double Ergebnis;
+	asm volatile(
+			"fldl2e;"
+			"fmul;"
+			"f2xm1;"
+			:"=t"(Ergebnis) :"0"(x)
+	);
+	return Ergebnis + 1;
 }
 
 double log(double x)	//Natürlicher Logarithmus von x ln(x)
@@ -70,7 +77,7 @@ double log(double x)	//Natürlicher Logarithmus von x ln(x)
 			"fld1;"
 			"fyl2x;"
 			"fldl2e;"
-			"fdiv %%st0,%%st1"
+			"fdiv %%st(0),%%st(1)"
 			:"=t"(Ergebnis) :"0"(x)
 	);
 	return Ergebnis;
@@ -84,7 +91,7 @@ double log10(double x)	//Logarithmus zur Basis 10 von x lg(x)
 			"fld1;"
 			"fyl2x;"
 			"fldl2t;"
-			"fdiv %%st0,%%st1"
+			"fdiv %%st(0),%%st(1)"
 			:"=t"(Ergebnis) :"0"(x)
 	);
 	return Ergebnis;
