@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef PIT_H_
 #define PIT_H_
 
@@ -18,3 +20,5 @@ void pit_RegisterTimer(pid_t PID, uint64_t msec);
 void pit_InitChannel(uint8_t channel, uint8_t mode, uint16_t data);
 
 #endif /* PIT_H_ */
+
+#endif

@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "tss.h"
 #include "gdt.h"
 
@@ -32,3 +34,5 @@ void TSS_Init()
 	//Taskergister laden
 	asm volatile("ltr %0" : : "m"(tr));
 }
+
+#endif

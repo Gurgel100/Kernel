@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef ISR_H_
 #define ISR_H_
 
@@ -46,3 +48,5 @@ void exception_MachineCheck(ihs_t *ihs);
 void exception_XF(ihs_t *ihs);
 
 #endif /* ISR_H_ */
+
+#endif

@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef CPU_H_
 #define CPU_H_
 
@@ -62,3 +64,5 @@ uint64_t cpu_MSRread(uint32_t msr);
 void cpu_MSRwrite(uint32_t msr, uint64_t Value);
 
 #endif /* CPU_H_ */
+
+#endif

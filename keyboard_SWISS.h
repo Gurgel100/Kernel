@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef KEYBOARD_SWISS_H_
 #define KEYBOARD_SWISS_H_
 
@@ -71,3 +73,5 @@ static const char KeyToAscii_AltGr[] =
 };
 
 #endif /* KEYBOARD_SWISS_H_ */
+
+#endif

@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "pci.h"
 #include "config.h"
 #include "util.h"
@@ -312,3 +314,5 @@ void initDevice(uint8_t bus, uint8_t slot)
 		pciDevice->Bus, pciDevice->Slot, pciDevice->VendorID, pciDevice->DeviceID);*/
 	#endif
 }
+
+#endif

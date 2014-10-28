@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef CMOS_H_
 #define CMOS_H_
 
@@ -25,3 +27,5 @@ Date_t *cmos_GetDate(Date_t *Date);
 void cmos_Reboot(void);
 
 #endif /* CMOS_H_ */
+
+#endif

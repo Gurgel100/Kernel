@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "sound.h"
 #include "pit.h"
 
@@ -28,3 +30,5 @@ void switch_off()
 {
 	outb(0x61, inb(0x61) & ~0x3);
 }
+
+#endif

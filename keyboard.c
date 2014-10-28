@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "keyboard.h"
 #include "isr.h"
 #include "stdint.h"
@@ -212,3 +214,5 @@ char getch()
 		ActualPuffer = NULL;
 	return Zeichen;
 }
+
+#endif

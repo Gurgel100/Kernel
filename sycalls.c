@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "syscalls.h"
 #include "isr.h"
 #include "cmos.h"
@@ -72,3 +74,5 @@ void syscall_Handler(ihs_t *ihs)
 		break;
 	}
 }
+
+#endif

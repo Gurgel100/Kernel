@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef IDT_H_
 #define IDT_H_
 
@@ -30,3 +32,5 @@ void IDT_Init(void);
 void IDT_SetEntry(uint8_t i, uint16_t Selector, uint16_t Flags, uintptr_t Offset);
 
 #endif /* IDT_H_ */
+
+#endif

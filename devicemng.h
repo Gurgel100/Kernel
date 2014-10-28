@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef DEVICEMNG_H_
 #define DEVICEMNG_H_
 
@@ -23,3 +25,5 @@ void dmng_registerDevice(struct cdi_device *dev);
 size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer);
 
 #endif /* DEVICEMNG_H_ */
+
+#endif

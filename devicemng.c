@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "devicemng.h"
 #include "lists.h"
 #include "storage.h"
@@ -98,3 +100,5 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
 
 	return size;
 }
+
+#endif

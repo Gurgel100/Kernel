@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef GDT_H_
 #define GDT_H_
 
@@ -41,3 +43,5 @@ void GDT_SetEntry(int i, uint32_t base, uint32_t limit, uint8_t access, uint8_t 
 void GDT_SetSystemDescriptor(int i, uint64_t base, uint32_t limit, uint8_t access, uint8_t flags);
 
 #endif /* GDT_H_ */
+
+#endif

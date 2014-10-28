@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef PIC_H_
 #define PIC_H_
 
@@ -16,3 +18,5 @@ void pic_MaskIRQ(uint16_t Mask);
 void pic_SendEOI(uint8_t irq);
 
 #endif /* PIC_H_ */
+
+#endif

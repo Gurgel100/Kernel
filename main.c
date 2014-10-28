@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "main.h"
 #include "config.h"
 #include "multiboot.h"
@@ -76,3 +78,5 @@ void Init()
 	#endif
 	asm volatile("sti");	//Interrupts aktivieren
 }
+
+#endif

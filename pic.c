@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "pic.h"
 #include "util.h"
 #include "display.h"
@@ -76,3 +78,5 @@ void pic_SendEOI(uint8_t irq)
 	if(irq > 7)
 		outb(PIC_SLAVE_COMMAND, EOI);
 }
+
+#endif

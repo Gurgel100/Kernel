@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "pit.h"
 #include "util.h"
 
@@ -78,3 +80,5 @@ void pit_Handler(void)
 		}
 	}
 }
+
+#endif

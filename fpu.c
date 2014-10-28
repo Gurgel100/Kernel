@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "fpu.h"
 #include "display.h"
 
@@ -27,3 +29,5 @@ void fpu_Init()
 	);
 	SysLog("FPU", "Initialisierung abgeschlossen");
 }
+
+#endif

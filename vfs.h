@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef VFS_H_
 #define VFS_H_
 
@@ -85,3 +87,5 @@ void vfs_RegisterDevice(device_t *dev);
 void vfs_UnregisterDevice(device_t *dev);
 
 #endif /* VFS_H_ */
+
+#endif

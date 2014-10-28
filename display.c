@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "display.h"
 #include "util.h"
 
@@ -181,3 +183,5 @@ void showCursor()
 	outb(0x3D4, 10);
 	outb(0x3D5, 0x64);	//Cursor aktiviert
 }
+
+#endif

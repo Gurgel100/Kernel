@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "cpu.h"
 #include "config.h"
 #include "display.h"
@@ -252,3 +254,5 @@ void cpu_MSRwrite(uint32_t msr, uint64_t Value)
 
 	asm volatile("wrmsr" : : "a" (low), "c" (msr), "d" (high));
 }
+
+#endif

@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "gdt.h"
 #include "display.h"
 
@@ -58,3 +60,5 @@ void GDT_SetSystemDescriptor(int i, uint64_t base, uint32_t limit, uint8_t acces
 	gdt[i + 1] = base >> 24;
 	gdt[i + 1] |= 0 << 32;
 }
+
+#endif

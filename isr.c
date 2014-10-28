@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "isr.h"
 #include "config.h"
 #include "display.h"
@@ -404,3 +406,5 @@ void traceStack(uint64_t rsp, uint8_t length)
 		printf("%u: 0x%X%X\n", i + 1, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
 	}
 }
+
+#endif

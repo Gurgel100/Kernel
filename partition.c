@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "partition.h"
 #include "storage.h"
 #include "scsi.h"
@@ -105,3 +107,5 @@ struct cdi_fs_driver *getFSDriver(const char *name)
 
 	return NULL;
 }
+
+#endif

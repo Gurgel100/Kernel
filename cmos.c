@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "cmos.h"
 #include "util.h"
 
@@ -114,3 +116,5 @@ void cmos_Reboot()
 {
 	Write(SHUTDOWN, 0x2);
 }
+
+#endif

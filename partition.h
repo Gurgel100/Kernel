@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef PARTITION_H_
 #define PARTITION_H_
 
@@ -53,3 +55,5 @@ typedef struct{
 int partition_getPartitions(device_t *dev);
 
 #endif /* PARTITION_H_ */
+
+#endif

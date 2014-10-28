@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef PCI_H_
 #define PCI_H_
 
@@ -37,3 +39,5 @@ uint64_t NumDevices;
 void pci_Init();
 
 #endif /* PCI_H_ */
+
+#endif

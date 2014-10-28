@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #ifndef TSS_H_
 #define TSS_H_
 #include "stdint.h"
@@ -35,3 +37,5 @@ typedef struct{
 void TSS_Init(void);
 
 #endif /* TSS_H_ */
+
+#endif

@@ -5,6 +5,8 @@
  *      Author: pascal
  */
 
+#ifdef BUILD_KERNEL
+
 #include "vfs.h"
 #include "stdint.h"
 #include "stddef.h"
@@ -513,3 +515,5 @@ struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 
 	return res;
 }
+
+#endif
