@@ -1,4 +1,4 @@
-#ifdef BUILD_KERNEL
+.ifdef BUILD_KERNEL
 .code64
 .section .text
 .extern isr_Handler
@@ -138,4 +138,4 @@ add $16,%rsp
 
 #Rücksprung
 iretq
-#endif
+.endif

@@ -1,4 +1,4 @@
-#ifdef BUILD_KERNEL
+.ifdef BUILD_KERNEL
 .code64
 .extern main
 .global _start
@@ -20,4 +20,4 @@ jmp _stop
 .section .rodata
 .space 0x100000		#1MB Platz für den Kernelstack
 stack:
-#endif
+.endif
