@@ -10,6 +10,7 @@
 #ifndef SYSCALL_H_
 #define SYSCALL_H_
 
+#include "stddef.h"
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
