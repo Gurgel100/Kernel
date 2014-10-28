@@ -123,14 +123,14 @@ bool vmm_Init(uint64_t Speicher, uintptr_t Stack)
 				|| ((i >= (MBS->mbs_mmap_addr & ~0xFFF)) && (i <= ((MBS->mbs_mmap_addr + MBS->mbs_mmap_length) & ~0xFFF)))) continue;
 
 		//Überprüfe, ob sich die Adresse in einem geladenem Modul befindet
-		for(mods = MBS->mbs_mods_addr, j = 0; j < MBS->mbs_mods_count; mods++, j++)
+		/*for(mods = MBS->mbs_mods_addr, j = 0; j < MBS->mbs_mods_count; mods++, j++)
 			if(i >= (mods->mod_start & ~0xFFF) && i <= (mods->mod_end & ~0xFFF))
 			{
 				isMod = true;
 				break;
-			}
+			}*/
 
-		if(!isMod)
+		//if(!isMod)
 			if(vmm_UnMap(i) == 2) return false;	//Wenn kein Speicher mehr vorhanden ist, geben wir einen Fehler zurück
 	}
 
