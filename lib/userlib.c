@@ -8,6 +8,7 @@
 #include "userlib.h"
 #include "stdlib.h"
 #include "stdbool.h"
+#include "string.h"
 
 extern Heap_Entries;
 extern Heap_Base;
@@ -17,10 +18,12 @@ void initLib()
 	Heap_Base = NULL;
 }
 
+#ifndef BUILD_KERNEL
 void getSysInfo(SIS *Struktur)
 {
 	asm("int $0x30" : :"a"(50), "b"(Struktur));
 }
+#endif
 
 void reverse(char *s)
 {
