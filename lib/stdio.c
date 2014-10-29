@@ -39,7 +39,7 @@ char *itoa(int64_t x, char *s);							//Int nach String
 char *utoa(uint64_t x, char *s);						//UInt nach String
 char *ftoa(float x, char *s);							//Float nach String
 char *i2hex(uint64_t val, char* dest, uint64_t len);	//Int nach Hexadezimal
-
+#ifdef BUILD_KERNEL
 //Dateifunktionen
 FILE *fopen(const char *filename, const char *mode)
 {
@@ -352,7 +352,9 @@ int fseek(FILE *stream, long int offset, int whence)
 			case SEEK_END:
 			{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
 				//Grösse der Datei ermitteln
+#ifdef BUILD_KERNEL
 				size_t filesize = vfs_getFileinfo(stream->stream, VFS_INFO_FILESIZE);
+#endif
 				stream->posRead = stream->posWrite = filesize - offset;
 			}
 			break;
@@ -394,7 +396,7 @@ int fgetpos(FILE *stream, fpos_t *pos)
 	*pos = stream->posRead;
 	return 0;
 }
-
+#endif
 
 //TODO: alle print-Funktionen fertigstellen
 
