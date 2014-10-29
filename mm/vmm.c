@@ -52,7 +52,7 @@ bool vmm_getPageStatus(uintptr_t Address);
  * Parameter:	Speicher = Grösse des phys. Speichers
  * 				Stack = Zeiger auf den Stack
  */
-bool vmm_Init(uint64_t Speicher, uintptr_t Stack)
+bool vmm_Init(uint64_t Speicher)
 {
 	uintptr_t mapEnd;
 	uint64_t cr3, i;

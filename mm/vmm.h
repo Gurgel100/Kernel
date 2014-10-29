@@ -20,7 +20,7 @@ typedef struct{
 	void *virtualAddress;
 }context_t;
 
-bool vmm_Init(uint64_t Speicher, uintptr_t Stack);									//Initialisiert virtuelle Speicherverw.
+bool vmm_Init(uint64_t Speicher);									//Initialisiert virtuelle Speicherverw.
 uintptr_t vmm_Alloc(uint64_t Size);						//Reserviert eine virtuelle Speicherst.
 void vmm_Free(uintptr_t Address, uint64_t Size);		//Gibt eine Speicherstelle frei
 
