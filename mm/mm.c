@@ -43,11 +43,8 @@ void mm_Free(uintptr_t Address, uint64_t Pages)
  */
 uintptr_t mm_SysAlloc(uint64_t Size)
 {
-	uint64_t Pages;
 	uintptr_t Address;
-	Pages = Size / MM_BLOCK_SIZE;
-	if(Size % MM_BLOCK_SIZE > 0) Pages++;	//Aufrunden
-	Address = vmm_SysAlloc(0, Pages, true);
+	Address = vmm_SysAlloc(0, Size, true);
 	if(Address == 1) Panic("MM", "Nicht genuegend physikalischer Speicher vorhanden");
 	if(Address == 2) Panic("MM", "Virtuelle Adresse ist schon belegt");
 	if(Address == 3) Panic("MM", "Nich genuegend virtueller Speicher vorhanden");
