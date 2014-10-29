@@ -10,12 +10,8 @@
 #include "stdbool.h"
 #include "string.h"
 
-extern Heap_Entries;
-extern Heap_Base;
 void initLib()
 {
-	Heap_Entries = 0;
-	Heap_Base = NULL;
 }
 
 #ifndef BUILD_KERNEL
