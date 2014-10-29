@@ -84,10 +84,7 @@ bool mm_SysAllocAddr(uintptr_t Address, uint64_t Size)
  */
 bool mm_SysFree(uintptr_t Address, uint64_t Size)
 {
-	uint64_t Pages;
-	if(Address > KERNELSPACE_END || Address < KERNELSPACE_START) return false;
-	Pages = Size / MM_BLOCK_SIZE;
-	if(Size % MM_BLOCK_SIZE > 0) Pages++;	//Aufrunden
-	vmm_SysFree(Address, Pages);
+	if(Address > KERNELSPACE_END) return false;
+	vmm_SysFree(Address, Size);
 	return true;
 }
