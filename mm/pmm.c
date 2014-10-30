@@ -55,7 +55,7 @@ bool pmm_Init()
 	//Stack auf den ersten Stackframe legen
 
 	//Jetzt muss zuerst die virt. Speicherverwaltung initialisiert werden
-	if(!vmm_Init(pmm_Speicher, (uintptr_t)NULL)) return false;
+	if(!vmm_Init(pmm_Speicher)) return false;
 
 	//Die ersten 1GB eintragen
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
