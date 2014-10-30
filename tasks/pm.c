@@ -7,9 +7,8 @@
 
 #include "pm.h"
 #include "vmm.h"
+#include "memory.h"
 #include "stddef.h"
-
-#define STACK_PT	0xFFFFFEFFFFFFFFFF	//Stackpointer an höchste Adresse setzen
 
 typedef struct{
 	process_t Process;
@@ -62,7 +61,7 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
-			.rsp = STACK_PT,
+			.rsp = MM_USER_STACK,
 
 			//IRQs einschalten (IF = 1)
 			.rflags = 0x202,

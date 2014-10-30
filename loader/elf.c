@@ -193,6 +193,9 @@ char elfLoad(FILE *fp)
 	//Jetzt erst einen neuen Prozess anlegen
 	pid_t taskID = pm_InitTask(0, Header->e_entry);
 	process_t *task = pm_getTask(taskID);
+
+	//Stack mappen
+	vmm_Map(MM_USER_STACK, pmm_Alloc(), 1);
 	//Prozess aktivieren
 	pm_ActivateTask(taskID);
 	return 0;

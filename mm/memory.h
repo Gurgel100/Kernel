@@ -17,6 +17,8 @@
 #define USERSPACE_END		0xFFFFFEFFFFFFFFFF		//Userspace Ende
 #define MAX_ADDRESS			0xFFFFFFFFFFFFFFFF		//Maximale Adresse
 
+#define MM_USER_STACK		USERSPACE_END			//Stackaddresse für Prozesse
+
 #define MM_BLOCK_SIZE		4096						//Eine Blockgrösse
 
 #endif /* MEMORY_H_ */
