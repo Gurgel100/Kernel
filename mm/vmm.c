@@ -13,6 +13,7 @@
 #include "memory.h"
 #include "display.h"
 #include "paging.h"
+#include "stdlib.h"
 
 #define NULL (void*)0
 
@@ -396,7 +397,7 @@ list_t vmm_getTables(context_t *context)
 		//PDP auf die Liste setzen
 		list_push(list, (void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
 
-		PDP = VMM_PDP_ADDRESS + (PML4i << 12);
+		PDP = (PDP_t*)(VMM_PDP_ADDRESS + (PML4i << 12));
 
 		//Danach die PDP nach Einträgen durchsuchen
 		for(PDPi = 0; PDPi < 512; PDPi++)
@@ -802,7 +803,7 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress)
 context_t *createContext()
 {
 	context_t *context = malloc(sizeof(context_t));
-	PML4_t *newPML4 = vmm_SysAlloc(0, 1, true);
+	PML4_t *newPML4 = (PML4_t*)vmm_SysAlloc(0, 1, true);
 
 	//Kernel in den Adressraum einbinden
 	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
@@ -812,7 +813,7 @@ context_t *createContext()
 		if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE || PG_AVL(PML4->PML4E[PML4i]) == VMM_POINTER_TO_PML4)
 			newPML4->PML4E[PML4i] = PML4->PML4E[PML4i];
 
-	context->physAddress = vmm_getPhysAddress(newPML4);
+	context->physAddress = vmm_getPhysAddress((uintptr_t)newPML4);
 	//Den letzten Eintrag verwenden wir als Zeiger auf den Anfang der Tabelle. Das ermöglicht das Editieren derselben.
 	if(PG_AVL(PML4->PML4E[511]) == VMM_POINTER_TO_PML4)
 		setPML4Entry(511, newPML4, 1, 1, 0, 1, 0, 0, VMM_POINTER_TO_PML4, 1, (uintptr_t)context->physAddress);
@@ -827,7 +828,7 @@ context_t *createContext()
  */
 void deleteContext(context_t *context)
 {
-	vmm_SysFree(context->virtualAddress, 1);
+	vmm_SysFree((uintptr_t)context->virtualAddress, 1);
 	free(context);
 }
 
