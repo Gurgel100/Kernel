@@ -30,10 +30,10 @@
 #define VMM_KERNELSPACE		0x1
 #define VMM_POINTER_TO_PML4	0x2
 
-const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39) + 1;
-const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30) + 1;
-const uint16_t PDe = ((KERNELSPACE_END & PG_PD_INDEX) >> 21) + 1;
-const uint16_t PTe = ((KERNELSPACE_END & PG_PT_INDEX) >> 12) + 1;
+const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39);
+const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30);
+const uint16_t PDe = ((KERNELSPACE_END & PG_PD_INDEX) >> 21);
+const uint16_t PTe = ((KERNELSPACE_END & PG_PT_INDEX) >> 12);
 
 context_t kernel_context;
 
