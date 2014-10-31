@@ -9,6 +9,7 @@
 #include "vmm.h"
 #include "memory.h"
 #include "stddef.h"
+#include "isr.h"
 
 typedef struct{
 	process_t Process;
