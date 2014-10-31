@@ -163,6 +163,10 @@ char elfLoad(FILE *fp)
 		return -1;
 	}
 
+	//Jetzt einen neuen Prozess anlegen
+	pid_t taskID = pm_InitTask(0, Header->e_entry);
+	process_t *task = pm_getTask(taskID);
+
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
 	fseek(fp, Header->e_phoff, SEEK_SET);
 	if(fread(ProgramHeader, 1, sizeof(elf_program_header_entry), fp) < sizeof(elf_program_header_entry))
@@ -176,26 +180,23 @@ char elfLoad(FILE *fp)
 
 		size_t pages = ProgramHeader[i].p_memsz / 4096;
 		pages += (ProgramHeader[i].p_memsz % 4096) ? 1 : 0;
-		Ziel = vmm_Alloc(pages);
+		Ziel = mm_SysAlloc(pages);
 		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
 		fread(Ziel, 1, ProgramHeader[i].p_filesz, fp);
-		//Speicherbereich an die richtige Addresse mappen
-		vmm_ReMap(Ziel, ProgramHeader[i].p_vaddr, pages, 1);
 
 		//Eventuell mit nullen auffüllen
 		memset(Ziel + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
+
+		//Speicherbereich an die richtige Addresse mappen
+		vmm_ReMap(NULL, Ziel, task->Context, ProgramHeader[i].p_vaddr, pages, 1);
 	}
 
 	//Temporäre Daten wieder freigeben
 	free(ProgramHeader);
 	free(Header);
 
-	//Jetzt erst einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, Header->e_entry);
-	process_t *task = pm_getTask(taskID);
-
 	//Stack mappen
-	vmm_Map(MM_USER_STACK, pmm_Alloc(), 1);
+	vmm_ContextMap(task->Context, MM_USER_STACK, pmm_Alloc(), 1);
 	//Prozess aktivieren
 	pm_ActivateTask(taskID);
 	return 0;
