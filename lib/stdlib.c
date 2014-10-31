@@ -27,12 +27,54 @@ typedef struct{
 							//(Flags): Alle ungeraden Bits 1 und alle geraden 0
 }heap_t;
 
+typedef struct{
+	void (*func)(void);
+	void *next;
+}atexit_list_t;
+
+atexit_list_t *Atexit_List_Base = NULL;
+
 uint64_t Heap_Entries = 0;
 void *Heap_Base = 0;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
 void setupNewHeapEntry(heap_t *old, heap_t *new);
+
+void __attribute__((noreturn)) abort()
+{
+	syscall_exit(-1);
+}
+
+int atexit(void (*func)(void))
+{
+	atexit_list_t *list = Atexit_List_Base;
+	if(list == NULL)
+	{
+		Atexit_List_Base = malloc(sizeof(atexit_list_t));
+		Atexit_List_Base->func = func;
+		Atexit_List_Base->next = NULL;
+	}
+	else
+	{
+		atexit_list_t *new = malloc(sizeof(atexit_list_t));
+		new->func = func;
+		new->next = list;
+		Atexit_List_Base = new;
+	}
+	return 0;
+}
+
+void __attribute__((packed)) exit(int status)
+{
+#ifndef BUILD_KERNEL
+	//Erst registrierte Funktionen aufrufen
+	atexit_list_t *list = Atexit_List_Base;
+	for(; list->next; list = list->next)
+		list->func();
+	syscall_exit(status);
+#endif
+}
 
 long int strtol(const char *str, char **endptr, int base)
 {

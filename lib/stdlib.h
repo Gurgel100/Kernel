@@ -37,6 +37,7 @@ extern void *malloc(size_t size);
 extern void *realloc(void *ptr, size_t size);
 
 extern void abort(void);
+extern int atexit(void (*func)(void));
 extern void exit(int status);
 
 extern int abs(int x);

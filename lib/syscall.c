@@ -33,4 +33,10 @@ inline void syscall_putch(unsigned char c)
 	asm volatile("int $0x30" : : "a"(21), "b"(c));
 }
 
+inline void __attribute__((noreturn)) syscall_exit(int status)
+{
+	asm volatile("int $0x30" : : "a"(11), "b"(status));
+	while(1) asm volatile("hlt");
+}
+
 #endif
