@@ -6,6 +6,7 @@
  */
 
 #include "string.h"
+#include "stdlib.h"
 
 char *strcpy(char *to, const char *from)
 {
