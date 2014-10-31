@@ -39,5 +39,6 @@ uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddres
 
 context_t *createContext(void);
 void deleteContext(context_t *context);
+inline void activateContext(context_t *context);
 
 #endif /* VMM_H_ */
