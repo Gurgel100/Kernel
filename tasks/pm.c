@@ -96,13 +96,16 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 void pm_DestroyTask(pid_t PID)
 {
 	uint64_t i;
-	processlist_t *oldProcess, *prevProcess;
+	processlist_t *oldProcess, *prevProcess = NULL;
 
 	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, prevProcess = oldProcess, oldProcess = ProcessList->Next)
 		if(oldProcess->Process.PID == PID)
 		{
 			deleteContext(oldProcess->Process.Context);
-			prevProcess->Next = oldProcess->Next;
+			if(!prevProcess)
+				prevProcess->Next = oldProcess->Next;
+			else
+				ProcessList = oldProcess->Next;
 			free(oldProcess->Process.State);
 			free(oldProcess);
 			numTasks--;
@@ -177,7 +180,7 @@ process_t *pm_getTask(pid_t PID)
 
 	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, oldProcess = ProcessList->Next)
 		if(oldProcess->Process.PID == PID)
-			return oldProcess->Process;
+			return &oldProcess->Process;
 
 	return NULL;
 }
