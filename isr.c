@@ -55,7 +55,7 @@ void isr_RegisterIRQHandler(uint16_t irq, void *Handler)
 }
 
 extern void keyboard_Handler(ihs_t *ihs);
-extern void syscall_Handler(ihs_t *ihs);
+extern ihs_t *syscall_Handler(ihs_t *ihs);
 extern ihs_t *pm_Schedule(ihs_t *ihs);
 extern void cdi_irq_handler(uint8_t irq);
 extern void pit_Handler(void);
@@ -181,7 +181,7 @@ ihs_t *isr_Handler(ihs_t *ihs)
 		pic_SendEOI(ihs->interrupt - 32);		//PIC sagen, dass IRQ behandelt wurde
 	}
 	else
-		syscall_Handler(new_ihs);
+		new_ihs = syscall_Handler(new_ihs);
 	return new_ihs;
 }
 

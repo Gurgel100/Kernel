@@ -26,6 +26,7 @@ typedef struct{
 void pm_Init(void);
 pid_t pm_InitTask(pid_t parent, void *entry);
 void pm_DestroyTask(pid_t PID);
+ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code);
 void pm_HaltTask(pid_t PID);
 void pm_ActivateTask(pid_t PID);
 void pm_SleepTask(pid_t PID);

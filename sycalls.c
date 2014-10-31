@@ -10,6 +10,7 @@
 #include "syscalls.h"
 #include "isr.h"
 #include "cmos.h"
+#include "pm.h"
 
 extern void putch(char);
 extern char getch(void);
@@ -21,7 +22,7 @@ extern void setCursor(uint16_t, uint16_t);
 /*
  * Funktionsnummer wird im Register rax übergeben
  */
-void syscall_Handler(ihs_t *ihs)
+ihs_t *syscall_Handler(ihs_t *ihs)
 {
 	switch(ihs->rax)
 	{
@@ -56,6 +57,11 @@ void syscall_Handler(ihs_t *ihs)
 			setCursor(ihs->rbx & 0xFFFF, ihs->rcx & 0xFFFF);
 		break;
 
+		//Parameter:	rbx = Rückgabecode
+		case EXIT:
+			ihs = pm_ExitTask(ihs, ihs->rbx);
+		break;
+
 		//Parameter:	rax = Adresse
 		//Rückgabewert:	rax = Adresse
 		case TIME:
@@ -73,6 +79,7 @@ void syscall_Handler(ihs_t *ihs)
 			getSystemInformation(ihs->rbx);
 		break;
 	}
+	return ihs;
 }
 
 #endif

@@ -28,6 +28,8 @@ static processlist_t *ProcessList;		//Liste aller Prozesse (Status)
 static processlist_t *lastProcess;		//letzter Prozess
 static processlist_t *currentProcess;	//Aktueller Prozess
 
+ihs_t *pm_Schedule(ihs_t *cpu);
+
 /*
  * Prozessverwaltung initialisieren
  */
@@ -110,6 +112,28 @@ void pm_DestroyTask(pid_t PID)
 			free(oldProcess);
 			numTasks--;
 		}
+}
+
+/*
+ * Beendet den momentan laufenden Task. Wird als Syscall aufgerufen
+ * Parameter:		Registerstatus
+ * Rückgabewert:	Neuer Registerstatus (Taskswitch)
+ */
+ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
+{
+	process_t *process = &currentProcess->Process;
+	//Erst wechseln wir den Task
+	cpu = pm_Schedule(cpu);
+
+	//Erst überprüfen wir aber, ob der neue Task immer noch wir sind
+	//Wenn ja, dann wird der Task nicht gelöscht
+	if(process->PID != currentProcess->Process.PID)
+	{
+		//Jetzt können wir den Task löschen
+		pm_DestroyTask(process->PID);
+	}
+
+	return cpu;
 }
 
 /*
