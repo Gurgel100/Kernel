@@ -7,6 +7,7 @@
 
 #include "string.h"
 #include "stdlib.h"
+#include "stdint.h"
 
 char *strcpy(char *to, const char *from)
 {
@@ -65,7 +66,7 @@ char *strtok(char *string, const char *delimiters)
 	//Erste Delimiters überspringen
 	cont:
 	sc = *string++;
-	for(del = delimiters; (dc = *del) != '\0'; del++)
+	for(del = (char*)delimiters; (dc = *del) != '\0'; del++)
 		if(sc == dc)
 			goto cont;
 
@@ -80,7 +81,7 @@ char *strtok(char *string, const char *delimiters)
 	while(1)
 	{
 		sc = *string++;
-		del = delimiters;
+		del = (char*)delimiters;
 		do
 		{
 			if((dc = *del++) == sc)
@@ -104,7 +105,7 @@ extern char *strchr(const char *string, int c)
 	for(i = 0; i < length; i++)
 	{
 		if(string[i] == c)
-			return string + i;
+			return (char*)string + i;
 	}
 	return NULL;
 }
@@ -115,7 +116,7 @@ extern char *strrchr(const char *string, int c)
 	for(i = strlen(string); i > 0; i--)
 	{
 		if(string[i - 1] == c)
-			return string + (i - 1);
+			return (char*)string + (i - 1);
 	}
 	return NULL;
 }
@@ -148,7 +149,7 @@ char *strncat(char *str1, const char *str2, size_t n)
 void *memset(void *block, int c, size_t n)
 {
 	unsigned char volatile *i;
-	for(i = block; i < block + n; i++)
+	for(i = block; (uintptr_t)i < (uintptr_t)block + n; i++)
 		*i = (unsigned char)c;
 	return block;
 }
@@ -158,7 +159,7 @@ void *memmove(void *to, const void *from, size_t size)
 {
 	size_t i;
 	char *dest = to;
-	char *src = from;
+	const char *src = from;
 	if(from + size > to)	//Von hinten nach vorne kopieren
 	{
 		for(i = size; i > 0 ; i--)
