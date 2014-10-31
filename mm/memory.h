@@ -14,7 +14,7 @@
 
 //Userspace
 #define USERSPACE_START		KERNELSPACE_END + 1			//Userspace Anfang
-#define USERSPACE_END		0xFFFFFEFFFFFFFFFF		//Userspace Ende
+#define USERSPACE_END		0xFFFFFF7FFFFFFFFF		//Userspace Ende
 #define MAX_ADDRESS			0xFFFFFFFFFFFFFFFF		//Maximale Adresse
 
 #define MM_USER_STACK		USERSPACE_END			//Stackaddresse für Prozesse
