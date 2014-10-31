@@ -34,6 +34,8 @@ void vmm_MapModule(mods *mod);
 void vmm_UnMapModule(mods *mod);
 
 uint64_t vmm_getPhysAddress(uint64_t virtualAddress);
+uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context, uintptr_t dst, size_t length, bool us);
+uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddress, bool US);
 
 context_t *createContext(void);
 void deleteContext(context_t *context);
