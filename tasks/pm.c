@@ -173,11 +173,11 @@ void pm_WakeTask(pid_t PID)
 process_t *pm_getTask(pid_t PID)
 {
 	uint64_t i;
-	processlist_t *oldProcess, *prevProcess;
+	processlist_t *oldProcess;
 
-	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, prevProcess = oldProcess, oldProcess = ProcessList->Next)
+	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, oldProcess = ProcessList->Next)
 		if(oldProcess->Process.PID == PID)
-			return oldProcess;
+			return oldProcess->Process;
 
 	return NULL;
 }
