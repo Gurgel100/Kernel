@@ -14,6 +14,7 @@
 #include "display.h"
 #include "paging.h"
 #include "stdlib.h"
+#include "string.h"
 
 #define NULL (void*)0
 
@@ -31,10 +32,10 @@
 #define VMM_KERNELSPACE		0x1
 #define VMM_POINTER_TO_PML4	0x2
 
-const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39);
-const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30);
-const uint16_t PDe = ((KERNELSPACE_END & PG_PD_INDEX) >> 21);
-const uint16_t PTe = ((KERNELSPACE_END & PG_PT_INDEX) >> 12);
+const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39) + 1;
+const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30) + 1;
+const uint16_t PDe = ((KERNELSPACE_END & PG_PD_INDEX) >> 21) + 1;
+const uint16_t PTe = ((KERNELSPACE_END & PG_PT_INDEX) >> 12) + 1;
 
 context_t kernel_context;
 
@@ -81,19 +82,19 @@ bool vmm_Init(uint64_t Speicher)
 	{
 		setPML4Entry(PML4i, PML4, PML4->PML4E[PML4i] & PG_P, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
 		if((PML4->PML4E[PML4i] & PG_P) == 0) continue;
-		PDP = (PDP_t*)VMM_PDP_ADDRESS + (PML4i << 12);
+		PDP = (PDP_t*)(VMM_PDP_ADDRESS + (PML4i << 12));
 		//PDP anpassen
 		for(PDPi = 0; PDPi < PDPe; PDPi++)
 		{
 			setPDPEntry(PDPi, PDP, PDP->PDPE[PDPi] & PG_P, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
 			if((PDP->PDPE[PDPi] & PG_P) == 0) continue;
-			PD = (PD_t*)VMM_PD_ADDRESS + ((PML4i << 21) | (PDPi << 12));
+			PD = (PD_t*)(VMM_PD_ADDRESS + ((PML4i << 21) | (PDPi << 12)));
 			//PD anpassen
 			for(PDi = 0; PDi < PDe; PDi++)
 			{
 				setPDEntry(PDi, PD, PD->PDE[PDi] & PG_P, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
 				if((PD->PDE[PDi] & PG_P) == 0) continue;
-				PT = (PT_t*)VMM_PT_ADDRESS + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+				PT = (PT_t*)(VMM_PT_ADDRESS + (((uint64_t)PML4i << 30) | (PDPi << 21) | (PDi << 12)));
 				//PT anpassen
 				for(PTi = 0; PTi < PTe; PTi++)
 					setPTEntry(PTi, PT, PT->PTE[PTi] & PG_P, 1, 0, 1, 0, 0, 0, 0, VMM_KERNELSPACE, 0, 0, PT->PTE[PTi] & PG_ADDRESS);
@@ -675,13 +676,13 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
  * 					1 = zu wenig phys. Speicherplatz vorhanden
  * 					2 = Destinationaddresse ist schon belegt
  *///TODO: Bei Fehler alles Rückgängig machen
-uint8_t vmm_ReMap(uintptr_t src, uintptr_t dst, size_t length, bool us)
+uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context, uintptr_t dst, size_t length, bool us)
 {
 	size_t i;
 	for(i = 0; i < length; i++)
 	{
 		uint8_t r;
-		if((r = vmm_Map(dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE), us)) != 0)
+		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE), us)) != 0)
 			return r;
 		if(vmm_UnMap(src + i * VMM_SIZE_PER_PAGE) == 2)
 			return 1;
@@ -721,6 +722,161 @@ void *getFreePages(void *start, void *end, size_t pages)
 		}
 	}
 	return NULL;
+}
+
+/*
+ * Mappt einen Speicherbereich an die vorgegebene Address im entsprechendem Kontext
+ */
+uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddress, bool US)
+{
+	PML4_t *PML4 = context->virtualAddress;
+	PDP_t *PDP;
+	PD_t *PD;
+	PT_t *PT;
+	uintptr_t Address;
+
+	//Einträge in die Page Tabellen
+	uint16_t PML4i = (vAddress & PG_PML4_INDEX) >> 39;
+	uint16_t PDPi = (vAddress & PG_PDP_INDEX) >> 30;
+	uint16_t PDi = (vAddress & PG_PD_INDEX) >> 21;
+	uint16_t PTi = (vAddress & PG_PT_INDEX) >> 12;
+
+	//PML4 Tabelle bearbeiten
+	if((PML4->PML4E[PML4i] & PG_P) == 0)		//Eintrag für die PML4 schon vorhanden?
+	{											//Erstelle neuen Eintrag
+		if((Address = (uintptr_t)pmm_Alloc()) == 1)		//Speicherplatz für die PDP reservieren
+		{
+			return 1;							//Kein Speicherplatz vorhanden
+		}
+
+		//Eintrag in die PML4
+		if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+			setPML4Entry(PML4i, PML4, 1, 1, US, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
+		else
+			setPML4Entry(PML4i, PML4, 1, 1, US, 1, 0, 0, 0, 0, Address);
+		//PDP mappen
+		PDP = (PDP_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+		vmm_Map((uintptr_t)PDP, Address, 0);
+		uint32_t i;
+		for(i = 0; i < 512; i++)
+			PDP->PDPE[i] = 0;
+	}
+	else
+	{
+		//PDP mappen
+		PDP = (PDP_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+		vmm_Map((uintptr_t)PDP, PML4->PML4E[PML4i], 0);
+		if((PML4->PML4E[PML4i] & PG_US) < US)	//Wenn zu wenig Berechtigungen
+		{
+			//Eintrag der PML4 ändern
+			if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+				setPML4Entry(PML4i, PML4, 1, 1, US, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+			else
+				setPML4Entry(PML4i, PML4, 1, 1, US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+		}
+	}
+
+	//PDP Tabelle bearbeiten
+	if((PDP->PDPE[PDPi] & PG_P) == 0)			//Eintrag in die PDP schon vorhanden?
+	{											//Neuen Eintrag erstellen
+		if((Address = (uintptr_t)pmm_Alloc()) == 1)		//Speicherplatz für die PD reservieren
+		{
+			vmm_UnMap((uintptr_t)PDP);
+			return 1;							//Kein Speicherplatz vorhanden
+		}
+
+		//Eintrag in die PDP
+		if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+			setPDPEntry(PDPi, PDP, 1, 1, US, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
+		else
+			setPDPEntry(PDPi, PDP, 1, 1, US, 1, 0, 0, 0, 0, Address);
+		//PD mappen
+		PD = (PD_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+		vmm_Map((uintptr_t)PD, Address, 0);
+		uint32_t i;
+		for(i = 0; i < 512; i++)
+			PD->PDE[i] = 0;
+	}
+	else
+	{
+		//PD mappen
+		PD = (PD_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+		vmm_Map((uintptr_t)PD, PDP->PDPE[PDPi], 0);
+		if((PDP->PDPE[PDPi] & PG_US) < US)		//Wenn zu wenig Berechtigungen
+		{
+			//Eintrag der PDP ändern
+			if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+				setPDPEntry(PDPi, PDP, 1, 1, US, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+			else
+				setPDPEntry(PDPi, PDP, 1, 1, US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+		}
+	}
+
+	//PD Tabelle bearbeiten
+	if((PD->PDE[PDi] & PG_P) == 0)			//Eintrag in die PD schon vorhanden?
+	{										//Neuen Eintrag erstellen
+		if((Address = (uintptr_t)pmm_Alloc()) == 1)	//Speicherplatz für die PT reservieren
+		{
+			vmm_UnMap((uintptr_t)PDP);
+			vmm_UnMap((uintptr_t)PD);
+			return 1;							//Kein Speicherplatz vorhanden
+		}
+
+		//Eintrag in die PDP
+		if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+			setPDEntry(PDi, PD, 1, 1, US, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
+		else
+			setPDEntry(PDi, PD, 1, 1, US, 1, 0, 0, 0, 0, Address);
+		//PT mappen
+		PT = (PT_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+		vmm_Map((uintptr_t)PT, Address, 0);
+		uint32_t i;
+		for(i = 0; i < 512; i++)
+			PT->PTE[i] = 0;
+	}
+	else
+	{
+		//PT mappen
+		PT = (PT_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+		vmm_Map((uintptr_t)PT, PD->PDE[PDi], 0);
+		if((PD->PDE[PDi] & PG_US) < US)		//Wenn zu wenig Berechtigungen
+		{
+			//Eintrag der PD ändern
+			if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+				setPDEntry(PDi, PD, 1, 1, US, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
+			else
+				setPDEntry(PDi, PD, 1, 1, US, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
+		}
+	}
+
+	//PT Tabelle bearbeiten
+	if((PT->PTE[PTi] & PG_P) == 0)			//Eintrag in die PT schon vorhanden?
+	{										//Neuen Eintrag erstellen
+		//Eintrag in die PT
+		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
+			setPTEntry(PTi, PT, 1, 1, US, 1, 0, 0, 0, 0, VMM_KERNELSPACE, 0, 0, pAddress);
+		else
+			setPTEntry(PTi, PT, 1, 1, US, 1, 0, 0, 0, 0, 0, 0, 0, pAddress);
+	}
+	else
+	{
+		vmm_UnMap((uintptr_t)PDP);
+		vmm_UnMap((uintptr_t)PD);
+		vmm_UnMap((uintptr_t)PT);
+		return 2;							//virtuelle Addresse schon besetzt
+	}
+
+	//Reserved-Bits zurücksetzen
+	PD->PDE[PDi] &= ~0x1C0;
+	PDP->PDPE[PDPi] &= ~0x1C0;
+	PML4->PML4E[PML4i] &= ~0x1C0;
+
+	//Tabellen wieder unmappen
+	vmm_UnMap((uintptr_t)PDP);
+	vmm_UnMap((uintptr_t)PD);
+	vmm_UnMap((uintptr_t)PT);
+
+	return 0;
 }
 
 /*
@@ -803,7 +959,7 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress)
 context_t *createContext()
 {
 	context_t *context = malloc(sizeof(context_t));
-	PML4_t *newPML4 = (PML4_t*)vmm_SysAlloc(0, 1, true);
+	PML4_t *newPML4 = (PML4_t*)memset((void*)vmm_SysAlloc(0, 1, true), 0, MM_BLOCK_SIZE);
 
 	//Kernel in den Adressraum einbinden
 	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
