@@ -18,6 +18,8 @@ inline void FreePage(void *Address, size_t Pages);
 inline char syscall_getch();
 inline void syscall_putch(unsigned char c);
 
+inline void syscall_exit(int status);
+
 #endif /* SYSCALL_H_ */
 
 #endif
