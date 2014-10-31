@@ -44,11 +44,14 @@ void setupNewHeapEntry(heap_t *old, heap_t *new);
 
 void abort()
 {
+#ifndef BUILD_KERNEL
 	syscall_exit(-1);
+#endif
 }
 
 int atexit(void (*func)(void))
 {
+#ifndef BUILD_KERNEL
 	atexit_list_t *list = Atexit_List_Base;
 	if(list == NULL)
 	{
@@ -63,6 +66,7 @@ int atexit(void (*func)(void))
 		new->next = list;
 		Atexit_List_Base = new;
 	}
+#endif
 	return 0;
 }
 
