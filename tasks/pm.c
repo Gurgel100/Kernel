@@ -10,6 +10,8 @@
 #include "memory.h"
 #include "stddef.h"
 #include "isr.h"
+#include "stdlib.h"
+#include "string.h"
 
 typedef struct{
 	process_t Process;
