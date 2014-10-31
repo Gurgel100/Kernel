@@ -9,6 +9,7 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "string.h"
+#include "ctype.h"
 #ifdef BUILD_KERNEL
 #include "mm.h"
 #include "cpu.h"
@@ -174,7 +175,7 @@ void free(void *ptr)
 		if(Heap->Prev != NULL)
 		{
 			tmpHeap = Heap->Prev;
-			if(((uintptr_t)tmpHeap + tmpHeap->Length + sizeof(heap_t)) == Heap
+			if(((uintptr_t)tmpHeap + tmpHeap->Length + sizeof(heap_t)) == (uintptr_t)Heap
 					&& !(tmpHeap->Flags & HEAP_RESERVED))	//Wenn der Speicherbereich vornedran frei ist, dann mit diesem fusionieren
 			{
 				tmpHeap->Next = Heap->Next;
@@ -190,7 +191,7 @@ void free(void *ptr)
 		if(Heap->Next != NULL)
 		{
 			tmpHeap = Heap->Next;
-			if(((uintptr_t)Heap + Heap->Length + sizeof(heap_t)) == tmpHeap
+			if(((uintptr_t)Heap + Heap->Length + sizeof(heap_t)) == (uintptr_t)tmpHeap
 					&& !(tmpHeap->Flags & HEAP_RESERVED))	//Wenn der Speicherbereich hintendran frei ist, dann mit diesem fusionieren
 			{
 				Heap->Next = tmpHeap->Next;
@@ -347,7 +348,7 @@ void *realloc(void *ptr, size_t size)
 		free(ptr);
 		return NULL;
 	}
-	heap_t *Heap, *tmpHeap;
+	heap_t *Heap;
 	void *Address = NULL;
 	Heap = ptr - sizeof(heap_t);
 	//TODO: nicht sehr effektiv, aber es Funktioniert
