@@ -29,6 +29,8 @@
 //Dateifunktionen (TODO)
 #define FOPEN	40
 #define FCLOSE	41
+#define FREAD	42
+#define FWRITE	43
 
 //Verschiedene Funktionen
 #define TIME	50
