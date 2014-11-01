@@ -49,10 +49,20 @@ double atan(double x)
 }
 
 //TODO
-/*double atan2(double x, double y);
-double sinh(double x);
-double cosh(double x);
-double tanh(double x);*/
+//double atan2(double x, double y);
+double sinh(double x)
+{
+	return (exp(x) - exp(-x)) / 2;
+}
+double cosh(double x)
+{
+	return (exp(x) + exp(-x)) / 2;
+}
+double tanh(double x)
+{
+	double e = exp(2 * x);
+	return (e - 1) / (e + 1);
+}
 
 /*
  * e hoch x
