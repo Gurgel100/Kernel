@@ -7,6 +7,7 @@
 
 #include "pm.h"
 #include "vmm.h"
+#include "pmm.h"
 #include "memory.h"
 #include "stddef.h"
 #include "isr.h"
