@@ -55,8 +55,8 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 	newProcess->Process.Sleeping = false;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
-			.cs = 0x08,	//Userspace
-			.ss = 0x10,
+			.cs = 0x18 + 3,	//Userspace
+			.ss = 0x20 + 3,
 			.es = 0x10,
 			.ds = 0x10,
 			.gs = 0x10,
