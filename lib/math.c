@@ -120,3 +120,27 @@ double sqrt(double x)
 	asm("fsqrt" :"=t"(Ergebnis) :"0"(x));
 	return Ergebnis;
 }
+
+double ceil(double x)
+{
+	long int i = (long int)x;
+	if(i < x) i++;
+	return (double)i;
+}
+
+double fabs(double x)
+{
+	return (x >= 0) ? x : -x;
+}
+
+double floor(double x)
+{
+	return (double)(long int)x;
+}
+
+double fmod(double x, double y)
+{
+	double Ergebnis;
+	asm("fprem" :"=t"(Ergebnis) :"u"(y), "0"(x));
+	return Ergebnis;
+}

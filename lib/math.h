@@ -32,6 +32,11 @@ extern double log10(double x);	//Logarithmus zur Basis 10 von x lg(x)
 extern double pow(double x, double y);
 extern double sqrt(double x);
 
+extern double ceil(double x);
+extern double fabs(double x);
+extern double floor(double x);
+extern double fmod(double x, double y);
+
 #ifdef __cplusplus
 }
 #endif
