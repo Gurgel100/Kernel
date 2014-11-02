@@ -38,7 +38,6 @@ void setPML4Entry(uint16_t i, PML4_t *PML4, uint8_t Present, uint8_t RW, uint8_t
 	PML4->PML4E[i] |= Address & 0xFFFFFFFFFF000LL;
 	PML4->PML4E[i] |= ((AVL >> 3) & 0x7FFLL) <<52;
 	PML4->PML4E[i] |= (NX & 1LL) << 63;
-	FlushTLB();
 }
 
 void setPDPEntry(uint16_t i, PDP_t *PDP, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
@@ -54,7 +53,6 @@ void setPDPEntry(uint16_t i, PDP_t *PDP, uint8_t Present, uint8_t RW, uint8_t US
 	PDP->PDPE[i] |= Address & 0xFFFFFFFFFF000LL;
 	PDP->PDPE[i] |= ((AVL >> 3) & 0x7FFLL) <<52;
 	PDP->PDPE[i] |= (NX & 1LL) << 63;
-	FlushTLB();
 }
 
 void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
@@ -70,14 +68,12 @@ void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, u
 	PD->PDE[i] |= Address & 0xFFFFFFFFFF000LL;
 	PD->PDE[i] |= ((AVL >> 3) & 0x7FFLL) <<52;
 	PD->PDE[i] |= (NX & 1LL) << 63;
-	FlushTLB();
 }
 
 void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
 		uint8_t PCD, uint8_t A, uint8_t D, uint8_t G, uint16_t AVL,
 		uint8_t PAT, uint8_t NX, uintptr_t Address)
 {
-	InvalidateTLBEntry(PT->PTE[i] & PG_ADDRESS);
 	PT->PTE[i] = (Present & 1);
 	PT->PTE[i] |= (RW & 1) << 1;
 	PT->PTE[i] |= (US & 1) << 2;
@@ -96,28 +92,21 @@ void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, u
 //XXX
 inline void clearPML4Entry(uint16_t i, PML4_t *PML4)
 {
-	PML4->PML4E[i] = 0;
-	InvalidateTLBEntry(PML4->PML4E[i] & PG_ADDRESS);
-	//FlushTLB();
+	PML4->PML4E[i] = 0
 }
 
 inline void clearPDPEntry(uint16_t i, PDP_t *PDP)
 {
 	PDP->PDPE[i] = 0;
-	InvalidateTLBEntry(PDP->PDPE[i] & PG_ADDRESS);
-	//FlushTLB();
 }
 
 inline void clearPDEntry(uint16_t i, PD_t *PD)
 {
 	PD->PDE[i] = 0;
-	InvalidateTLBEntry(PD->PDE[i] & PG_ADDRESS);
-	//FlushTLB();
 }
 
 inline void clearPTEntry(uint16_t i, PT_t *PT)
 {
-	InvalidateTLBEntry(PT->PTE[i] & PG_ADDRESS);
 	PT->PTE[i] = 0;
 }
 
