@@ -19,6 +19,7 @@
 #define IDT_TYPE_TRAP_GATE	(0b1111 << 8)	//Interrupts bleiben aktiviert
 
 #define IDT_DPL_KERNEL	0
+#define IDT_DPL_USER	0x6000
 
 #define IDT_PRESENT			0x8000
 
