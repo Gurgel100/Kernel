@@ -7,7 +7,6 @@
 
 #include "pm.h"
 #include "vmm.h"
-#include "pmm.h"
 #include "memory.h"
 #include "stddef.h"
 #include "isr.h"
@@ -24,6 +23,8 @@ static uint64_t numTasks;
 static processlist_t *ProcessList;		//Liste aller Prozesse (Status)
 static processlist_t *lastProcess;		//letzter Prozess
 static processlist_t *currentProcess;	//Aktueller Prozess
+
+extern context_t kernel_context;
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -63,7 +64,7 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
-			.rsp = MM_USER_STACK,
+			.rsp = MM_USER_STACK + 1,
 
 			//IRQs einschalten (IF = 1)
 			.rflags = 0x202,
@@ -71,15 +72,15 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 			//Interrupt ist beim Schedulen 32
 			.interrupt = 32
 	};
-	newProcess->Process.State = malloc(sizeof(ihs_t));
-	memmove(newProcess->Process.State, &new_state, sizeof(ihs_t));
-	//newProcess->State = new_state;
+	newProcess->Process.State = (ihs_t*)(MM_USER_STACK + 1 - sizeof(ihs_t));
 
 	newProcess->Process.Context = createContext();
 	newProcess->Next = NULL;
 
-	//Stack mappen
-	vmm_ContextMap(newProcess->Process.Context, MM_USER_STACK, pmm_Alloc(), 1);
+	//Stack mappen (1 Page)
+	void *Stack = (void*)mm_SysAlloc(1);
+	memmove(Stack + MM_BLOCK_SIZE - sizeof(ihs_t), &new_state, sizeof(ihs_t));
+	vmm_ReMap(&kernel_context, (uintptr_t)Stack, newProcess->Process.Context, MM_USER_STACK, 1, 1);
 
 	if(ProcessList == NULL)				//Wenn noch keine Prozessliste vorhanden ist, eine neue anlegen
 		ProcessList = newProcess;
@@ -108,7 +109,6 @@ void pm_DestroyTask(pid_t PID)
 				prevProcess->Next = oldProcess->Next;
 			else
 				ProcessList = oldProcess->Next;
-			free(oldProcess->Process.State);
 			free(oldProcess);
 			numTasks--;
 		}
@@ -223,7 +223,7 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		//Wenn nur ein Task läuft, dann muss kein Taskswitch vorgenommen werden. Dies ist auch der Fall wenn nur einer aktiv ist
 		if(currentProcess->Next == NULL && currentProcess == ProcessList)
 			return cpu;
-		memmove(currentProcess->Process.State, cpu, sizeof(ihs_t));
+		currentProcess->Process.State = cpu;
 
 		do
 		{
@@ -234,7 +234,7 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 
 		activateContext(currentProcess->Process.Context);
 
-		memmove(cpu, currentProcess->Process.State, sizeof(ihs_t));
+		return currentProcess->Process.State;
 	}
 	else if(ProcessList != NULL)
 	{
@@ -242,7 +242,7 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		{
 			currentProcess = ProcessList;
 			activateContext(currentProcess->Process.Context);
-			memmove(cpu, currentProcess->Process.State, sizeof(ihs_t));
+			return currentProcess->Process.State;
 		}
 	}
 	return cpu;
