@@ -91,4 +91,6 @@ inline void clearPML4Entry(uint16_t i, PML4_t *PML4);
 inline void clearPDPEntry(uint16_t i, PDP_t *PDP);
 inline void clearPDEntry(uint16_t i, PD_t *PD);
 inline void clearPTEntry(uint16_t i, PT_t *PT);
+
+inline void InvalidateTLBEntry(void *Address);
 #endif /* PAGING_H_ */
