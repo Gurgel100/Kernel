@@ -75,7 +75,7 @@ void exit(int status)
 #ifndef BUILD_KERNEL
 	//Erst registrierte Funktionen aufrufen
 	atexit_list_t *list = Atexit_List_Base;
-	for(; list->next; list = list->next)
+	for(; list && list->next; list = list->next)
 		list->func();
 	syscall_exit(status);
 #endif
