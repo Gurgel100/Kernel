@@ -193,7 +193,7 @@ char elfLoad(FILE *fp)
 		memset(Ziel + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
 
 		//Speicherbereich an die richtige Addresse mappen
-		vmm_ReMap(NULL, Ziel, task->Context, ProgramHeader[i].p_vaddr, pages, 1);
+		vmm_ReMap(&kernel_context, Ziel, task->Context, ProgramHeader[i].p_vaddr, pages, 1);
 	}
 
 	//Temporäre Daten wieder freigeben
