@@ -10,7 +10,7 @@
 #ifndef GDT_H_
 #define GDT_H_
 
-#define GDT_ENTRIES	6
+#define GDT_ENTRIES	7
 
 #include "stdint.h"
 

@@ -21,6 +21,7 @@ void GDT_Init()
 	GDT_SetEntry(2, 0, 0xFFFFF, 0x92, 0xC);	//Datensegment, les- und schreibbar
 	//Ring 3
 	GDT_SetEntry(3, 0, 0xFFFFF, 0xFA, 0xA);	//Codesegment, ausführ- und lesbar, 64-bit, Ring 3
+	GDT_SetEntry(4, 0, 0xFFFFF, 0xF2, 0xC);	//Datensegment, les- und schreibbar, Ring 3
 
 	gdtr.limit = GDT_ENTRIES *8 - 1;
 	gdtr.pointer = gdt;

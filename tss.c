@@ -10,7 +10,7 @@
 #include "tss.h"
 #include "gdt.h"
 
-#define SELECTOR	4
+#define SELECTOR	5
 
 static tss_entry_t tss;
 static uint8_t stack0[1000] __attribute__((aligned(16)));	//0.5 MB für den Stack (16-Byte aligned)
