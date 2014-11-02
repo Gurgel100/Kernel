@@ -114,6 +114,8 @@ typedef struct
 		elf64_xword	p_align;		// Alignment. if zero or one, then no alignment is needed, otherwise the alignment has to be a power of two
 }elf_program_header_entry;
 
+extern context_t kernel_context;
+
 char elfCheck(elf_header *ELFHeader);	//Par.: Zeiger auf ELF-Header
 uint64_t getElfEntryAddress(elf_header *ElfHeader);
 
