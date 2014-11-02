@@ -19,10 +19,6 @@ typedef struct{
 	void *Next;
 }processlist_t;							//Prozessliste
 
-typedef struct{
-		uint64_t mmx[6];
-};
-
 static pid_t nextPID;
 static uint64_t numTasks;
 static processlist_t *ProcessList;		//Liste aller Prozesse (Status)

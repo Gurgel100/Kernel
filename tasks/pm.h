@@ -15,6 +15,11 @@
 typedef uint64_t pid_t;
 
 typedef struct{
+		uint64_t mmx[6];
+		uint128_t ymm[16][2];		//YMM-Register sind 256-Bit breit
+}__attribute__((aligned(16)))ihs_extended_t;
+
+typedef struct{
 		ihs_t *State;
 		context_t *Context;
 		pid_t PID;
