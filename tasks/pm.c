@@ -81,6 +81,9 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 	newProcess->Process.Context = createContext();
 	newProcess->Next = NULL;
 
+	//Stack mappen
+	vmm_ContextMap(newProcess->Process.Context, MM_USER_STACK, pmm_Alloc(), 1);
+
 	if(ProcessList == NULL)				//Wenn noch keine Prozessliste vorhanden ist, eine neue anlegen
 		ProcessList = newProcess;
 	else

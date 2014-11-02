@@ -195,8 +195,6 @@ char elfLoad(FILE *fp)
 	free(ProgramHeader);
 	free(Header);
 
-	//Stack mappen
-	vmm_ContextMap(task->Context, MM_USER_STACK, pmm_Alloc(), 1);
 	//Prozess aktivieren
 	pm_ActivateTask(taskID);
 	return 0;
