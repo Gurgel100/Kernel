@@ -92,7 +92,7 @@ void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, u
 //XXX
 inline void clearPML4Entry(uint16_t i, PML4_t *PML4)
 {
-	PML4->PML4E[i] = 0
+	PML4->PML4E[i] = 0;
 }
 
 inline void clearPDPEntry(uint16_t i, PDP_t *PDP)
