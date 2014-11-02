@@ -170,7 +170,12 @@ char elfLoad(FILE *fp)
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
 	fseek(fp, Header->e_phoff, SEEK_SET);
 	if(fread(ProgramHeader, 1, sizeof(elf_program_header_entry), fp) < sizeof(elf_program_header_entry))
+	{
+		free(Header);
+		free(ProgramHeader);
+		pm_DestroyTask(taskID);
 		return -1;
+	}
 
 	register int i;
 	for(i = 0; i < Header->e_phnum; i++)
