@@ -11,10 +11,8 @@
 #include "gdt.h"
 
 #define SELECTOR	5
-#define STACKSIZE	4096		//4kb für den Stack
 
 static tss_entry_t tss;
-static uint8_t stack0[STACKSIZE] __attribute__((aligned(16)));	//0.5 MB für den Stack (16-Byte aligned)
 
 void TSS_Init()
 {
@@ -26,7 +24,6 @@ void TSS_Init()
 	tr.Selector = SELECTOR << 3;
 
 	//TSS initialisieren
-	TSS_setStack((void*)(stack0 + STACKSIZE));
 	tss.MapBaseAddress = 0x96;
 	memset(tss.IOPD, 0, 8192);
 
