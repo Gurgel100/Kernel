@@ -193,7 +193,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			{
 				size_t size = 0;
 				size_t i, tmp;
-				for(i = 0; i < length && tmp != 0; i += stream->bufSize)
+				for(i = 0; i < length; i += stream->bufSize)
 				{
 					tmp = vfs_Read(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
 					stream->bufPos = tmp;
@@ -201,6 +201,8 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 					stream->posRead += tmp;
 					memcpy(ptr + i, stream->buffer, tmp);
 					size += tmp;
+					if(tmp == 0)
+						break;
 				}
 				if(size < length)
 					stream->eof = true;
