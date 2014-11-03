@@ -35,6 +35,7 @@ typedef struct{
 }__attribute__((packed))tss_entry_t;
 
 void TSS_Init(void);
+void TSS_setStack(void *stack);
 
 #endif /* TSS_H_ */
 
