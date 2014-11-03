@@ -40,6 +40,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 	sound_Play(10000, 1000);
+	vfs_MountRoot();
 
 	//Der Kernel wird durch ein Interrupt aufgeweckt
 	while(1) asm volatile("hlt;");	//Wir wollen diese Funktion nicht verlassen
