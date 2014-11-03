@@ -39,4 +39,37 @@ inline void __attribute__((noreturn)) syscall_exit(int status)
 	while(1);
 }
 
+inline void *syscall_fopen(char *path, mode_t mode)
+{
+	void *ret;
+	asm volatile("int $0x30" : "=a"(ret) : "a"(40), "b"(path), "c"(mode));
+	return ret;
+}
+
+inline void syscall_fclose(vfs_stream_t *stream)
+{
+	asm volatile("int $0x30" : : "a"(41), "b"(stream));
+}
+
+inline size_t syscall_fread(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
+{
+	size_t ret;
+	asm volatile("int $0x30" : "=a"(ret) : "a"(42), "b"(stream), "c"(start), "d"(length), "e"(buffer));
+	return ret;
+}
+
+inline size_t syscall_fwrite(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
+{
+	size_t ret;
+	asm volatile("int $0x30" : "=a"(ret) : "a"(43), "b"(stream), "c"(start), "d"(length), "e"(buffer));
+	return ret;
+}
+
+inline uint64_t syscall_StreamInfo(vfs_stream_t *stream, vfs_fileinfo_t info)
+{
+	uint64_t ret;
+	asm volatile("int $0x30" : "=a"(ret) : "a"(44), "b"(stream), "c"(info));
+	return ret;
+}
+
 #endif
