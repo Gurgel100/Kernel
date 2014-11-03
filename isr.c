@@ -170,9 +170,15 @@ ihs_t *isr_Handler(ihs_t *ihs)
 		switch(ihs->interrupt)
 		{
 			case 32:
+			{
+				static uint64_t nextSchedule = 50;
 				pit_Handler();
-				if((Uptime % 50) == 0)
+				if(Uptime == nextSchedule)
+				{
 					new_ihs = pm_Schedule(ihs);
+					nextSchedule += 50;				//Alle 50ms wird der Task gewechselt
+				}
+			}
 			break;
 			case 33:
 				keyboard_Handler(ihs);
