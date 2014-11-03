@@ -9,6 +9,7 @@
 
 #include "tss.h"
 #include "gdt.h"
+#include "string.h"
 
 #define SELECTOR	5
 
@@ -33,7 +34,7 @@ void TSS_Init()
 
 void TSS_setStack(void *stack)
 {
-	tss.rsp0 = stack;
+	tss.rsp0 = (uint64_t)stack;
 }
 
 #endif
