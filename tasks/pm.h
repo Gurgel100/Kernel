@@ -26,6 +26,7 @@ typedef struct{
 		pid_t PPID;
 		bool Active;
 		bool Sleeping;
+		void *kernelStackBottom, *kernelStack;
 }process_t;
 
 void pm_Init(void);

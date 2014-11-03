@@ -7,11 +7,13 @@
 
 #include "pm.h"
 #include "vmm.h"
+#include "pmm.h"
 #include "memory.h"
 #include "stddef.h"
 #include "isr.h"
 #include "stdlib.h"
 #include "string.h"
+#include "tss.h"
 
 typedef struct{
 	process_t Process;
@@ -23,8 +25,6 @@ static uint64_t numTasks;
 static processlist_t *ProcessList;		//Liste aller Prozesse (Status)
 static processlist_t *lastProcess;		//letzter Prozess
 static processlist_t *currentProcess;	//Aktueller Prozess
-
-extern context_t kernel_context;
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -72,15 +72,17 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 			//Interrupt ist beim Schedulen 32
 			.interrupt = 32
 	};
-	newProcess->Process.State = (ihs_t*)(MM_USER_STACK + 1 - sizeof(ihs_t));
+	//Kernelstack vorbereiten
+	newProcess->Process.kernelStackBottom = (void*)mm_SysAlloc(1);
+	newProcess->Process.kernelStack = newProcess->Process.kernelStackBottom + MM_BLOCK_SIZE;
+	newProcess->Process.State = (ihs_t*)(newProcess->Process.kernelStack - sizeof(ihs_t));
+	memcpy(newProcess->Process.State, &new_state, sizeof(ihs_t));
 
 	newProcess->Process.Context = createContext();
 	newProcess->Next = NULL;
 
 	//Stack mappen (1 Page)
-	void *Stack = (void*)mm_SysAlloc(1);
-	memmove(Stack + MM_BLOCK_SIZE - sizeof(ihs_t), &new_state, sizeof(ihs_t));
-	vmm_ReMap(&kernel_context, (uintptr_t)Stack, newProcess->Process.Context, MM_USER_STACK, 1, 1);
+	vmm_ContextMap(newProcess->Process.Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), 1);
 
 	if(ProcessList == NULL)				//Wenn noch keine Prozessliste vorhanden ist, eine neue anlegen
 		ProcessList = newProcess;
@@ -233,6 +235,7 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		while(currentProcess->Process.Sleeping || !currentProcess->Process.Active);
 
 		activateContext(currentProcess->Process.Context);
+		TSS_setStack(currentProcess->Process.kernelStack);
 
 		return currentProcess->Process.State;
 	}
@@ -242,6 +245,7 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		{
 			currentProcess = ProcessList;
 			activateContext(currentProcess->Process.Context);
+			TSS_setStack(currentProcess->Process.kernelStack);
 			return currentProcess->Process.State;
 		}
 	}
