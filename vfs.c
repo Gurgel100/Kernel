@@ -522,7 +522,7 @@ void vfs_RegisterDevice(device_t *dev)
 
 struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 {
-	struct cdi_fs_res *res;
+	struct cdi_fs_res *res = NULL;
 	struct cdi_fs_res *prevRes = stream->fs->root_res;
 	struct cdi_fs_stream tmpStream = {
 		.fs = stream->fs,
@@ -545,6 +545,7 @@ struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 			res->res->load(&tmpStream);
 			prevRes = res;
 			j++;
+			i = 0;
 		}
 	}
 	freeDirs(&dirs, dirSize);
