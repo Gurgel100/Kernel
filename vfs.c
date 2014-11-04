@@ -87,6 +87,29 @@ void vfs_Init(void)
 	Node->Name = "mount";
 	Node->Type = TYPE_DIR;
 
+	//Unterordner "dev" füllen
+	Node = getNode("/dev");
+	if(Node != NULL)
+	{
+		Node->Child = malloc(sizeof(vfs_node_t));
+		Node->Child->Parent = Node;
+		Node = Node->Child;
+		Node->Name = "stdout";
+		Node->Type = TYPE_FILE;
+
+		Node->Next = malloc(sizeof(vfs_node_t));
+		Node->Next->Parent = Node->Parent;
+		Node = Node->Next;
+		Node->Name = "stdin";
+		Node->Type = TYPE_FILE;
+
+		Node->Next = malloc(sizeof(vfs_node_t));
+		Node->Next->Parent = Node->Parent;
+		Node = Node->Next;
+		Node->Name = "stderr";
+		Node->Type = TYPE_FILE;
+	}
+
 	lastNode = Node;
 }
 
