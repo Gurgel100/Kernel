@@ -111,9 +111,19 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 		case TYPE_MOUNT:
 			stream->stream.fs = node->partition->fs;
 			stream->stream.res = getRes(&stream->stream, remPath);
+			if(stream->stream.res == NULL)
+			{
+				free(stream);
+				if(remPath)
+					free(remPath);
+				return NULL;
+			}
 		break;
 		case TYPE_DIR:	//Ordner kann man nicht öffnen
 			printf("Versucht Ordner zu öffnen!\n");
+			free(stream);
+			if(remPath)
+				free(remPath);
 			return NULL;
 		break;
 	}
