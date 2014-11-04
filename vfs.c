@@ -454,15 +454,18 @@ vfs_node_t *getLastNode(const char *Path, char **remPath)
 	if(!Node)
 	{
 		Node = oldNode;
-		i--;
 	}
 	if(remPath != NULL)
 	{
 		*remPath = NULL;
-		for(;i < NumDirs; i++)
+		size_t size = 0;
+		size_t j;
+		for(j = 1; i < NumDirs; i++, j++)
 		{
-			*remPath = realloc(*remPath, strlen(Dirs[i]));
-			strcpy(*remPath, Dirs[i]);
+			size += strlen(Dirs[i]);
+			*remPath = realloc(*remPath, size + j + 1);
+			strcpy(*remPath + size - strlen(Dirs[i]) + j - 1, "/");
+			strcpy(*remPath + size - strlen(Dirs[i]) + j, Dirs[i]);
 		}
 	}
 
