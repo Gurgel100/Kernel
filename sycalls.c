@@ -62,6 +62,35 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			ihs = pm_ExitTask(ihs, ihs->rbx);
 		break;
 
+		//Parameter:	rbx = Pfad, rcx = Addresse zur Modusstruktur
+		//Rückgabewert:	rax = Pointer zur Systemdateistruktur
+		case FOPEN:
+			ihs->rax = vfs_Open((char*)ihs->rbx, (vfs_mode_t)*ihs->rcx);
+		break;
+
+		//Parameter:	rbx = Pointer zur Systemdateistruktur
+		case FCLOSE:
+			vfs_Close((vfs_stream_t*)ihs->rbx);
+		break;
+
+		//Parameter:	rbx = Systemdateistruktur, rcx = Start, rdx = Länge, rdi = Buffer
+		//Rückgabewert:	rax = Bytes, die erfolgreich gelesen wurden
+		case FREAD:
+			ihs->rax = vfs_Read((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, ihs->rdi);
+		break;
+
+		//Parameter:	rbx = Systemdateistruktur, rcx = Start, rdx = Länge, rdi = Buffer
+		//Rückgabewert:	rax = Bytes, die erfolgreich geschrieben wurden
+		case FWRITE:
+			ihs->rax = vfs_Write((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, ihs->rdi);
+		break;
+
+		//Parameter:	rbx = Systemdateistruktur, rcx = Informationstyp
+		//Rückgabewert:	rax = Wert für den entsprechenden Informationstyp
+		case FINFO:
+			ihs->rax = vfs_getFileinfo(ihs->rbx, ihs->rcx);
+		break;
+
 		//Parameter:	rax = Adresse
 		//Rückgabewert:	rax = Adresse
 		case TIME:

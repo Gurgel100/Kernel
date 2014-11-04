@@ -31,6 +31,7 @@
 #define FCLOSE	41
 #define FREAD	42
 #define FWRITE	43
+#define FINFO	44
 
 //Verschiedene Funktionen
 #define TIME	50
