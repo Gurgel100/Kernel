@@ -11,6 +11,7 @@
 #include "isr.h"
 #include "cmos.h"
 #include "pm.h"
+#include "vfs.h"
 
 extern void putch(char);
 extern char getch(void);
@@ -65,7 +66,7 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 		//Parameter:	rbx = Pfad, rcx = Addresse zur Modusstruktur
 		//Rückgabewert:	rax = Pointer zur Systemdateistruktur
 		case FOPEN:
-			ihs->rax = vfs_Open((char*)ihs->rbx, (vfs_mode_t)*ihs->rcx);
+			ihs->rax = (uintptr_t)vfs_Open((char*)ihs->rbx, *((vfs_mode_t*)ihs->rcx));
 		break;
 
 		//Parameter:	rbx = Pointer zur Systemdateistruktur
@@ -76,19 +77,19 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 		//Parameter:	rbx = Systemdateistruktur, rcx = Start, rdx = Länge, rdi = Buffer
 		//Rückgabewert:	rax = Bytes, die erfolgreich gelesen wurden
 		case FREAD:
-			ihs->rax = vfs_Read((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, ihs->rdi);
+			ihs->rax = vfs_Read((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, (void*)ihs->rdi);
 		break;
 
 		//Parameter:	rbx = Systemdateistruktur, rcx = Start, rdx = Länge, rdi = Buffer
 		//Rückgabewert:	rax = Bytes, die erfolgreich geschrieben wurden
 		case FWRITE:
-			ihs->rax = vfs_Write((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, ihs->rdi);
+			ihs->rax = vfs_Write((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, (void*)ihs->rdi);
 		break;
 
 		//Parameter:	rbx = Systemdateistruktur, rcx = Informationstyp
 		//Rückgabewert:	rax = Wert für den entsprechenden Informationstyp
 		case FINFO:
-			ihs->rax = vfs_getFileinfo(ihs->rbx, ihs->rcx);
+			ihs->rax = vfs_getFileinfo((vfs_stream_t*)ihs->rbx, ihs->rcx);
 		break;
 
 		//Parameter:	rax = Adresse
