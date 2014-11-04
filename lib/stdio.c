@@ -39,7 +39,7 @@ char *itoa(int64_t x, char *s);							//Int nach String
 char *utoa(uint64_t x, char *s);						//UInt nach String
 char *ftoa(float x, char *s);							//Float nach String
 char *i2hex(uint64_t val, char* dest, uint64_t len);	//Int nach Hexadezimal
-#ifdef BUILD_KERNEL
+
 //Dateifunktionen
 FILE *fopen(const char *filename, const char *mode)
 {
@@ -107,7 +107,11 @@ FILE *fopen(const char *filename, const char *mode)
 	file->mode.read = m.read;
 	file->mode.write = m.write;
 	file->mode.binary = binary;
+#ifdef BUILD_KERNEL
 	file->stream = vfs_Open(filename, m);
+#else
+	file->stream = syscall_fopen(filename, m);
+#endif
 	if(file->stream == NULL)
 	{
 		free(file);
@@ -130,7 +134,11 @@ int fclose(FILE *stream)
 	if(setvbuf(stream, NULL, _IONBF, 0))
 		return EOF;
 
+#ifdef BUILD_KERNEL
 	vfs_Close(stream->stream);
+#else
+	syscall_fclose(stream->stream);
+#endif
 	free(stream);
 
 	return 0;
@@ -168,7 +176,11 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 				size_t i;
 				for(i = 0; i < length; i++)
 				{
+#ifdef BUILD_KERNEL
 					size_t size = vfs_Read(stream->stream, stream->posRead++, 1, &tmp);
+#else
+					size_t size = syscall_fread(stream->stream, stream->posRead++, 1, &tmp);
+#endif
 					stream->buffer[stream->bufPos++] = tmp;
 					if(tmp == '\n' && i < length)
 					{
@@ -195,7 +207,11 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 				size_t i, tmp;
 				for(i = 0; i < length; i += stream->bufSize)
 				{
+#ifdef BUILD_KERNEL
 					tmp = vfs_Read(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
+#else
+					tmp = syscall_fread(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
+#endif
 					stream->bufPos = tmp;
 					stream->bufStart = stream->posRead;
 					stream->posRead += tmp;
@@ -212,7 +228,11 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	}
 	else
 	{
+#ifdef BUILD_KERNEL
 		readData = vfs_Read(stream->stream, stream->posRead, length, ptr);
+#else
+		readData = syscall_fread(stream->stream, stream->posRead, length, ptr);
+#endif
 		stream->posRead += length;
 	}
 
@@ -234,7 +254,11 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
 	if(stream->bufMode == IO_MODE_NO_BUFFER)
 	{
+#ifdef BUILD_KERNEL
 		writeData = vfs_Write(stream->stream, stream->posWrite, length, ptr);
+#else
+		writeData = syscall_fwrite(stream->stream, stream->posWrite, length, ptr);
+#endif
 	}
 	else if(stream->bufMode == IO_MODE_LINE_BUFFER)
 	{
@@ -247,7 +271,11 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 			if(source[i] == '\n')
 			{
 				size_t size = 0;
+#ifdef BUILD_KERNEL
 				size = vfs_Write(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
+#else
+				size = syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
+#endif
 				stream->bufPos = 0;
 				stream->bufStart += size;
 				writeData += size;
@@ -271,7 +299,11 @@ int fflush(FILE *stream)
 		return 0;
 
 	if(stream->bufMode != IO_MODE_NO_BUFFER)
+#ifdef BUILD_KERNEL
 		vfs_Write(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
+#else
+		syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
+#endif
 
 	return 0;
 }
@@ -356,6 +388,8 @@ int fseek(FILE *stream, long int offset, int whence)
 				//Grösse der Datei ermitteln
 #ifdef BUILD_KERNEL
 				size_t filesize = vfs_getFileinfo(stream->stream, VFS_INFO_FILESIZE);
+#else
+				size_t filesize = syscall_StreamInfo(stream->stream, VFS_INFO_FILESIZE);
 #endif
 				stream->posRead = stream->posWrite = filesize - offset;
 			}
@@ -398,7 +432,6 @@ int fgetpos(FILE *stream, fpos_t *pos)
 	*pos = stream->posRead;
 	return 0;
 }
-#endif
 
 //TODO: alle print-Funktionen fertigstellen
 
