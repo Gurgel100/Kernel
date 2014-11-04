@@ -36,6 +36,7 @@ typedef struct vfs_node{
 		union{
 			partition_t *partition;
 			device_t *dev;
+			size_t (*Handler)(char *name, uint64_t start, size_t length, const void *buffer);
 		};
 }vfs_node_t;
 

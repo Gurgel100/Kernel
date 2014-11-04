@@ -11,6 +11,7 @@
 #define DISPLAY_H_
 
 #include "stdint.h"
+#include "stddef.h"
 
 //Hintergrundfarben
 #define BG_BLACK			0x00
@@ -53,6 +54,8 @@ void Display_Clear(void);
 void Panic(char *Device, char *Text);
 void hideCursor(void);
 void showCursor(void);
+
+size_t Display_FileHandler(char *name, uint64_t start, size_t length, const void *buffer);
 
 #endif /* DISPLAY_H_ */
 

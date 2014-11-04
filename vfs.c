@@ -13,6 +13,7 @@
 #include "string.h"
 #include "stdlib.h"
 #include "list.h"
+#include "display.h"
 
 #define VFS_MODE_READ	0x1
 #define VFS_MODE_WRITE	0x2
@@ -96,18 +97,21 @@ void vfs_Init(void)
 		Node = Node->Child;
 		Node->Name = "stdout";
 		Node->Type = TYPE_FILE;
+		Node->Handler = Display_FileHandler;
 
 		Node->Next = malloc(sizeof(vfs_node_t));
 		Node->Next->Parent = Node->Parent;
 		Node = Node->Next;
 		Node->Name = "stdin";
 		Node->Type = TYPE_FILE;
+		Node->Handler = NULL;
 
 		Node->Next = malloc(sizeof(vfs_node_t));
 		Node->Next->Parent = Node->Parent;
 		Node = Node->Next;
 		Node->Name = "stderr";
 		Node->Type = TYPE_FILE;
+		Node->Handler = Display_FileHandler;
 	}
 
 	lastNode = Node;
@@ -235,6 +239,11 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
 			//Überprüfen, ob auf das Dateisystem geschrieben werden darf
 			if(!stream->stream.fs->read_only && stream->stream.res->flags.write)
 				sizeWritten = stream->stream.res->file->read(&stream->stream, start, length, buffer);
+		break;
+		case TYPE_FILE:
+			//Wenn ein Handler gesetzt ist, dann Handler aufrufen
+			if(stream->node->Handler != NULL)
+				sizeWritten = stream->node->Handler(stream->node->Name, start, length, buffer);
 		break;
 	}
 	return sizeWritten;
