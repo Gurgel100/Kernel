@@ -56,6 +56,7 @@ struct{
 		bool avx;
 		bool aes;
 		bool rdrand;
+		bool nx;
 }cpuInfo;
 
 void cpu_Init(void);

@@ -98,6 +98,9 @@ void cpu_Init()
 	//Erweiterte Funktionen
 	cpuInfo.maxextCPUID = cpu_CPUID(0x80000000, EAX);
 
+	Temp = cpu_CPUID(0x80000001, EDX);
+	cpuInfo.nx = Temp & (1 << 20);
+
 	//Namen des Prozessors
 	if(cpuInfo.maxextCPUID >= 0x80000003 && cpuInfo.Vendor == INTEL)
 	{
@@ -183,8 +186,17 @@ void cpu_Init()
 				);
 	}
 
-	//Setze NX-Bit (Bit 11 im EFER)
-	cpu_MSRwrite(0xC0000080, cpu_MSRread(0xC0000080) | 0x800);
+	//Setze NX-Bit (Bit 11 im EFER), wenn verfügbar
+	if(cpuInfo.nx)
+		cpu_MSRwrite(0xC0000080, cpu_MSRread(0xC0000080) | 0x800);
+
+	//Wenn verfügbar Global Pages aktivieren
+	if(cpuInfo.GlobalPage)
+		asm volatile(
+				"mov %%cr4,%%rax;"
+				"or $1<<7,%%rax;"
+				"mov %%rax,%%cr4;"
+				: : :"rax");
 	SysLog("CPU", "Initialisierung abgeschlossen");
 }
 
