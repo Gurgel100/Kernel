@@ -82,7 +82,7 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 	newProcess->Next = NULL;
 
 	//Stack mappen (1 Page)
-	vmm_ContextMap(newProcess->Process.Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), 1);
+	vmm_ContextMap(newProcess->Process.Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
 
 	if(ProcessList == NULL)				//Wenn noch keine Prozessliste vorhanden ist, eine neue anlegen
 		ProcessList = newProcess;
