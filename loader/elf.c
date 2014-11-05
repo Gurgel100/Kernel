@@ -114,6 +114,42 @@ typedef struct
 		elf64_xword	p_align;		// Alignment. if zero or one, then no alignment is needed, otherwise the alignment has to be a power of two
 }elf_program_header_entry;
 
+#define ELF_SHT_NULL		0	//Nicht benutzt
+#define ELF_SHT_PROGBITS	1	//Enthält Programmspezifische Informationen
+#define ELF_SHT_SYMTAB		2	//Enthält Linkersymboltabelle
+#define ELF_SHT_STRTAB		3	//Enthält Stringtabelle
+#define ELF_SHT_RELA		4	//Enthält "Rela" Typ relocation entries
+#define ELF_SHT_HASH		5	//Enthält symbol Hashtabelle
+#define ELF_SHT_DYNAMIC		6	//Enthält dynamic linking tables
+#define ELF_SHT_NOTE		7	//Enthält note Informationen
+#define ELF_SHT_NOBITS		8	//Enthält uninitialisierten Platz. Belegt keinen Speicher in der Datei
+#define ELF_SHT_REL			9	//Enthält "Rel" Typ relocation entries
+#define ELF_SHT_SHLIB		10	//Reserviert
+#define ELF_SHT_DYNSYM		11	//Enthält eine dynamic loader symbol table
+#define ELF_SHT_LOOS		0x60000000	//Environment Spezifisch
+#define ELF_SHT_HIOS		0x6FFFFFFF
+#define ELF_SHT_LOPROC		0x70000000	//Prozessor spezifisch
+#define ELF_SHT_HIPROC		0x7FFFFFFF
+
+#define ELF_SHF_WRITE		0x1		//Sektion enthält schreibbare Daten
+#define ELF_SHF_ALLOC		0x2		//Sektion ist im Speicherimage des Programms
+#define ELF_SHF_EXECINSTR	0x4		//Sektion enthält ausführbare Daten
+#define ELF_SHF_MASKOS		0x0F000000	//Envirement-spezifisch
+#define ELF_SHF_MASKPROC	0xF0000000	//Prozessor-spezifisch
+
+typedef struct{
+	elf64_word	sh_name;		// Offset zum Sektionsnamen relativ zur Sektionsnamentabelle
+	elf64_word	sh_type;		// Sektionstyp
+	elf64_xword	sh_flags;		// Sektionsattribute
+	elf64_addr	sh_addr;		// Virtuelle Addresse im Speicher
+	elf64_off	sh_offset;		// Offset in der Datei
+	elf64_xword	sh_size;		// Sektionsgrösse in der Datei
+	elf64_word	sh_link;		// Link zu einer anderen Sektion
+	elf64_word	sh_info;		// Verschiedene Informationen
+	elf64_xword	sh_addralign;	// Address Alignment
+	elf64_xword	sh_entsize;		// Grösse der Einträge, wenn Sektion eine Tabelle hat
+}elf_section_header_entry;
+
 extern context_t kernel_context;
 
 char elfCheck(elf_header *ELFHeader);	//Par.: Zeiger auf ELF-Header
