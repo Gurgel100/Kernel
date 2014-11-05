@@ -197,6 +197,15 @@ void cpu_Init()
 				"or $1<<7,%%rax;"
 				"mov %%rax,%%cr4;"
 				: : :"rax");
+
+	//Caching aktivieren
+	asm volatile(
+			"mov %%cr0,%%rax;"
+			"btc $30,%%rax;"	//Cache disable bit deaktivieren
+			"btc $29,%%rax;"	//Write through auch deaktivieren sonst gibt es eine #GP-Exception
+			"mov %%rax,%%cr0;"
+			: : :"rax");
+
 	SysLog("CPU", "Initialisierung abgeschlossen");
 }
 
