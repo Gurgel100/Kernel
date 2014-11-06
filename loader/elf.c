@@ -8,6 +8,9 @@
 #include "pm.h"
 #include "mm.h"
 #include "memory.h"
+#include "string.h"
+#include "vmm.h"
+#include "stdlib.h"
 
 typedef uint64_t	elf64_addr;
 typedef uint16_t 	elf64_half;
@@ -181,7 +184,6 @@ uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse 
 char elfLoad(FILE *fp)
 {
 	elf_header *Header;
-	char *Speicher;
 	char *Ziel;
 
 	//Zurücksetzen des Dateizeigers
@@ -202,7 +204,7 @@ char elfLoad(FILE *fp)
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, Header->e_entry);
+	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry);
 	process_t *task = pm_getTask(taskID);
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
@@ -215,7 +217,7 @@ char elfLoad(FILE *fp)
 		return -1;
 	}
 
-	register int i;
+	int i;
 	for(i = 0; i < Header->e_phnum; i++)
 	{
 		//Wenn kein ladbares Segment, dann Springe zum nächsten Segment
@@ -223,7 +225,7 @@ char elfLoad(FILE *fp)
 
 		size_t pages = ProgramHeader[i].p_memsz / 4096;
 		pages += (ProgramHeader[i].p_memsz % 4096) ? 1 : 0;
-		Ziel = mm_SysAlloc(pages);
+		Ziel = (char*)mm_SysAlloc(pages);
 		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
 		fread(Ziel, 1, ProgramHeader[i].p_filesz, fp);
 
@@ -231,7 +233,7 @@ char elfLoad(FILE *fp)
 		memset(Ziel + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
 
 		//Speicherbereich an die richtige Addresse mappen
-		vmm_ReMap(&kernel_context, Ziel, task->Context, ProgramHeader[i].p_vaddr, pages, VMM_FLAGS_WRITE | VMM_FLAGS_USER);
+		vmm_ReMap(&kernel_context, (uintptr_t)Ziel, task->Context, ProgramHeader[i].p_vaddr, pages, VMM_FLAGS_WRITE | VMM_FLAGS_USER);
 	}
 
 	//Temporäre Daten wieder freigeben
