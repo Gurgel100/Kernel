@@ -118,6 +118,46 @@ void* list_get(list_t list, size_t index)
 }
 
 /*
+ * Loescht ein Listenelement
+ *
+ * @param list Liste, aus der entfernt werden soll
+ * @param index Index des zu entfernenden Elements
+ *
+ * @return Das entfernte Element oder NULL, wenn kein Element mit dem
+ * angegebenen Index existiert.
+ */
+void* list_remove(list_t list, size_t index)
+{
+	struct list_node *Node, *prevNode;
+	size_t i;
+	void *value;
+	if(!list) return NULL;
+	if(index >= list->Size)
+		return NULL;
+	Node = list->Anchor;
+	value = Node->Value;
+	if(index == 0)
+	{
+		list->Anchor = Node->Next;
+	}
+	else
+	{
+		prevNode = Node;
+		for(i = 1; i < index; i++)
+		{
+			prevNode = Node;
+			Node = Node->Next;
+		}
+		prevNode->Next = Node->Next;
+	}
+
+	free(Node);
+	list->Size--;
+
+	return value;
+}
+
+/*
  * Gibt die Laenge der Liste zurueck
  *
  * @param list Liste, deren Laenge zurueckgegeben werden soll
