@@ -6,6 +6,7 @@
  */
 
 #include "list.h"
+#include "stdlib.h"
 
 struct list_node{
 		void *Value;
