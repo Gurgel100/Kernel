@@ -14,17 +14,12 @@
 #include "stdlib.h"
 #include "string.h"
 #include "tss.h"
+#include "list.h"
 
-typedef struct{
-	process_t Process;
-	void *Next;
-}processlist_t;							//Prozessliste
-
-static pid_t nextPID;
-static uint64_t numTasks;
-static processlist_t *ProcessList;		//Liste aller Prozesse (Status)
-static processlist_t *lastProcess;		//letzter Prozess
-static processlist_t *currentProcess;	//Aktueller Prozess
+static pid_t nextPID = 1;
+static uint64_t numTasks = 0;
+static list_t ProcessList;					//Liste aller Prozesse (Status)
+static process_t *currentProcess = NULL;	//Aktueller Prozess
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -33,9 +28,7 @@ ihs_t *pm_Schedule(ihs_t *cpu);
  */
 void pm_Init()
 {
-	nextPID = 0;
-	numTasks = 0;
-	ProcessList = lastProcess = currentProcess = NULL;
+	ProcessList = list_create();
 }
 
 /*
@@ -46,13 +39,13 @@ void pm_Init()
 
 pid_t pm_InitTask(pid_t parent, void *entry)
 {
-	processlist_t *newProcess = malloc(sizeof(processlist_t));
+	process_t *newProcess = malloc(sizeof(process_t));
 	numTasks++;
 
-	newProcess->Process.PID = nextPID++;
-	newProcess->Process.PPID = parent;
-	newProcess->Process.Active = false;
-	newProcess->Process.Sleeping = false;
+	newProcess->PID = nextPID++;
+	newProcess->PPID = parent;
+	newProcess->Active = false;
+	newProcess->Sleeping = false;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
 			.cs = 0x18 + 3,	//Userspace
@@ -73,25 +66,20 @@ pid_t pm_InitTask(pid_t parent, void *entry)
 			.interrupt = 32
 	};
 	//Kernelstack vorbereiten
-	newProcess->Process.kernelStackBottom = (void*)mm_SysAlloc(1);
-	newProcess->Process.kernelStack = newProcess->Process.kernelStackBottom + MM_BLOCK_SIZE;
-	newProcess->Process.State = (ihs_t*)(newProcess->Process.kernelStack - sizeof(ihs_t));
-	memcpy(newProcess->Process.State, &new_state, sizeof(ihs_t));
+	newProcess->kernelStackBottom = (void*)mm_SysAlloc(1);
+	newProcess->kernelStack = newProcess->kernelStackBottom + MM_BLOCK_SIZE;
+	newProcess->State = (ihs_t*)(newProcess->kernelStack - sizeof(ihs_t));
+	memcpy(newProcess->State, &new_state, sizeof(ihs_t));
 
-	newProcess->Process.Context = createContext();
-	newProcess->Next = NULL;
+	newProcess->Context = createContext();
 
 	//Stack mappen (1 Page)
-	vmm_ContextMap(newProcess->Process.Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
+	vmm_ContextMap(newProcess->Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
 
-	if(ProcessList == NULL)				//Wenn noch keine Prozessliste vorhanden ist, eine neue anlegen
-		ProcessList = newProcess;
-	else
-		lastProcess->Next = newProcess;
+	//Prozess in Liste eintragen
+	list_push(ProcessList, newProcess);
 
-	lastProcess = newProcess;
-
-	return newProcess->Process.PID;
+	return newProcess->PID;
 }
 
 /*
@@ -100,20 +88,22 @@ pid_t pm_InitTask(pid_t parent, void *entry)
  */
 void pm_DestroyTask(pid_t PID)
 {
-	uint64_t i;
-	processlist_t *oldProcess, *prevProcess = NULL;
+	uint64_t i = 0;
+	process_t *process;
 
-	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, prevProcess = oldProcess, oldProcess = ProcessList->Next)
-		if(oldProcess->Process.PID == PID)
-		{
-			deleteContext(oldProcess->Process.Context);
-			if(!prevProcess)
-				prevProcess->Next = oldProcess->Next;
-			else
-				ProcessList = oldProcess->Next;
-			free(oldProcess);
+	while((process = list_get(ProcessList, i)) != NULL)
+	{
+		if(process->PID == PID)
+		{	//Wenn der richtige Prozess gefunden wurde, alle Datenstrukturen des Prozesses freigeben
+			list_remove(ProcessList, i);
+			deleteContext(process->Context);
+			mm_SysFree((uintptr_t)process->kernelStackBottom, 1);
+			free(process);
 			numTasks--;
+			break;
 		}
+		i++;
+	}
 }
 
 /*
@@ -123,13 +113,13 @@ void pm_DestroyTask(pid_t PID)
  */
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
 {
-	process_t *process = &currentProcess->Process;
+	process_t *process = currentProcess;
 	//Erst wechseln wir den Task
 	cpu = pm_Schedule(cpu);
 
 	//Erst überprüfen wir aber, ob der neue Task immer noch wir sind
 	//Wenn ja, dann wird der Task nicht gelöscht
-	if(process->PID != currentProcess->Process.PID)
+	if(process->PID != currentProcess->PID)
 	{
 		//Jetzt können wir den Task löschen
 		pm_DestroyTask(process->PID);
@@ -144,12 +134,17 @@ ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
  */
 void pm_HaltTask(pid_t PID)
 {
-	uint64_t i;
-	processlist_t *Process;
+	uint64_t i = 0;
+	process_t *Process;
 
-	for(i = 0, Process = ProcessList; i < numTasks; i++, Process = ProcessList->Next)
-		if(Process->Process.PID == PID)
-			Process->Process.Active = false;
+	while((Process = list_get(ProcessList, i++)) == NULL)
+	{
+		if(Process->PID == PID)
+		{
+			Process->Active = false;
+			break;
+		}
+	}
 }
 
 /*
@@ -158,12 +153,17 @@ void pm_HaltTask(pid_t PID)
  */
 void pm_ActivateTask(pid_t PID)
 {
-	uint64_t i;
-	processlist_t *Process;
+	uint64_t i = 0;
+	process_t *Process;
 
-	for(i = 0, Process = ProcessList; i < numTasks; i++, Process = ProcessList->Next)
-		if(Process->Process.PID == PID)
-			Process->Process.Active = true;
+	while((Process = list_get(ProcessList, i++)) == NULL)
+	{
+		if(Process->PID == PID)
+		{
+			Process->Active = true;
+			break;
+		}
+	}
 }
 
 /*
@@ -172,12 +172,18 @@ void pm_ActivateTask(pid_t PID)
  */
 void pm_SleepTask(pid_t PID)
 {
-	uint64_t i;
-	processlist_t *Process;
+	uint64_t i = 0;
+	process_t *Process;
 
-	for(i = 0, Process = ProcessList; i < numTasks; i++, Process = ProcessList->Next)
-		if(Process->Process.PID == PID)
-			Process->Process.Sleeping = true;
+
+	while((Process = list_get(ProcessList, i++)) == NULL)
+	{
+		if(Process->PID == PID)
+		{
+			Process->Sleeping = true;
+			break;
+		}
+	}
 }
 
 /*
@@ -186,12 +192,17 @@ void pm_SleepTask(pid_t PID)
  */
 void pm_WakeTask(pid_t PID)
 {
-	uint64_t i;
-	processlist_t *Process;
+	uint64_t i = 0;
+	process_t *Process;
 
-	for(i = 0, Process = ProcessList; i < numTasks; i++, Process = ProcessList->Next)
-		if(Process->Process.PID == PID)
-			Process->Process.Sleeping = false;
+	while((Process = list_get(ProcessList, i++)) == NULL)
+	{
+		if(Process->PID == PID)
+		{
+			Process->Sleeping = false;
+			break;
+		}
+	}
 }
 
 /*
@@ -201,12 +212,14 @@ void pm_WakeTask(pid_t PID)
  */
 process_t *pm_getTask(pid_t PID)
 {
-	uint64_t i;
-	processlist_t *oldProcess;
+	uint64_t i = 0;
+	process_t *Process;
 
-	for(i = 0, oldProcess = ProcessList; i < numTasks; i++, oldProcess = ProcessList->Next)
-		if(oldProcess->Process.PID == PID)
-			return &oldProcess->Process;
+	while((Process = list_get(ProcessList, i++)) == NULL)
+	{
+		if(Process->PID == PID)
+			return Process;
+	}
 
 	return NULL;
 }
@@ -219,34 +232,48 @@ process_t *pm_getTask(pid_t PID)
  */
 ihs_t *pm_Schedule(ihs_t *cpu)
 {
+	static size_t actualProcessIndex = 0;
 
-	if(currentProcess != NULL)	//Nur Zustand speichern, wenn schon in einem Task
+	if(list_size(ProcessList))		//Gibt es eigentlich etwas zu schedulen?
 	{
-		//Wenn nur ein Task läuft, dann muss kein Taskswitch vorgenommen werden. Dies ist auch der Fall wenn nur einer aktiv ist
-		if(currentProcess->Next == NULL && currentProcess == ProcessList)
-			return cpu;
-		currentProcess->Process.State = cpu;
-
-		do
+		if(currentProcess != NULL)	//Wenn wir noch in keinem Task sind dann müssen wir auch nichts speichern
 		{
-			currentProcess = (currentProcess->Next == NULL) ?
-					ProcessList : currentProcess->Next;
+			process_t *newProcess;
+			do
+			{
+				newProcess = list_get(ProcessList, actualProcessIndex);
+				actualProcessIndex = (actualProcessIndex > list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+			}
+			while(newProcess->Active && !newProcess->Sleeping);
+			if(newProcess == currentProcess)
+				return cpu;
+			//Jetzt alten Prozessorzustand speichern
+			currentProcess->State = cpu;
+
+			//Hier findet der eigentliche Taskswitch statt
+			currentProcess = newProcess;
+			activateContext(currentProcess->Context);
+			TSS_setStack(currentProcess->kernelStack);
+			cpu = currentProcess->State;
 		}
-		while(currentProcess->Process.Sleeping || !currentProcess->Process.Active);
-
-		activateContext(currentProcess->Process.Context);
-		TSS_setStack(currentProcess->Process.kernelStack);
-
-		return currentProcess->Process.State;
-	}
-	else if(ProcessList != NULL)
-	{
-		if(ProcessList->Process.Active && !ProcessList->Process.Sleeping)
+		else
 		{
-			currentProcess = ProcessList;
-			activateContext(currentProcess->Process.Context);
-			TSS_setStack(currentProcess->Process.kernelStack);
-			return currentProcess->Process.State;
+			//Einen Task suchen, der geht
+			do
+			{
+				currentProcess = list_get(ProcessList, actualProcessIndex);
+				actualProcessIndex = (actualProcessIndex > list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+			}
+			while(currentProcess->Active && !currentProcess->Sleeping);
+			//Wenn keine erster Prozess gefunden wurde, wechseln wir auch nicht den Task
+			if(actualProcessIndex == 0)
+				return cpu;
+
+			//Ist schneller als actualIndex = (actualIndex + 1) % list_size(ProcessList)
+			actualProcessIndex = (actualProcessIndex > list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+			activateContext(currentProcess);
+			TSS_setStack(currentProcess->kernelStack);
+			cpu = currentProcess->State;
 		}
 	}
 	return cpu;
