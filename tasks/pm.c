@@ -137,7 +137,7 @@ void pm_HaltTask(pid_t PID)
 	uint64_t i = 0;
 	process_t *Process;
 
-	while((Process = list_get(ProcessList, i++)) == NULL)
+	while((Process = list_get(ProcessList, i++)) != NULL)
 	{
 		if(Process->PID == PID)
 		{
@@ -156,7 +156,7 @@ void pm_ActivateTask(pid_t PID)
 	uint64_t i = 0;
 	process_t *Process;
 
-	while((Process = list_get(ProcessList, i++)) == NULL)
+	while((Process = list_get(ProcessList, i++)) != NULL)
 	{
 		if(Process->PID == PID)
 		{
@@ -176,7 +176,7 @@ void pm_SleepTask(pid_t PID)
 	process_t *Process;
 
 
-	while((Process = list_get(ProcessList, i++)) == NULL)
+	while((Process = list_get(ProcessList, i++)) != NULL)
 	{
 		if(Process->PID == PID)
 		{
@@ -195,7 +195,7 @@ void pm_WakeTask(pid_t PID)
 	uint64_t i = 0;
 	process_t *Process;
 
-	while((Process = list_get(ProcessList, i++)) == NULL)
+	while((Process = list_get(ProcessList, i++)) != NULL)
 	{
 		if(Process->PID == PID)
 		{
@@ -215,7 +215,7 @@ process_t *pm_getTask(pid_t PID)
 	uint64_t i = 0;
 	process_t *Process;
 
-	while((Process = list_get(ProcessList, i++)) == NULL)
+	while((Process = list_get(ProcessList, i++)) != NULL)
 	{
 		if(Process->PID == PID)
 			return Process;
