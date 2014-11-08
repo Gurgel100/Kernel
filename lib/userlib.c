@@ -17,7 +17,7 @@ void initLib()
 #ifndef BUILD_KERNEL
 void getSysInfo(SIS *Struktur)
 {
-	asm("int $0x30" : :"a"(50), "b"(Struktur));
+	asm("int $0x30" : :"a"(60), "b"(Struktur));
 }
 #endif
 
