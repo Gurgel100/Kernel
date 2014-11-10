@@ -185,7 +185,6 @@ uintptr_t vmm_Alloc(uint64_t Length)
 	return 0;						//Keine virt. Addresse gefunden
 }
 
-//TODO: Warum 8 mal Pages?
 /*
  * Gibt Speicherplatz im Userspace frei
  * Parameter:	vAddress = Virtuelle Adresse, an die der Block anfängt
@@ -194,7 +193,7 @@ uintptr_t vmm_Alloc(uint64_t Length)
 void vmm_Free(uintptr_t vAddress, uint64_t Pages)
 {
 	uintptr_t i;
-	for(i = vAddress; i <= vAddress + Pages * 8; i += VMM_SIZE_PER_PAGE)
+	for(i = vAddress; i < vAddress + Pages * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
 	{
 		uint8_t Fehler = vmm_UnMap(i);
 		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
@@ -286,7 +285,7 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
 void vmm_SysFree(uintptr_t vAddress, uint64_t Length)
 {
 	uintptr_t i;
-	for(i = vAddress; i <= vAddress + Length * 8; i += VMM_SIZE_PER_PAGE)
+	for(i = vAddress; i < vAddress + Length * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
 	{
 		uint8_t Fehler = vmm_UnMap(i);
 		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
