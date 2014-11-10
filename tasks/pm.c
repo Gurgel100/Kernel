@@ -242,9 +242,9 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 			do
 			{
 				newProcess = list_get(ProcessList, actualProcessIndex);
-				actualProcessIndex = (actualProcessIndex > list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+				actualProcessIndex = (actualProcessIndex < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
 			}
-			while(newProcess->Active && !newProcess->Sleeping);
+			while(!newProcess->Active || newProcess->Sleeping);
 			if(newProcess == currentProcess)
 				return cpu;
 			//Jetzt alten Prozessorzustand speichern
@@ -262,16 +262,14 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 			do
 			{
 				currentProcess = list_get(ProcessList, actualProcessIndex);
-				actualProcessIndex = (actualProcessIndex > list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+				actualProcessIndex = (actualProcessIndex < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
 			}
-			while(currentProcess->Active && !currentProcess->Sleeping);
+			while((!currentProcess->Active || currentProcess->Sleeping) && actualProcessIndex != 0);
 			//Wenn keine erster Prozess gefunden wurde, wechseln wir auch nicht den Task
 			if(actualProcessIndex == 0)
 				return cpu;
 
-			//Ist schneller als actualIndex = (actualIndex + 1) % list_size(ProcessList)
-			actualProcessIndex = (actualProcessIndex > list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
-			activateContext(currentProcess);
+			activateContext(currentProcess->Context);
 			TSS_setStack(currentProcess->kernelStack);
 			cpu = currentProcess->State;
 		}
