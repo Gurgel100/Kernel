@@ -893,6 +893,146 @@ uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddres
 }
 
 /*
+ * Gibt eine physikalischer Addresse zu einer virtuellen Addresse frei
+ * Params:	context = Kontext in dem die Page demapped werden soll
+ * 			vAddress = virt. Addresse der freizugebenden Speicherstelle
+ *
+ * Rückgabewert:	0 = Page wurde freigegeben
+ * 					1 = virt. Addresse nicht belegt
+ * 					2 = zu wenig phys. Speicherplatz vorhanden
+ */
+uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
+{
+	PML4_t *PML4 = context.virtualAddress;
+	PDP_t *PDP;
+	PD_t *PD;
+	PT_t *PT;
+	uint16_t i;
+
+	//Einträge in die Page Tabellen
+	uint16_t PML4i = (vAddress & PG_PML4_INDEX) >> 39;
+	uint16_t PDPi = (vAddress & PG_PDP_INDEX) >> 30;
+	uint16_t PDi = (vAddress & PG_PD_INDEX) >> 21;
+	uint16_t PTi = (vAddress & PG_PT_INDEX) >> 12;
+
+	InvalidateTLBEntry(vAddress);
+
+	//PML4 Tabelle bearbeiten
+	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
+		return 1;
+
+	//PDP mappen
+	PDP = (PDP_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+	vmm_Map((uintptr_t)PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+
+	//PDP Tabelle bearbeiten
+	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
+		return 1;
+
+	//PD mappen
+	PD = (PD_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+	vmm_Map((uintptr_t)PD, PDP->PDPE[PDPi], VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+
+	//PD Tabelle bearbeiten
+	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
+		return 1;
+
+	//PT mappen
+	PT = (PT_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+	vmm_Map((uintptr_t)PT, PD->PDE[PDi], VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+
+	//PT Tabelle bearbeiten
+	if((PT->PTE[PTi] & PG_P) == 1)			//Wenn PT Eintrag vorhanden
+	{										//dann lösche ihn
+		//Ist dies eine Page des Kernelspaces?
+		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
+			setPTEntry(PTi, PT, 0, 1, 0, 1, 0, 0, 0, 0, VMM_KERNELSPACE, 0, 0, 0);
+		else
+			clearPTEntry(PTi, PT);
+
+		//Wird die PT noch benötigt?
+		for(i = 0; i < PAGE_ENTRIES; i++)
+		{
+			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
+			{
+				PT->PTE[PTi] &= ~0x1C0;
+				PD->PDE[PDi] &= ~0x1C0;
+				PDP->PDPE[PDPi] &= ~0x1C0;
+				PML4->PML4E[PML4i] &= ~0x1C0;
+				vmm_UnMap((uintptr_t)PT);
+				vmm_UnMap((uintptr_t)PD);
+				vmm_UnMap((uintptr_t)PDP);
+				vmm_UnMap((uintptr_t)PML4);
+				return 0; //Wird die PT noch benötigt, sind wir fertig
+			}
+		}
+		//Ansonsten geben wir den Speicherplatz für die PT frei
+		vmm_SysFree((void*)PT, 1);
+		//und löschen den Eintrag für diese PT in der PD
+
+		//Ist dies eine Page des Kernelspaces?
+		if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+			setPDEntry(PDi, PD, 0, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, 0);
+		else
+			clearPDEntry(PDi, PD);
+
+		//Wird die PD noch benötigt?
+		for(i = 0; i < PAGE_ENTRIES; i++)
+		{
+			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+			{
+				PD->PDE[PDi] &= ~0x1C0;
+				PDP->PDPE[PDPi] &= ~0x1C0;
+				PML4->PML4E[PML4i] &= ~0x1C0;
+				vmm_UnMap((uintptr_t)PD);
+				vmm_UnMap((uintptr_t)PDP);
+				vmm_UnMap((uintptr_t)PML4);
+				return 0; //Wid die PD noch benötigt, sind wir fertig
+			}
+		}
+		//Ansonsten geben wir den Speicherplatz für die PD frei
+		vmm_SysFree((void*)PD, 1);
+		//und löschen den Eintrag für diese PD in der PDP
+
+		//Ist dies eine Page des Kernelspaces?
+		if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+			setPDPEntry(PDPi, PDP, 0, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, 0);
+		else
+			clearPDPEntry(PDPi, PDP);
+
+		//Wird die PDP noch benötigt?
+		for(i = 0; i < PAGE_ENTRIES; i++)
+		{
+			//Wird die PDP noch benötigt, sind wir fertig
+			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+			{
+				PDP->PDPE[PDPi] &= ~0x1C0;
+				PML4->PML4E[PML4i] &= ~0x1C0;
+				vmm_UnMap((uintptr_t)PDP);
+				vmm_UnMap((uintptr_t)PML4);
+				return 0;
+			}
+		}
+		//Ansonsten geben wir den Speicherplatz für die PDP frei
+		vmm_SysFree((void*)PDP, 1);
+		//und löschen den Eintrag für diese PDP in der PML4
+
+		//Ist dies eine Page des Kernelspaces?
+		if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+			setPML4Entry(PML4i, PML4, 0, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, 0);
+		else
+			clearPML4Entry(PML4i, PML4);	//PML4 ist immer vorhanden, daher keine Überprüfung
+											//ob sie leer ist (was sehr schlecht sein würde --> PF)
+		//Reserved-Bits zurücksetzen
+		PML4->PML4E[PML4i] &= ~0x1C0;
+		vmm_UnMap((uintptr_t)PML4);
+		return 0;
+	}
+	else
+		return 1;
+}
+
+/*
  * Sucht die zugehörigen virtuelle Adresse der übergebenen phys. Adresse
  * Parameter:		pAddress = die phys. Addresse der zu suchenden virt. Adresse
  * Rückgabewert:	virtuelle Adresse der phys. Adresse
