@@ -134,16 +134,11 @@ ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
  */
 void pm_HaltTask(pid_t PID)
 {
-	uint64_t i = 0;
-	process_t *Process;
+	process_t *Process = pm_getTask(PID);
 
-	while((Process = list_get(ProcessList, i++)) != NULL)
+	if(Process != NULL)
 	{
-		if(Process->PID == PID)
-		{
-			Process->Active = false;
-			break;
-		}
+		Process->Active = false;
 	}
 }
 
@@ -153,16 +148,11 @@ void pm_HaltTask(pid_t PID)
  */
 void pm_ActivateTask(pid_t PID)
 {
-	uint64_t i = 0;
-	process_t *Process;
+	process_t *Process = pm_getTask(PID);
 
-	while((Process = list_get(ProcessList, i++)) != NULL)
+	if(Process != NULL)
 	{
-		if(Process->PID == PID)
-		{
-			Process->Active = true;
-			break;
-		}
+		Process->Active = true;
 	}
 }
 
@@ -172,17 +162,11 @@ void pm_ActivateTask(pid_t PID)
  */
 void pm_SleepTask(pid_t PID)
 {
-	uint64_t i = 0;
-	process_t *Process;
+	process_t *Process = pm_getTask(PID);
 
-
-	while((Process = list_get(ProcessList, i++)) != NULL)
+	if(Process != NULL)
 	{
-		if(Process->PID == PID)
-		{
-			Process->Sleeping = true;
-			break;
-		}
+		Process->Sleeping = true;
 	}
 }
 
@@ -192,16 +176,11 @@ void pm_SleepTask(pid_t PID)
  */
 void pm_WakeTask(pid_t PID)
 {
-	uint64_t i = 0;
-	process_t *Process;
+	process_t *Process = pm_getTask(PID);
 
-	while((Process = list_get(ProcessList, i++)) != NULL)
+	if(Process != NULL)
 	{
-		if(Process->PID == PID)
-		{
-			Process->Sleeping = false;
-			break;
-		}
+		Process->Sleeping = false;
 	}
 }
 
