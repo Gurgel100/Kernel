@@ -1137,6 +1137,14 @@ context_t *createContext()
  */
 void deleteContext(context_t *context)
 {
+	//Erst alle Pages des Kontextes freigeben
+	uintptr_t i;
+	for(i = USERSPACE_START; i < USERSPACE_END; i++)
+	{
+		vmm_ContextUnMap(context, i);
+	}
+
+	//Restliche Datenstrukturen freigeben
 	vmm_SysFree((uintptr_t)context->virtualAddress, 1);
 	free(context);
 }
