@@ -903,7 +903,7 @@ uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddres
  */
 uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 {
-	PML4_t *PML4 = context.virtualAddress;
+	PML4_t *PML4 = context->virtualAddress;
 	PDP_t *PDP;
 	PD_t *PD;
 	PT_t *PT;
@@ -915,7 +915,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 	uint16_t PDi = (vAddress & PG_PD_INDEX) >> 21;
 	uint16_t PTi = (vAddress & PG_PT_INDEX) >> 12;
 
-	InvalidateTLBEntry(vAddress);
+	InvalidateTLBEntry((void*)vAddress);
 
 	//PML4 Tabelle bearbeiten
 	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
@@ -967,7 +967,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 			}
 		}
 		//Ansonsten geben wir den Speicherplatz für die PT frei
-		vmm_SysFree((void*)PT, 1);
+		vmm_SysFree((uintptr_t)PT, 1);
 		//und löschen den Eintrag für diese PT in der PD
 
 		//Ist dies eine Page des Kernelspaces?
@@ -991,7 +991,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 			}
 		}
 		//Ansonsten geben wir den Speicherplatz für die PD frei
-		vmm_SysFree((void*)PD, 1);
+		vmm_SysFree((uintptr_t)PD, 1);
 		//und löschen den Eintrag für diese PD in der PDP
 
 		//Ist dies eine Page des Kernelspaces?
@@ -1014,7 +1014,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 			}
 		}
 		//Ansonsten geben wir den Speicherplatz für die PDP frei
-		vmm_SysFree((void*)PDP, 1);
+		vmm_SysFree((uintptr_t)PDP, 1);
 		//und löschen den Eintrag für diese PDP in der PML4
 
 		//Ist dies eine Page des Kernelspaces?
