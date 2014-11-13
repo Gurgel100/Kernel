@@ -1139,7 +1139,7 @@ void deleteContext(context_t *context)
 {
 	//Erst alle Pages des Kontextes freigeben
 	uintptr_t i;
-	for(i = USERSPACE_START; i < USERSPACE_END; i++)
+	for(i = USERSPACE_START; i < USERSPACE_END; i += MM_BLOCK_SIZE)
 	{
 		vmm_ContextUnMap(context, i);
 	}
