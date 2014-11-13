@@ -590,7 +590,7 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
 	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
 
-	InvalidateTLBEntry(vAddress);
+	InvalidateTLBEntry((void*)vAddress);
 
 	//PML4 Tabelle bearbeiten
 	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
