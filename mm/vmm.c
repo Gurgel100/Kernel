@@ -962,7 +962,6 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 				vmm_UnMap((uintptr_t)PT);
 				vmm_UnMap((uintptr_t)PD);
 				vmm_UnMap((uintptr_t)PDP);
-				vmm_UnMap((uintptr_t)PML4);
 				return 0; //Wird die PT noch benötigt, sind wir fertig
 			}
 		}
@@ -986,7 +985,6 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 				PML4->PML4E[PML4i] &= ~0x1C0;
 				vmm_UnMap((uintptr_t)PD);
 				vmm_UnMap((uintptr_t)PDP);
-				vmm_UnMap((uintptr_t)PML4);
 				return 0; //Wid die PD noch benötigt, sind wir fertig
 			}
 		}
@@ -1009,7 +1007,6 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 				PDP->PDPE[PDPi] &= ~0x1C0;
 				PML4->PML4E[PML4i] &= ~0x1C0;
 				vmm_UnMap((uintptr_t)PDP);
-				vmm_UnMap((uintptr_t)PML4);
 				return 0;
 			}
 		}
@@ -1025,7 +1022,6 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 											//ob sie leer ist (was sehr schlecht sein würde --> PF)
 		//Reserved-Bits zurücksetzen
 		PML4->PML4E[PML4i] &= ~0x1C0;
-		vmm_UnMap((uintptr_t)PML4);
 		return 0;
 	}
 	else
