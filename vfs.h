@@ -19,7 +19,9 @@
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
 
+#ifndef EOF
 #define EOF -1
+#endif
 
 typedef struct cdi_fs_filesystem vfs_fs_t;
 
