@@ -13,6 +13,7 @@
 #include "display.h"
 #include "mm.h"
 #include "string.h"
+#include "stdlib.h"
 #ifdef DEBUGMODE
 #include "stdio.h"
 #endif
@@ -64,9 +65,9 @@ bool pmm_Init()
 	{
 		if(map->type == 1)
 			for(i = map->base_addr;pages > 0 && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-				if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
+				if(i < vmm_getPhysAddress((uintptr_t)&kernel_start) || i > vmm_getPhysAddress((uintptr_t)&kernel_end))
 				{
-					pmm_Free(i);
+					pmm_Free((void*)i);
 					pages--;
 				}
 		map = (mmap*)((uintptr_t)map + map->size + 4);
@@ -83,9 +84,9 @@ bool pmm_Init()
 		{
 			if(map->type == 1)
 				for(i = map->base_addr; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-					if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
+					if(i < vmm_getPhysAddress((uintptr_t)&kernel_start) || i > vmm_getPhysAddress((uintptr_t)&kernel_end))
 					{
-						pmm_Free(i);
+						pmm_Free((void*)i);
 					}
 			map = (mmap*)((uintptr_t)map + map->size + 4);
 		}
@@ -100,7 +101,7 @@ bool pmm_Init()
 	list_t reservedPages = vmm_getTables(&kernel_context);
 	//Liste durchgehen und Bits in der BitMap löschen
 	uintptr_t Address;
-	while((Address = list_pop(reservedPages)))
+	while((Address = (uintptr_t)list_pop(reservedPages)))
 	{
 		Map[Address / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE)] &= ~(1ULL << ((((uintptr_t)Address) / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT));
 	}
@@ -117,11 +118,10 @@ bool pmm_Init()
  */
 void *pmm_Alloc()
 {
-	bool found = false;
-	void *Address = 1;
+	void *Address = (void*)1;
 	size_t i;
 	if(pmm_Speicher_Verfuegbar == 0)
-		return 1;
+		return (void*)1;
 	for(i = 4; i < mapSize; i++)
 	{
 		if(Map[i] & (-1ULL))
@@ -132,7 +132,7 @@ void *pmm_Alloc()
 			{
 				if(Map[i] & (1ULL << j))
 				{
-					Address = (i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE;
+					Address = (void*)((i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE);
 
 					//In der Bitmap eintragen, dass Page reserviert
 					Map[i] &= ~(1ULL << j);
@@ -167,13 +167,13 @@ void pmm_Free(void *Address)
 void *pmm_AllocDMA(void *maxAddress, size_t Size)
 {
 	if(pmm_Speicher_Verfuegbar == 0)
-		return 1;
+		return (void*)1;
 	//Durchsuche die Bitmap um Speicherseiten zu finden, die hintereinander liegen
 	size_t Bits = Size / PMM_BITS_PER_ELEMENT + Size % PMM_BITS_PER_ELEMENT;
 	size_t startBit;
 	uintptr_t i;
 	bool found = false;
-	for(i = 0; i < maxAddress; i += MM_BLOCK_SIZE)
+	for(i = 0; i < (uintptr_t)maxAddress; i += MM_BLOCK_SIZE)
 	{
 		uint64_t Index = i / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE);
 		startBit = (i / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
@@ -182,7 +182,7 @@ void *pmm_AllocDMA(void *maxAddress, size_t Size)
 			uint64_t j;
 			for(j = 0; j < Bits; j++)
 			{
-				if((Map[Index + Bits / PMM_BITS_PER_ELEMENT] >> (startBit + j)) & 0x1 == 0)	//Speicherseite nicht frei => weitersuchen
+				if(((Map[Index + Bits / PMM_BITS_PER_ELEMENT] >> (startBit + j)) & 0x1) == 0)	//Speicherseite nicht frei => weitersuchen
 				{
 					found = false;
 					break;
@@ -198,5 +198,5 @@ void *pmm_AllocDMA(void *maxAddress, size_t Size)
 			}
 		}
 	}
-	return 1;
+	return (void*)1;
 }
