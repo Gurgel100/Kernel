@@ -691,7 +691,7 @@ uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context,
 		uint8_t r;
 		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE), flags)) != 0)
 			return r;
-		if(vmm_UnMap(src + i * VMM_SIZE_PER_PAGE) == 2)
+		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE) == 2)
 			return 1;
 	}
 	return 0;
