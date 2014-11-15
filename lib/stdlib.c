@@ -188,8 +188,11 @@ void free(void *ptr)
 				Heap_Entries--;
 
 				//Prev-Eintrag des nächsten Eintrages korrigieren
-				tmpHeap = Heap->Next;
-				tmpHeap->Prev = Heap;
+				if(Heap->Next != NULL)
+				{
+					tmpHeap = Heap->Next;
+					tmpHeap->Prev = Heap;
+				}
 			}
 		}
 		if(Heap->Next != NULL)
@@ -203,8 +206,11 @@ void free(void *ptr)
 				Heap_Entries--;
 
 				//Prev-Eintrag des nächsten Eintrages korrigieren
-				tmpHeap = Heap->Next;
-				tmpHeap->Prev = Heap;
+				if(Heap->Next != NULL)
+				{
+					tmpHeap = Heap->Next;
+					tmpHeap->Prev = Heap;
+				}
 			}
 		}
 		Heap->Flags = HEAP_FLAGS;
