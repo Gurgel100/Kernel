@@ -201,8 +201,8 @@ void cpu_Init()
 	//Caching aktivieren
 	asm volatile(
 			"mov %%cr0,%%rax;"
-			"btc $30,%%rax;"	//Cache disable bit deaktivieren
-			"btc $29,%%rax;"	//Write through auch deaktivieren sonst gibt es eine #GP-Exception
+			"btr $30,%%rax;"	//Cache disable bit deaktivieren
+			"btr $29,%%rax;"	//Write through auch deaktivieren sonst gibt es eine #GP-Exception
 			"mov %%rax,%%cr0;"
 			: : :"rax");
 
