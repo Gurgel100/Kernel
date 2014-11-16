@@ -358,42 +358,77 @@ void *realloc(void *ptr, size_t size)
 		free(ptr);
 		return NULL;
 	}
-	heap_t *Heap;
+	heap_t *Heap, *tmpHeap;
 	void *Address = NULL;
 	Heap = ptr - sizeof(heap_t);
-	//TODO: nicht sehr effektiv, aber es Funktioniert
 	//Ist dieser Heap gültig?
 	if(Heap->Flags == (HEAP_FLAGS | HEAP_RESERVED))
 	{
-		Address = malloc(size);
-		if(Address)
-		{
-			if(size > Heap->Length)
-				memcpy(Address, ptr, Heap->Length);
-			else
-				memcpy(Address, ptr, size);
-			free(ptr);
-		}
-	}
-	/*if(Heap->Length > size)
-	{
-		Heap->Length = size;
-		tmpHeap = Heap->Next;
-		if(tmpHeap->Flags & HEAP_RESERVED)	//Wenn nächster Speicherbereich belegt ist, dann muss dazwischen ein neuer Eintrag hinein
-		{
-			tmpHeap = Heap->Next - size;
-			setupNewHeapEntry(Heap, tmpHeap);
-			tmpHeap->Length = Heap->Length - size;
-		}
-		else
-		{
-			tmpHeap->Length += Heap->Length - size;
-		}
 		Address = ptr;
+		//TODO: Vielleicht könnte man hier auch Speicherplatz freigeben?
+		//Wenn der PLatz noch da ist müssen wir nichts untenehmen
+		if(Heap->Length < size)
+		{
+			//Ist hinten noch freier Platz?
+			if(Heap->Next != NULL)
+			{
+				tmpHeap = Heap->Next;
+				//Wenn hintendran noch freier Platz ist können wir unseren einfach vergrössern
+				if(!(tmpHeap->Flags & HEAP_RESERVED) && Heap->Length + tmpHeap->Length + sizeof(heap_t) >= size)
+				{
+					//Müssen wir den Header auch noch nehmen?
+					if(tmpHeap->Length < (size - Heap->Length))
+					{
+						Heap->Next = tmpHeap->Next;
+						if(tmpHeap->Next != NULL)
+						{
+							((heap_t*)tmpHeap->Next)->Prev = Heap;
+						}
+						Heap->Length += tmpHeap->Length + sizeof(heap_t);
+						Heap_Entries--;
+					}
+					//Ansonsten verschieben wir den Header des nächsten Eintrags einfach
+					else
+					{
+						tmpHeap = memmove((void*)Heap + sizeof(heap_t) + size, tmpHeap, sizeof(heap_t));
+						Heap->Next = tmpHeap;
+						tmpHeap->Length -= size - Heap->Length;
+						//Eintrag des übernächsten Eintrags aktualisieren
+						if(tmpHeap->Next != NULL)
+						{
+							((heap_t*)tmpHeap->Next)->Prev = tmpHeap;
+						}
+						Heap->Length = size;
+					}
+				}
+				else
+				{
+					Address = malloc(size);
+					if(Address)
+					{
+						if(size > Heap->Length)
+							memcpy(Address, ptr, Heap->Length);
+						else
+							memcpy(Address, ptr, size);
+						free(ptr);
+					}
+				}
+			}
+			else
+			{
+				Address = malloc(size);
+				if(Address)
+				{
+					if(size > Heap->Length)
+						memcpy(Address, ptr, Heap->Length);
+					else
+						memcpy(Address, ptr, size);
+					free(ptr);
+				}
+			}
+		}
 	}
-	else if(Heap->Length < size)
-	{
-	}*/
+
 	return Address;
 }
 
