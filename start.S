@@ -17,7 +17,7 @@ cli
 hlt
 jmp _stop
 
-.section .rodata
-.space 0x100000		#1MB Platz für den Kernelstack
+.section .bss
+.space 0x10000		#64KB Platz für den Kernelstack
 stack:
 .endif
