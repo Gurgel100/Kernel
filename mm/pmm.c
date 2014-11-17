@@ -166,7 +166,7 @@ void pmm_Free(void *Address)
 	size_t i = (uintptr_t)Address / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
 	uint8_t bit = ((uintptr_t)Address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
 	lock(&pmm_lock);
-	Map[i] |= (1ULL << bit);
+	asm volatile("bts %0,%1": : "r"(bit & 0xFF), "m"(Map[i]));
 	pmm_Speicher_Verfuegbar++;
 	unlock(&pmm_lock);
 }
