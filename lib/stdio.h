@@ -66,16 +66,19 @@ extern FILE* stdin;
 extern FILE* stdout;
 
 extern FILE *fopen(const char *filename, const char *mode);
-int fclose(FILE *stream);
-size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
-int fflush(FILE *stream);
-void setbuf(FILE *stream, char *buffer);
-int setvbuf(FILE *stream, char *buffer, int mode, size_t size);
-int fseek(FILE *stream, long int offset, int whence);
-long int ftell(FILE *stream);
-int fsetpos(FILE *stream, const fpos_t *pos);
-int fgetpos(FILE *stream, fpos_t *pos);
+extern int fclose(FILE *stream);
+extern size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+extern size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+extern int fflush(FILE *stream);
+extern void setbuf(FILE *stream, char *buffer);
+extern int setvbuf(FILE *stream, char *buffer, int mode, size_t size);
+extern int fseek(FILE *stream, long int offset, int whence);
+extern long int ftell(FILE *stream);
+extern int fsetpos(FILE *stream, const fpos_t *pos);
+extern int fgetpos(FILE *stream, fpos_t *pos);
+
+extern int fgetc(FILE *stream);
+extern char *fgets(char *str, int n, FILE *stream);
 
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int fprintf(FILE *stream, const char *format, ...);

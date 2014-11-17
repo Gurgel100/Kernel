@@ -433,6 +433,36 @@ int fgetpos(FILE *stream, fpos_t *pos)
 	return 0;
 }
 
+int fgetc(FILE *stream)
+{
+	char buffer;
+	if(stream == NULL)
+		return EOF;
+	if(fread(&buffer, 1, 1, stream) == 0)
+	{
+		if(stream->eof)
+			return EOF;
+		return EOF;
+	}
+	return (int)buffer;
+}
+
+char *fgets(char *str, int n, FILE *stream)
+{
+	char c;
+	int i = 0;
+	if(stream == NULL || str == NULL)
+		return NULL;
+
+	while((c = fgetc(stream)) != '\n' && i < (n - 1) && !stream->eof)
+	{
+		str[i++] = c;
+	}
+	if(i != 0)
+		str[i] = '\0';
+	return str;
+}
+
 //TODO: alle print-Funktionen fertigstellen
 
 int fprintf(FILE *stream, const char *format, ...)
