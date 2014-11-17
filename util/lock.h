@@ -23,5 +23,7 @@ void lock_wait(volatile lock_t *l);
 
 //Eine Variable atomar inkrementieren
 void locked_inc(volatile uint64_t *var);
+//Eine Variable atomar inkrementieren
+void locked_dec(volatile uint64_t *var);
 
 #endif /* LOCK_H_ */

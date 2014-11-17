@@ -38,3 +38,9 @@ void locked_inc(volatile uint64_t *var)
 {
 	asm volatile("lock incq (%0)" : : "r"(var));
 }
+
+//Eine Variable atomar inkrementieren
+void locked_dec(volatile uint64_t *var)
+{
+	asm volatile("lock decq (%0)" : : "r"(var));
+}
