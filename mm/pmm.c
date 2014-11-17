@@ -14,6 +14,7 @@
 #include "mm.h"
 #include "string.h"
 #include "stdlib.h"
+#include "lock.h"
 #ifdef DEBUGMODE
 #include "stdio.h"
 #endif
@@ -33,6 +34,8 @@ static uint64_t pmm_Kernelsize;			//Grösse des Kernels in Bytes
 static uint64_t tmpMap[4096] __attribute__((aligned(MM_BLOCK_SIZE)));
 static uint64_t *Map = tmpMap;
 static size_t mapSize = 4096;			//Grösse der Bitmap
+
+static lock_t pmm_lock = LOCK_UNLOCKED;
 
 /*
  * Initialisiert die physikalische Speicherverwaltung
@@ -125,8 +128,12 @@ void *pmm_Alloc()
 {
 	void *Address = (void*)1;
 	size_t i;
+	lock(&pmm_lock);
 	if(pmm_Speicher_Verfuegbar == 0)
+	{
+		unlock(&pmm_lock);
 		return (void*)1;
+	}
 	for(i = 4; i < mapSize; i++)
 	{
 		if(Map[i] & (-1ULL))
@@ -150,6 +157,7 @@ void *pmm_Alloc()
 		}
 	}
 
+	unlock(&pmm_lock);
 	return Address;
 }
 
@@ -164,15 +172,21 @@ void pmm_Free(void *Address)
 	//entsprechendes Bit in der Bitmap zurücksetzen
 	size_t i = (uintptr_t)Address / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
 	uint8_t bit = ((uintptr_t)Address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
+	lock(&pmm_lock);
 	Map[i] |= (1ULL << bit);
 	pmm_Speicher_Verfuegbar++;
+	unlock(&pmm_lock);
 }
 
 //Für DMA erforderlich
 void *pmm_AllocDMA(void *maxAddress, size_t Size)
 {
+	lock(&pmm_lock);
 	if(pmm_Speicher_Verfuegbar == 0)
+	{
+		unlock(&pmm_lock);
 		return (void*)1;
+	}
 	//Durchsuche die Bitmap um Speicherseiten zu finden, die hintereinander liegen
 	size_t Bits = Size / PMM_BITS_PER_ELEMENT + Size % PMM_BITS_PER_ELEMENT;
 	size_t startBit;
@@ -199,9 +213,11 @@ void *pmm_AllocDMA(void *maxAddress, size_t Size)
 			{
 				for(j = 0; j < Bits; j++)
 				Map[Index + Bits / PMM_BITS_PER_ELEMENT] &= ~(1 << (startBit + j));
+				unlock(&pmm_lock);
 				return (void*)i;
 			}
 		}
 	}
+	unlock(&pmm_lock);
 	return (void*)1;
 }
