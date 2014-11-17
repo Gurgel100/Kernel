@@ -70,7 +70,8 @@ bool pmm_Init()
 					pmm_Free((void*)i);
 					pages--;
 				}
-		map = (mmap*)((uintptr_t)map + map->size + 4);
+		if(pages > 0)
+			map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
 	while(pages > 0 && map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength));
 
@@ -83,11 +84,15 @@ bool pmm_Init()
 		while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
 		{
 			if(map->type == 1)
-				for(i = map->base_addr; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
+			{
+				if(i < map->base_addr || i > map->base_addr + map->length)
+					i = map->base_addr;
+				for(; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
 					if(i < vmm_getPhysAddress((uintptr_t)&kernel_start) || i > vmm_getPhysAddress((uintptr_t)&kernel_end))
 					{
 						pmm_Free((void*)i);
 					}
+			}
 			map = (mmap*)((uintptr_t)map + map->size + 4);
 		}
 	}
