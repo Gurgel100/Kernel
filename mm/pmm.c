@@ -136,22 +136,15 @@ void *pmm_Alloc()
 	}
 	for(i = 4; i < mapSize; i++)
 	{
-		if(Map[i] & (-1ULL))
+		uint8_t j = __builtin_ffsl(Map[i]);
+		if(j > 0)
 		{
-			uint8_t j;
-			//Jedes Bit prüfen, ob Speicherseite frei
-			for(j = 0; j < PMM_BITS_PER_ELEMENT; j++)
-			{
-				if(Map[i] & (1ULL << j))
-				{
-					Address = (void*)((i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE);
+			//j - 1 rechnen, da ffsl eins drauf addiert
+			j--;
+			Address = (void*)((i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE);
 
-					//In der Bitmap eintragen, dass Page reserviert
-					Map[i] &= ~(1ULL << j);
-
-					break;
-				}
-			}
+			//In der Bitmap eintragen, dass Page reserviert
+			asm volatile("btr %0,%1": :"r"(j & 0xFF) ,"m"(Map[i]));
 			pmm_Speicher_Verfuegbar--;
 			break;
 		}
