@@ -15,6 +15,7 @@
 #include "paging.h"
 #include "stdlib.h"
 #include "string.h"
+#include "lock.h"
 
 #define NULL (void*)0
 
@@ -36,6 +37,8 @@ const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39) + 1;
 const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30) + 1;
 const uint16_t PDe = ((KERNELSPACE_END & PG_PD_INDEX) >> 21) + 1;
 const uint16_t PTe = ((KERNELSPACE_END & PG_PT_INDEX) >> 12) + 1;
+
+static lock_t vmm_lock = LOCK_LOCKED;
 
 context_t kernel_context;
 
@@ -132,6 +135,9 @@ bool vmm_Init(uint64_t Speicher)
 			if(vmm_UnMap(i) == 2) return false;	//Wenn kein Speicher mehr vorhanden ist, geben wir einen Fehler zurück
 	}
 
+	//Lock der Speicherverwaltung freigeben
+	unlock(&vmm_lock);
+
 	SysLog("VMM", "Initialisierung abgeschlossen");
 	return true;
 }
@@ -222,6 +228,8 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
 	uint64_t k = 0;						//Zähler für Anzahl Seiten
 	uint8_t Fehler;
 
+	lock(&vmm_lock);
+
 	if(Ignore)		//Ignoriere Addresse, d.h. bestimme virt. Addresse
 	{
 		for(i = KERNELSPACE_START & 0x1000; i <= KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
@@ -253,10 +261,12 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
 							continue;
 						}
 					}
+					unlock(&vmm_lock);
 					return startAddress;	//Virtuelle Addresse zurückgeben
 				}
 			}
 		}
+		unlock(&vmm_lock);
 		return 3;						//Keine virt. Addresse gefunden
 	}
 	else		//Ignoriere die Addresse nicht
@@ -264,13 +274,23 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
 		for(i = 0; i < Length; i++)
 		{
 			if((pAddress = (uintptr_t)pmm_Alloc()) == 1)
+			{
+				unlock(&vmm_lock);
 				return 1;
+			}
 			Fehler = vmm_Map(vAddress + i * VMM_SIZE_PER_PAGE, pAddress, 0);
 			if(Fehler == 1)
+			{
+				unlock(&vmm_lock);
 				return 1;
+			}
 			if(Fehler == 2)
+			{
+				unlock(&vmm_lock);
 				return 2;
+			}
 		}
+		unlock(&vmm_lock);
 		return 0;
 	}
 }
@@ -285,11 +305,13 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
 void vmm_SysFree(uintptr_t vAddress, uint64_t Length)
 {
 	uintptr_t i;
+	lock(&vmm_lock);
 	for(i = vAddress; i < vAddress + Length * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
 	{
 		uint8_t Fehler = vmm_UnMap(i);
 		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
 	}
+	unlock(&vmm_lock);
 }
 
 /*
@@ -335,6 +357,7 @@ void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys)
 	*Phys = pmm_AllocDMA(maxAddress, Size);
 		if(*Phys == NULL) return NULL;
 
+	lock(&vmm_lock);
 	for(i = KERNELSPACE_START; i <= KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
 	{
 		if(vmm_getPageStatus(i))	//Wenn Page frei ist,
@@ -359,7 +382,11 @@ void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys)
 					for(j = 0; j < k; j++)
 					{
 						Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, (uintptr_t)*Phys, 0);
-						if(Fehler == 1) return (void*)1;
+						if(Fehler == 1)
+						{
+							unlock(&vmm_lock);
+							return (void*)1;
+						}
 						if(Fehler == 2)		//Virt. Adresse schon belegt? Also weiter suchen
 						{
 							k = 0;
@@ -370,10 +397,14 @@ void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys)
 				else
 					k = 0;
 				if(k)
+				{
+					unlock(&vmm_lock);
 					return (void*)startAddress;	//Virtuelle Addresse zurückgeben
+				}
 			}
 		}
 	}
+	unlock(&vmm_lock);
 	return NULL;
 }
 
