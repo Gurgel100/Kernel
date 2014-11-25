@@ -46,6 +46,7 @@ context_t kernel_context;
 //Mapt eine phys. auf eine virt. Speicherst.
 uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags);
 uint8_t vmm_UnMap(uintptr_t vAddress);
+uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags);
 
 void *getFreePages(void *start, void *end, size_t pages);
 
@@ -700,6 +701,47 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 	}
 	else
 		return 1;
+}
+
+/*
+ * Ändert das Mapping einer Page. Falls die Page nicht vorhanden ist, wird sie gemappt
+ * Params:			vAddress = Neue virt. Addresse der Page
+ * 					pAddress = Neue phys. Addresse der Page
+ * 					flags = neue Flags der Page
+ * Rückgabewert:	0 = Alles in Ordnung
+ * 					1 = zu wenig phys. Speicher vorhanden
+ */
+uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags)
+{
+	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
+	//Einträge in die Page Tabellen
+	uint16_t PML4i = (vAddress & PG_PML4_INDEX) >> 39;
+	uint16_t PDPi = (vAddress & PG_PDP_INDEX) >> 30;
+	uint16_t PDi = (vAddress & PG_PD_INDEX) >> 21;
+	uint16_t PTi = (vAddress & PG_PT_INDEX) >> 12;
+
+	//Flags auslesen
+	bool US = (flags & VMM_FLAGS_USER);
+	bool G = (flags & VMM_FLAGS_GLOBAL);
+	bool RW = (flags & VMM_FLAGS_WRITE);
+	bool NX = (flags & VMM_FLAGS_NX);
+
+	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+
+	if(vmm_getPageStatus(vAddress))
+	{
+		if(vmm_Map(vAddress, pAddress, flags) == 1) return 1;
+	}
+	else
+	{
+		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
+			setPTEntry(PTi, PT, 1, RW, US, 1, 0, 0, 0, G, VMM_KERNELSPACE, 0, NX, pAddress);
+		else
+			setPTEntry(PTi, PT, 1, RW, US, 1, 0, 0, 0, G, 0, 0, NX, pAddress);
+
+		InvalidateTLBEntry((void*)vAddress);
+	}
+	return 0;
 }
 
 /*
