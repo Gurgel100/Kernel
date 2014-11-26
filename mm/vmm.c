@@ -46,6 +46,7 @@ context_t kernel_context;
 //Mapt eine phys. auf eine virt. Speicherst.
 uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags);
 uint8_t vmm_UnMap(uintptr_t vAddress);
+uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags);
 
 void *getFreePages(void *start, void *end, size_t pages);
 
@@ -59,6 +60,7 @@ bool vmm_getPageStatus(uintptr_t Address);
  */
 bool vmm_Init(uint64_t Speicher)
 {
+	extern uint8_t kernel_start, kernel_end, kernel_code_start, kernel_code_end;
 	uint64_t cr3, i;
 
 	PML4_t *PML4;
@@ -80,59 +82,27 @@ bool vmm_Init(uint64_t Speicher)
 
 	PML4 = (PML4_t*)VMM_PML4_ADDRESS;
 
-	//PML4 anpassen
-	for(PML4i = 0; PML4i < PML4e; PML4i++)
+	//Speicher bis 1MB bearbeiten
+	for(i = 0; i < 0x100000; i += 0x1000)
 	{
-		setPML4Entry(PML4i, PML4, PML4->PML4E[PML4i] & PG_P, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-		if((PML4->PML4E[PML4i] & PG_P) == 0) continue;
-		PDP = (PDP_t*)(VMM_PDP_ADDRESS + (PML4i << 12));
-		//PDP anpassen
-		for(PDPi = 0; PDPi < PDPe; PDPi++)
-		{
-			setPDPEntry(PDPi, PDP, PDP->PDPE[PDPi] & PG_P, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-			if((PDP->PDPE[PDPi] & PG_P) == 0) continue;
-			PD = (PD_t*)(VMM_PD_ADDRESS + ((PML4i << 21) | (PDPi << 12)));
-			//PD anpassen
-			for(PDi = 0; PDi < PDe; PDi++)
-			{
-				setPDEntry(PDi, PD, PD->PDE[PDi] & PG_P, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
-				if((PD->PDE[PDi] & PG_P) == 0) continue;
-				PT = (PT_t*)(VMM_PT_ADDRESS + (((uint64_t)PML4i << 30) | (PDPi << 21) | (PDi << 12)));
-				//PT anpassen
-				for(PTi = 0; PTi < PTe; PTi++)
-					setPTEntry(PTi, PT, PT->PTE[PTi] & PG_P, 1, 0, 1, 0, 0, 0, 1, VMM_KERNELSPACE, 0, 0, PT->PTE[PTi] & PG_ADDRESS);
-				PD->PDE[PDi] &= ~0x1C0;
-			}
-			PDP->PDPE[PDPi] &= ~0x1C0;
-		}
-		PML4->PML4E[PML4i] &= ~0x1C0;
+		vmm_ChangeMap(i, i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	}
-
-	//TLB löschen
-	//pg_FlushTLB();
-
-	//überflüssiger virtueller Speicherplatz freigeben
-	//dazu gehen wir jede Adresse durch und überprüfen, ob sie in irgendeiner Struktur vorhanden ist
-	extern uint8_t kernel_end;
-	for(i = ((uint64_t)&kernel_end & ~0xFFF) + MM_BLOCK_SIZE; i <= Speicher; i += VMM_SIZE_PER_PAGE)
+	for(i = (uintptr_t)&kernel_start; i <= (uintptr_t)&kernel_end; i += 0x1000)
 	{
-		//mods *mods;
-		/*uint32_t j;
-		bool isMod = false;*/
-		if(((i >= ((uint64_t)MBS & ~0xFFF)) && (i <= (((uint64_t)MBS + sizeof(*MBS)) & ~0xFFF)))
-				|| ((i >= (MBS->mbs_mods_addr & ~0xFFF)) && (i <= ((MBS->mbs_mods_addr + MBS->mbs_mods_count * sizeof(mods)) & ~0xFFF)))
-				|| ((i >= (MBS->mbs_mmap_addr & ~0xFFF)) && (i <= ((MBS->mbs_mmap_addr + MBS->mbs_mmap_length) & ~0xFFF)))) continue;
-
-		//Überprüfe, ob sich die Adresse in einem geladenem Modul befindet
-		/*for(mods = MBS->mbs_mods_addr, j = 0; j < MBS->mbs_mods_count; mods++, j++)
-			if(i >= (mods->mod_start & ~0xFFF) && i <= (mods->mod_end & ~0xFFF))
-			{
-				isMod = true;
-				break;
-			}*/
-
-		//if(!isMod)
-			if(vmm_UnMap(i) == 2) return false;	//Wenn kein Speicher mehr vorhanden ist, geben wir einen Fehler zurück
+		if(i >= (uintptr_t)&kernel_code_start && i <= (uintptr_t)&kernel_code_end)
+		{
+			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL);
+		}
+		else
+		{
+			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		}
+	}
+	//Den restlichen virtuellen Speicher freigeben
+	while(!vmm_getPageStatus(i))
+	{
+		vmm_UnMap(i);
+		i += 0x1000;
 	}
 
 	//Lock der Speicherverwaltung freigeben
@@ -700,6 +670,47 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 	}
 	else
 		return 1;
+}
+
+/*
+ * Ändert das Mapping einer Page. Falls die Page nicht vorhanden ist, wird sie gemappt
+ * Params:			vAddress = Neue virt. Addresse der Page
+ * 					pAddress = Neue phys. Addresse der Page
+ * 					flags = neue Flags der Page
+ * Rückgabewert:	0 = Alles in Ordnung
+ * 					1 = zu wenig phys. Speicher vorhanden
+ */
+uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags)
+{
+	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
+	//Einträge in die Page Tabellen
+	uint16_t PML4i = (vAddress & PG_PML4_INDEX) >> 39;
+	uint16_t PDPi = (vAddress & PG_PDP_INDEX) >> 30;
+	uint16_t PDi = (vAddress & PG_PD_INDEX) >> 21;
+	uint16_t PTi = (vAddress & PG_PT_INDEX) >> 12;
+
+	//Flags auslesen
+	bool US = (flags & VMM_FLAGS_USER);
+	bool G = (flags & VMM_FLAGS_GLOBAL);
+	bool RW = (flags & VMM_FLAGS_WRITE);
+	bool NX = (flags & VMM_FLAGS_NX);
+
+	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+
+	if(vmm_getPageStatus(vAddress))
+	{
+		if(vmm_Map(vAddress, pAddress, flags) == 1) return 1;
+	}
+	else
+	{
+		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
+			setPTEntry(PTi, PT, 1, RW, US, 1, 0, 0, 0, G, VMM_KERNELSPACE, 0, NX, pAddress);
+		else
+			setPTEntry(PTi, PT, 1, RW, US, 1, 0, 0, 0, G, 0, 0, NX, pAddress);
+
+		InvalidateTLBEntry((void*)vAddress);
+	}
+	return 0;
 }
 
 /*

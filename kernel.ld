@@ -20,10 +20,12 @@ SECTIONS
      * Der Multiboot-Header muss zuerst kommen (in den ersten 8 kB).
      * Die Standardsektionen einfach hintereinander weg einbinden.
      */
+     kernel_code_start = .;
     .text : {
         /*(multiboot) kein Multibootheader vorhanden.*/
         *(.text)
     }
+    kernel_code_end = .;
     .data ALIGN(4096) : {
         *(.data)
     }
