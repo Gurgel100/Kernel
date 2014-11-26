@@ -76,6 +76,9 @@ bool vmm_Init(uint64_t Speicher)
 	//Lasse den letzten Eintrag der PML4 auf die PML4 selber zeigen
 	setPML4Entry(511, PML4, 1, 1, 0, 1, 0, 0, VMM_POINTER_TO_PML4, 1, (uintptr_t)PML4);
 
+	//Ersten Eintrag überarbeiten
+	setPML4Entry(0, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[0] & PG_ADDRESS);
+
 	//PML4 in Kernelkontext eintragen
 	kernel_context.physAddress = (uintptr_t)PML4;
 	kernel_context.virtualAddress = (void*)VMM_PML4_ADDRESS;
