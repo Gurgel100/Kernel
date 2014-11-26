@@ -64,11 +64,6 @@ bool vmm_Init(uint64_t Speicher)
 	uint64_t cr3, i;
 
 	PML4_t *PML4;
-	PDP_t *PDP;
-	PD_t *PD;
-	PT_t *PT;
-
-	uint16_t PML4i, PDPi, PDi, PTi;
 
 	asm volatile("mov %%cr3,%0" : "=r" (cr3));
 	PML4 = (PML4_t*)(cr3 & 0xFFFFFFFFFF000);	//nur die Adresse wollen wir haben
