@@ -221,7 +221,7 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 			do
 			{
 				newProcess = list_get(ProcessList, actualProcessIndex);
-				actualProcessIndex = (actualProcessIndex < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+				actualProcessIndex = (actualProcessIndex + 1 < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
 			}
 			while(!newProcess->Active || newProcess->Sleeping);
 			if(newProcess == currentProcess)
@@ -238,15 +238,18 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		else
 		{
 			//Einen Task suchen, der geht
+			process_t *newProcess;
 			do
 			{
-				currentProcess = list_get(ProcessList, actualProcessIndex);
-				actualProcessIndex = (actualProcessIndex < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
+				newProcess = list_get(ProcessList, actualProcessIndex);
+				actualProcessIndex = (actualProcessIndex + 1 < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
 			}
-			while((!currentProcess->Active || currentProcess->Sleeping) && actualProcessIndex != 0);
+			while((!newProcess->Active || newProcess->Sleeping) && actualProcessIndex != 0);
 			//Wenn keine erster Prozess gefunden wurde, wechseln wir auch nicht den Task
-			if(actualProcessIndex == 0)
+			if(newProcess == NULL || !newProcess->Active || newProcess->Sleeping)
 				return cpu;
+
+			currentProcess = newProcess;
 
 			activateContext(currentProcess->Context);
 			TSS_setStack(currentProcess->kernelStack);
