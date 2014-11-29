@@ -169,8 +169,11 @@ void vmm_Free(uintptr_t vAddress, uint64_t Pages)
 	uintptr_t i;
 	for(i = vAddress; i < vAddress + Pages * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
 	{
+		void *pAddress = (void*)vmm_getPhysAddress(vAddress);
 		uint8_t Fehler = vmm_UnMap(i);
 		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
+		if(Fehler != 1)
+			pmm_Free(pAddress);
 	}
 }
 
@@ -276,8 +279,11 @@ void vmm_SysFree(uintptr_t vAddress, uint64_t Length)
 	lock(&vmm_lock);
 	for(i = vAddress; i < vAddress + Length * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
 	{
+		void *pAddress = (void*)vmm_getPhysAddress(vAddress);
 		uint8_t Fehler = vmm_UnMap(i);
 		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
+		if(Fehler != 1)
+			pmm_Free(pAddress);
 	}
 	unlock(&vmm_lock);
 }
