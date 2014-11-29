@@ -216,18 +216,19 @@ void free(void *ptr)
 		Heap->Flags = HEAP_FLAGS;
 		//TODO
 		//Wenn möglich unnötige Speicherseiten freigeben
-		/*if((Heap->Length + sizeof(heap_t)) % 4096 == 0)
+		//Dabei behalten wir immer eine Page
+		if(Heap->Length > 4096)
+		{
+			uint64_t Pages = Heap->Length / 4096;
+			Heap->Length -= Pages * 4096;
+			FreePage((void*)Heap + sizeof(heap_t) + Heap->Length, Pages);
+		}
+		else if(Heap->Length + sizeof(heap_t) > 4096)
 		{
 			uint64_t Pages = (Heap->Length + sizeof(heap_t)) / 4096;
-			FreePage(Heap, Pages);
+			Heap->Length -= Pages * 4096;
+			FreePage((void*)Heap + sizeof(heap_t) + Heap->Length, Pages);
 		}
-
-		if(Heap_Entries == 1)
-		{
-			size_t Pages = (Heap->Length % 4096 != 0) ? Heap->Length / 4096 + 1 :
-					Heap->Length /4096;
-			FreePage(Heap, Pages);
-		}*/
 	}
 }
 
