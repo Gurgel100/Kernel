@@ -7,6 +7,11 @@
 
 #include "ctype.h"
 
+int isalnum(int c)
+{
+	return (isalpha(c) || isdigit(c));
+}
+
 int isalpha(int c)
 {
 	return (islower(c) || isupper(c));
@@ -25,6 +30,31 @@ int isspace(int c)
 int isxdigit(int c)
 {
 	return (isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
+}
+
+int iscntrl(int c)
+{
+	return ((c >= 0x00 && c <= 0x1F) || c == 0x7F);
+}
+
+int isgraph(int c)
+{
+	return (isalnum(c) || ispunct(c));
+}
+
+int isprint(int c)
+{
+	return (isgraph(c) || c == 0x20);
+}
+
+int ispunct(int c)
+{
+	return ((c >= 0x21 && c <= 0x2F) || (c >= 0x3A && c <= 0x40) || (c >= 0x5B && c <= 0x60) || (c >= 0x7B && c <= 0x7E));
+}
+
+int isspace(int c)
+{
+	return (c == 0x20 || c == 0x0C || c == 0x0A || c == 0x0D || c == 0x09 || c == 0x0B);
 }
 
 int islower(int c)
