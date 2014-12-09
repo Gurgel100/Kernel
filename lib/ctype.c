@@ -52,11 +52,6 @@ int ispunct(int c)
 	return ((c >= 0x21 && c <= 0x2F) || (c >= 0x3A && c <= 0x40) || (c >= 0x5B && c <= 0x60) || (c >= 0x7B && c <= 0x7E));
 }
 
-int isspace(int c)
-{
-	return (c == 0x20 || c == 0x0C || c == 0x0A || c == 0x0D || c == 0x09 || c == 0x0B);
-}
-
 int islower(int c)
 {
 	return (c >= 'a' && c <= 'z');
