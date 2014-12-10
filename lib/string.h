@@ -15,15 +15,19 @@ extern "C" {
 #endif
 
 extern char *strcpy(char *to, const char *from);
+extern char *strncpy(char *to, const char *from, size_t size);
 extern int strcmp(const char *str1, const char *str2);
+extern int strncmp(const char *str1, const char *str2, size_t size);
 
 extern size_t strlen(const char *cs);
 extern void *strdup(const char *s);
 extern char *strtok(char *string, const char *delimiters);
-extern char *strchr(const char *string, int c);
-extern char *strrchr(const char *string, int c);
 extern char *strcat(char *str1, const char *str2);
 extern char *strncat(char *str1, const char *str2, size_t n);
+
+extern char *strchr(const char *str, int ch);
+extern char *strrchr(const char *str, int ch);
+extern char *strstr(const char *str, const char *substr);
 
 extern void *memset(void *block, int c, size_t n);
 extern void *memmove(void *to, const void *from, size_t size);
