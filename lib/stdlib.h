@@ -29,6 +29,10 @@ typedef struct{
 		long rem;
 }ldiv_t;
 
+extern double atof(const char* str);
+extern int atoi(const char *str);
+extern long atol(const char *str);
+
 extern long int strtol(const char *str, char **endptr, int base);
 
 extern void *calloc(size_t nitems, size_t size);
