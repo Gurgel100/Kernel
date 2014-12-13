@@ -107,7 +107,7 @@ double atof(const char* str)
 	if(*s == '0' && tolower(*(s + 1)) == 'x')
 	{
 		s += 2;
-		size_t digit = 10;
+		size_t digit = 16;
 		while(isxdigit(*s) || (!point && *s == '.'))
 		{
 			if(*s == '.')
@@ -125,12 +125,12 @@ double atof(const char* str)
 				}
 				if(point)
 				{
-					value += val / digit;
-					digit *= 10;
+					value += (double)val / digit;
+					digit *= 16;
 				}
 				else
 				{
-					value = value * 10 + val;
+					value = value * 16 + val;
 				}
 			}
 			s++;
@@ -138,7 +138,7 @@ double atof(const char* str)
 		if(tolower(*s++) == 'p')
 		{
 			long exponent = atol(s);
-			value *= pow(2, exponent + 127);
+			value *= pow(16, exponent);
 		}
 	}
 	//INF
@@ -176,7 +176,7 @@ double atof(const char* str)
 		if(tolower(*s++) == 'e')
 		{
 			long exponent = atol(s);
-			value *= pow(2, exponent + 127);
+			value *= pow(10, exponent);
 		}
 	}
 
