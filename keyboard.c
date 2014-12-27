@@ -15,6 +15,7 @@
 #include "display.h"
 #include "stdbool.h"
 #include "keyboard_SWISS.h"
+#include "stdio.h"
 
 //Ports
 #define KEYBOARD_PORT		0x60
@@ -149,6 +150,12 @@ void keyboard_Handler(ihs_t *ihs)
 		ActualPuffer = NewPuffer;
 		if(Puffer == NULL)
 			Puffer = ActualPuffer;
+
+		printf("Key pressed:         Scancode 0x%y; Char %c\n", Scancode, Zeichen);
+	}
+	else
+	{
+		printf("Unknown Key pressed: Scancode 0x%y\n", Scancode);
 	}
 	}
 }
