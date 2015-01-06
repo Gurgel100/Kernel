@@ -999,98 +999,42 @@ int vfprintf(FILE *stream, const char *format, va_list arg)
 	return EOF;
 }
 
+//Callback-Funktionen
+int vprintf_putc(void *arg, char c)
+{
+	putchar(c);
+	return 1;
+}
+
+int vprintf_putsn(void *arg, const char *str, int n)
+{
+	int len = strlen(str);
+
+	if(len <= n || n == -1)
+	{
+		return puts(str);
+	}
+	else
+	{
+		int i;
+		for(i = 0; i < n && str[i] != '\0'; i++)
+		{
+			putchar(str[i]);
+		}
+		return i;
+	}
+
+	return n;
+}
+
 int vprintf(const char *format, va_list arg)
 {
-	uint64_t pos = 0;
-	char lpad = ' ';
-	uint64_t width = 0;
-	static char buffer[64];
-	for(; *format; format++)
-	{
-		switch(*format)
-		{
-			case '%':	//Formatieren?
-				format++;
-				//% überspringen
-				if(*format == '%')
-				{
-					putchar('%');
-					pos++;
-					format++;
-				}
+	jprintf_args handler = {
+			.putc = &vprintf_putc,
+			.putsn = &vprintf_putsn
+	};
 
-				//Flags
-				switch(*format)
-				{
-					case '-': case '+': case ' ': case '#':
-						format++;
-					break;
-					case '0':
-						lpad = '0';
-						format++;
-					break;
-				}
-
-				//Width
-				if(*format >= '0' && *format <= '9')
-					width = strtol(format, (char**)&format, 10);
-				else if(*format == '*')
-				{
-					format++;
-					width = va_arg(arg, uint64_t);
-				}
-
-				switch(*format)
-				{
-					case 'u':	//Unsigned int
-						puts(utoa(va_arg(arg, uint64_t), buffer));
-						pos += strlen(buffer);
-					break;
-					case 'i':	//Signed int
-					case 'd':
-						puts(itoa(va_arg(arg, int64_t), buffer));
-						pos += strlen(buffer);
-					break;
-					case 'f':	//Float
-						puts(ftoa(va_arg(arg, double), buffer));
-						pos += strlen(buffer);
-					break;
-					case 'X':	//Hex 8
-						puts(i2hex(va_arg(arg, int64_t), buffer, 8));
-						pos += 8;
-					break;
-					case 'x':	//Hex 4
-						puts(i2hex(va_arg(arg, int64_t), buffer, 4));
-						pos += 4;
-					break;
-					case 'y':	//Hex 2
-						puts(i2hex(va_arg(arg, int64_t), buffer, 2));
-						pos += 2;
-					break;
-					case 's':	//String
-					{
-						char *temp = va_arg(arg, char*);
-						puts(temp);
-						pos += strlen(temp);
-					}
-					break;
-					case 'c':	//Char
-						putchar((char)va_arg(arg, int64_t));
-						pos++;
-					break;
-					default:	//Ansonsten ungültig
-						format--;
-						//pos--;
-					break;
-				}
-			break;
-			default:	//Ansonsten schreibe das aktuelle Zeichen
-				putchar(*format);
-				pos++;
-			break;
-		}
-	}
-	return pos;
+	return jvprintf(&handler, format, arg);
 }
 
 int vsprintf(char *str, const char *format, va_list arg)
