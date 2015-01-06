@@ -32,6 +32,18 @@ FILE* stderr = NULL;
 FILE* stdin = NULL;
 FILE* stdout = NULL;
 
+/*
+ * Rückgabewerte von putc und putsn:
+ * 	>0: Erfolg. Wert wird zu bytes_written addiert, das von jvprintf am Ende zurückgegeben wird.
+ * 	=0 (putc) oder !=num (putsn): jvprintf terminiert und gibt bytes_written + diesen Wert zurück.
+ * 	<0: jvprintf terminiert und gibt -1 zurück.
+ */
+typedef struct{
+	int (*putc)(void *, char);
+	int (*putsn)(void *, const char *, int);
+	void *arg;
+}jprintf_args;
+
 int sputchar(char **dest, int zeichen);
 int sputs(char **dest, const char *str);
 
@@ -498,6 +510,392 @@ int asprintf(char **str, const char *format, ...)
 	va_start(arg, format);
 	int pos = vasprintf(str, format, arg);
 	va_end(arg);
+	return pos;
+}
+
+//Generelle vprintf-Funtkion mit Callbacks
+int jprintf_putc(jprintf_args *args, char c)
+{
+	if(args->putc != NULL)
+	{
+		return args->putc(args->arg, c);
+	}
+
+	return 1;
+}
+
+int jprintf_putsn(jprintf_args *args, const char *str, int num)
+{
+	if(args->putsn != NULL)
+	{
+		return args->putsn(args->arg, str, num);
+	}
+	else
+	{
+		//Wenn keine putsn-Funktion definiert wurde, verwenden wir einfach putc
+		size_t i;
+		int bytes_written = 0;
+
+		for(i = 0; (i < num || num == -1) && str[i] != '\0'; i++)
+		{
+			bytes_written += jprintf_putc(args, str[i]);
+		}
+
+		return bytes_written;
+	}
+}
+
+int jvprintf(jprintf_args *args, const *format, va_list arg)
+{
+	uint64_t pos = 0;
+	char lpad = ' ';
+	uint64_t width, precision;
+	bool precision_spec;
+	int8_t length;
+	static char buffer[64];
+	bool left, sign, space_sign, alt;
+	for(; *format; format++)
+	{
+		switch(*format)
+		{
+			case '%':	//Formatieren?
+				format++;
+				//% überspringen
+				if(*format == '%')
+				{
+					jprintf_putc(args, '%');
+					pos++;
+					format++;
+				}
+
+				//Flags
+				left = false;
+				sign = false;
+				space_sign = false;
+				alt = false;
+				switch(*format)
+				{
+					case '-':
+						left = true;
+						format++;
+					break;
+					case '+':
+						sign = true;
+						format++;
+					break;
+					case ' ':
+						space_sign = true;
+						format++;
+					break;
+					case '#':
+						alt = true;
+						format++;
+					break;
+					case '0':
+						lpad = '0';
+						format++;
+					break;
+				}
+
+				//Width
+				width = 0;
+				if(*format >= '0' && *format <= '9')
+					width = strtol(format, (char**)&format, 10);
+				else if(*format == '*')
+				{
+					format++;
+					int w = va_arg(arg, int);
+					if(w < 0)
+					{
+						width = -w;
+						left = true;
+					}
+					else
+						width = w;
+				}
+
+				//Precision
+				precision_spec = false;
+				if(*format == '.')
+				{
+					format++;
+					if(*format >= '0' && *format <= '9')
+					{
+						precision = strtol(format, (char**)&format, 10);
+						precision_spec = true;
+					}
+					else if(*format == '*')
+					{
+						int prec = va_arg(arg, int);
+						if(prec < 0)
+							precision = 0;
+						else
+							precision = prec;
+						precision_spec = true;
+					}
+				}
+
+				//Length
+				length = 0;
+				switch(*format)
+				{
+					case 'h':
+						format++;
+						if(*format == 'h')
+						{
+							format++;
+							length = -2;
+						}
+						else
+							length = -1;
+					break;
+					case 'l':
+						format++;
+						if(*format == 'l')
+						{
+							format++;
+							length = 2;
+						}
+						else
+							length = 1;
+					break;
+					case 'j':
+						format++;
+						length = 3;
+					break;
+					case 'z':
+						format++;
+						length = 4;
+					break;
+					case 't':
+						format++;
+						length = 5;
+					break;
+					case 'L':
+						format++;
+						length = 6;
+					break;
+				}
+
+				switch(*format)
+				{
+					case 'u':	//Unsigned int
+					{
+						uint64_t value;
+						switch(length)
+						{
+							case -2:
+								value = va_arg(arg, unsigned int);
+							break;
+							case -1:
+								value = va_arg(arg, unsigned int);
+							break;
+							case 0: default:
+								value = va_arg(arg, unsigned int);
+							break;
+							case 1:
+								value = va_arg(arg, unsigned long);
+							break;
+							case 2:
+								value = va_arg(arg, unsigned long long);
+							break;
+							case 3:
+								value = va_arg(arg, uint64_t);
+							break;
+							case 4:
+								value = va_arg(arg, size_t);
+							break;
+							case 5:
+								value = va_arg(arg, uintptr_t);
+							break;
+						}
+						if(!precision_spec)
+							precision = 1;
+						utoa(value, buffer);
+						//Padding
+						size_t i;
+						for(i = 0; i < MIN(strlen(buffer), precision); i++)
+						{
+							pos += jprintf_putc(args, lpad);
+						}
+						if((precision_spec && precision != 0) || value != 0)
+						{
+							for(; precision > strlen(buffer); precision--)
+							{
+								jprintf_putc(args, '0');
+							}
+							pos += jprintf_putsn(args, buffer, -1);
+						}
+					}
+					break;
+					case 'i':	//Signed int
+					case 'd':
+					{
+						uint64_t value;
+						switch(length)
+						{
+							case -2:
+								value = va_arg(arg, unsigned int);
+							break;
+							case -1:
+								value = va_arg(arg, unsigned int);
+							break;
+							case 0: default:
+								value = va_arg(arg, unsigned int);
+							break;
+							case 1:
+								value = va_arg(arg, unsigned long);
+							break;
+							case 2:
+								value = va_arg(arg, unsigned long long);
+							break;
+							case 3:
+								value = va_arg(arg, uint64_t);
+							break;
+							case 4:
+								value = va_arg(arg, size_t);
+							break;
+							case 5:
+								value = va_arg(arg, uintptr_t);
+							break;
+						}
+						if(!precision_spec)
+							precision = 1;
+						itoa(value, buffer);
+						if(value < 0)
+						{
+							if(sign)
+							{
+								memmove(buffer + 1, buffer, strlen(buffer) + 1);
+								buffer[0] = '+';
+							}
+							else if(space_sign)
+							{
+								memmove(buffer + 1, buffer, strlen(buffer) + 1);
+								buffer[0] = ' ';
+							}
+						}
+						//Padding
+						size_t i;
+						for(i = 0; i < MIN(strlen(buffer), precision); i++)
+						{
+							pos += jprintf_putc(args, lpad);
+						}
+						if((precision_spec && precision != 0) || value != 0)
+						{
+							for(; precision > strlen(buffer); precision--)
+							{
+								jprintf_putc(args, '0');
+							}
+							pos += jprintf_putsn(args, buffer, -1);
+						}
+					}
+					break;
+					case 'f': case 'F':	//Float
+						//sputs(str, ftoa(va_arg(arg, double), buffer));
+						//pos += strlen(buffer);
+					break;
+					case 'x': case 'X':	//Hex
+					{
+						uint64_t value;
+						switch(length)
+						{
+							case -2:
+								value = va_arg(arg, unsigned int);
+							break;
+							case -1:
+								value = va_arg(arg, unsigned int);
+							break;
+							case 0: default:
+								value = va_arg(arg, unsigned int);
+							break;
+							case 1:
+								value = va_arg(arg, unsigned long);
+							break;
+							case 2:
+								value = va_arg(arg, unsigned long long);
+							break;
+							case 3:
+								value = va_arg(arg, uint64_t);
+							break;
+							case 4:
+								value = va_arg(arg, size_t);
+							break;
+							case 5:
+								value = va_arg(arg, uintptr_t);
+							break;
+						}
+						if(!precision_spec)
+							precision = 1;
+						i2hex(value, buffer, 64);
+						//Padding
+						size_t i;
+						for(i = 0; i < MIN(strlen(buffer), precision); i++)
+						{
+							pos += jprintf_putc(args, lpad);
+						}
+						if((precision_spec && precision != 0) || value != 0)
+						{
+							for(; precision > strlen(buffer); precision--)
+							{
+								jprintf_putc(args, '0');
+							}
+
+							if(*format == 'x')
+							{
+								size_t i;
+								for(i = 0; i < strlen(buffer); i++)
+								{
+									buffer[i] = (char)tolower(buffer[i]);
+								}
+							}
+
+							//Alternative Form
+							if(alt)
+							{
+								memmove(buffer + 2, buffer, strlen(buffer) + 1);
+								buffer[0] = '0';
+								buffer[1] = *format;
+							}
+							pos += jprintf_putsn(args, buffer, -1);
+						}
+					}
+					break;
+					case 's':	//String
+					{
+						if(!precision_spec)
+							precision = -1;
+
+						const char *str = va_arg(arg, char*);
+
+						for(; width > strlen(str); width--)
+						{
+							pos += jprintf_putc(args, lpad);
+						}
+
+						pos += jprintf_putsn(args, str, precision);
+					}
+					break;
+					case 'c':	//Char
+						//Padding
+						for(; width > 1; width--)
+						{
+							pos += jprintf_putc(args, lpad);
+						}
+						pos += jprintf_putc(args, (char)va_arg(arg, int));
+					break;
+					default:	//Ansonsten ungültig
+						format--;
+						//pos--;
+					break;
+				}
+			break;
+			default:	//Ansonsten schreibe das aktuelle Zeichen
+				jprintf_putc(args, *format);
+				pos++;
+			break;
+		}
+	}
 	return pos;
 }
 
