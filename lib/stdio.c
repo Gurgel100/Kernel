@@ -12,6 +12,7 @@
 #include "stdarg.h"
 #include "string.h"
 #include "userlib.h"
+#include "ctype.h"
 #ifdef BUILD_KERNEL
 #include "vfs.h"
 #else
@@ -545,7 +546,7 @@ int jprintf_putsn(jprintf_args *args, const char *str, int num)
 	}
 }
 
-int jvprintf(jprintf_args *args, const *format, va_list arg)
+int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
 	uint64_t pos = 0;
 	char lpad = ' ';
@@ -731,7 +732,7 @@ int jvprintf(jprintf_args *args, const *format, va_list arg)
 					case 'i':	//Signed int
 					case 'd':
 					{
-						uint64_t value;
+						int64_t value;
 						switch(length)
 						{
 							case -2:
