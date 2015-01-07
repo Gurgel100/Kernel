@@ -554,7 +554,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 	uint64_t width, precision;
 	bool precision_spec;
 	int8_t length;
-	static char buffer[64];
+	char buffer[64];
 	bool left, sign, space_sign, alt;
 	for(; *format; format++)
 	{
