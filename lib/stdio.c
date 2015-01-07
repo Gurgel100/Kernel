@@ -550,7 +550,7 @@ int jprintf_putsn(jprintf_args *args, const char *str, int num)
 int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
 	uint64_t pos = 0;
-	char lpad = ' ';
+	char lpad;
 	uint64_t width, precision;
 	bool precision_spec;
 	int8_t length;
@@ -575,6 +575,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 				sign = false;
 				space_sign = false;
 				alt = false;
+				lpad = ' ';
 				switch(*format)
 				{
 					case '-':
