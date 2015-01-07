@@ -861,9 +861,8 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							//Alternative Form
 							if(alt)
 							{
-								memmove(buffer + 2, buffer, strlen(buffer) + 1);
-								buffer[0] = '0';
-								buffer[1] = *format;
+								pos += jprintf_putc(args, '0');
+								pos += jprintf_putc(args, *format);
 							}
 							pos += jprintf_putsn(args, buffer, -1);
 						}
