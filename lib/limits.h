@@ -31,9 +31,9 @@ extern "C" {
 #define	INT_MAX		2147483647				//Grösster Wert eines int
 #define	UINT_MAX	4294967295U				//Grösster Wert eines unsigned int
 
-#define	LONG_MIN	(-9223372036854775808)	//Kleinster Wert eines long int
-#define	LONG_MAX	9223372036854775807		//Grösster Wert eines long int
-#define	ULONG_MAX	18446744073709551615	//Grösster Wert eines unsigned long int
+#define	LONG_MIN	(-9223372036854775808ll)	//Kleinster Wert eines long int
+#define	LONG_MAX	9223372036854775807ll		//Grösster Wert eines long int
+#define	ULONG_MAX	18446744073709551615ull	//Grösster Wert eines unsigned long int
 
 #ifdef __cplusplus
 }
