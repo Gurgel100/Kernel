@@ -19,10 +19,39 @@ char *strcpy(char *to, const char *from)
 	return to;
 }
 
+char *strncpy(char *to, const char *from, size_t size)
+{
+	size_t i;
+	for(i = 0; from[i] != '\0' && i < size; i++)
+			to[i] = from[i];
+
+	//'\0' muss auch kopiert werden falls i !>= size
+	if(i < size)
+	{
+		for(; i < size; i ++)
+			to[i] = '\0';
+	}
+	return to;
+}
+
 int strcmp(const char *str1, const char *str2)
 {
 	register int i;
 	for(i = 0; str1[i] != '\0' && str2[i] != '\0'; i++)
+	{
+		if(str1[i] == str2[i])
+			continue;
+		return str1[i] - str2[i];
+	}
+	if(str1[i] == str2[i])
+		return 0;
+	return str1[i] - str2[i];
+}
+
+int strncmp(const char *str1, const char *str2, size_t size)
+{
+	size_t i;
+	for(i = 0; str1[i] != '\0' && str2[i] != '\0' && i < size; i++)
 	{
 		if(str1[i] == str2[i])
 			continue;
@@ -98,29 +127,6 @@ char *strtok(char *string, const char *delimiters)
 	}
 }
 
-extern char *strchr(const char *string, int c)
-{
-	size_t i;
-	size_t length = strlen(string);
-	for(i = 0; i < length; i++)
-	{
-		if(string[i] == c)
-			return (char*)string + i;
-	}
-	return NULL;
-}
-
-extern char *strrchr(const char *string, int c)
-{
-	size_t i;
-	for(i = strlen(string); i > 0; i--)
-	{
-		if(string[i - 1] == c)
-			return (char*)string + (i - 1);
-	}
-	return NULL;
-}
-
 char *strcat(char *str1, const char *str2)
 {
 	size_t i;
@@ -143,6 +149,55 @@ char *strncat(char *str1, const char *str2, size_t n)
 	}
 	str1[length + i] = '\0';
 	return str1;
+}
+
+char *strrchr(const char *str, int ch)
+{
+	char *s;
+
+	for(s = (char*)str + strlen(str); s >= (char*)str; s--)
+	{
+		if(*s == ch)
+			return s;
+	}
+
+	return NULL;
+}
+
+char *strchr(const char *str, int ch)
+{
+	char *s;
+
+	for(s = (char*)str; *s != '\0'; s++)
+	{
+		if(*s == ch)
+			return s;
+	}
+
+	//Nullcharakter
+	if(*s == ch)
+		return s;
+
+	return NULL;
+}
+
+char *strstr(const char *str, const char *substr)
+{
+	char *s;
+	size_t size;
+
+	if(substr == NULL)
+		return str;
+
+	 size = strlen(substr);
+
+	for(s = str; *s != '\0'; s++)
+	{
+		if(strncmp(s, substr, size) == 0)
+			return s;
+	}
+
+	return NULL;
 }
 
 

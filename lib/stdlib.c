@@ -10,6 +10,7 @@
 #include "stdbool.h"
 #include "string.h"
 #include "ctype.h"
+#include "math.h"
 #ifdef BUILD_KERNEL
 #include "mm.h"
 #include "cpu.h"
@@ -79,6 +80,140 @@ void exit(int status)
 		list->func();
 	syscall_exit(status);
 #endif
+}
+
+double atof(const char* str)
+{
+	char *s = (char*)str;
+	double value = 0;
+	double sign = 1;
+	bool point = false;
+
+	//Whitespace character überspringen
+	while(isspace(*s)) s++;
+
+	//Plus- und Minuszeichen
+	if(*s == '-')
+	{
+		sign = -1;
+		s++;
+	}
+	else if(*s == '+')
+	{
+		s++;
+	}
+
+	//Hexadezimal
+	if(*s == '0' && tolower(*(s + 1)) == 'x')
+	{
+		s += 2;
+		size_t digit = 16;
+		while(isxdigit(*s) || (!point && *s == '.'))
+		{
+			if(*s == '.')
+				point = true;
+			else
+			{
+				int val;
+				if(isdigit(*s))
+				{
+					val = *s - '0';
+				}
+				else
+				{
+					val = tolower(*s) - 'a' + 10;
+				}
+				if(point)
+				{
+					value += (double)val / digit;
+					digit *= 16;
+				}
+				else
+				{
+					value = value * 16 + val;
+				}
+			}
+			s++;
+		}
+		if(tolower(*s++) == 'p')
+		{
+			long exponent = atol(s);
+			value *= pow(16, exponent);
+		}
+	}
+	//INF
+	else if(tolower(*s) == 'i' && tolower(*(s + 1)) == 'n' && tolower(*(s + 2)) == 'f')
+	{
+		value = INFINITY;
+	}
+	//NAN
+	else if(tolower(*s) == 'n' && tolower(*(s + 1)) == 'a' && tolower(*(s + 2)) == 'n')
+	{
+		value = NAN;
+	}
+	//Dezimal
+	else
+	{
+		size_t digit = 10;
+		while(isdigit(*s) || (!point && *s == '.'))
+		{
+			if(*s == '.')
+				point = true;
+			else
+			{
+				if(point)
+				{
+					value += (double)(*s -'0') / digit;
+					digit *= 10;
+				}
+				else
+				{
+					value = value * 10 + (*s - '0');
+				}
+			}
+			s++;
+		}
+		if(tolower(*s++) == 'e')
+		{
+			long exponent = atol(s);
+			value *= pow(10, exponent);
+		}
+	}
+
+	return value * sign;
+}
+
+int atoi(const char *str)
+{
+	return atol(str);
+}
+
+long atol(const char *str)
+{
+	char *s = (char*)str;
+	long sign = 1;
+	long value = 0;
+
+	//Whitespace character überspringen
+	while(isspace(*s)) s++;
+
+	if(*s == '-')
+	{
+		sign = -1;
+		s++;
+	}
+	else if(*s == '+')
+	{
+		s++;
+	}
+
+	while(isdigit(*s))
+	{
+		value = value * 10 + (*s - '0');
+		s++;
+	}
+
+	return value * sign;
 }
 
 long int strtol(const char *str, char **endptr, int base)

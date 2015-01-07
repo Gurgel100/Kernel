@@ -14,6 +14,7 @@ extern "C" {
 
 #define M_E         2.71828182845904523536
 #define NAN         (__builtin_nanf (""))
+#define INFINITY	(__builtin_inff ())
 
 extern double sin(double x);
 extern double cos(double x);
