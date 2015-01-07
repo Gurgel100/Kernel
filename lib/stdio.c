@@ -713,15 +713,15 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						if(!precision_spec)
 							precision = 1;
 						utoa(value, buffer);
+						size_t len = strlen(buffer);
 						//Padding
-						size_t i;
-						for(i = 0; i < MIN(strlen(buffer), precision); i++)
+						for(; width > len + precision; width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
 						if((precision_spec && precision != 0) || value != 0)
 						{
-							for(; precision > strlen(buffer); precision--)
+							for(; precision > len; precision--)
 							{
 								jprintf_putc(args, '0');
 							}
@@ -763,28 +763,28 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						if(!precision_spec)
 							precision = 1;
 						itoa(value, buffer);
+						size_t len = len = strlen(buffer);
 						if(value < 0)
 						{
 							if(sign)
 							{
-								memmove(buffer + 1, buffer, strlen(buffer) + 1);
+								memmove(buffer + 1, buffer, len + 1);
 								buffer[0] = '+';
 							}
 							else if(space_sign)
 							{
-								memmove(buffer + 1, buffer, strlen(buffer) + 1);
+								memmove(buffer + 1, buffer, len + 1);
 								buffer[0] = ' ';
 							}
 						}
 						//Padding
-						size_t i;
-						for(i = 0; i < MIN(strlen(buffer), precision); i++)
+						for(; width > precision + len ; width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
 						if((precision_spec && precision != 0) || value != 0)
 						{
-							for(; precision > strlen(buffer); precision--)
+							for(; precision > len; precision--)
 							{
 								jprintf_putc(args, '0');
 							}
@@ -836,9 +836,9 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						}
 						if(!precision_spec)
 							precision = 1;
+						size_t len = strlen(buffer);
 						//Padding
-						size_t i;
-						for(i = 0; i < MIN(strlen(buffer), precision); i++)
+						for(; width > precision + len; width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
