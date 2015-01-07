@@ -803,32 +803,39 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						{
 							case -2:
 								value = va_arg(arg, unsigned int);
+								i2hex(value, buffer, 2);
 							break;
 							case -1:
 								value = va_arg(arg, unsigned int);
+								i2hex(value, buffer, 4);
 							break;
 							case 0: default:
 								value = va_arg(arg, unsigned int);
+								i2hex(value, buffer, 8);
 							break;
 							case 1:
 								value = va_arg(arg, unsigned long);
+								i2hex(value, buffer, 16);
 							break;
 							case 2:
 								value = va_arg(arg, unsigned long long);
+								i2hex(value, buffer, 16);
 							break;
 							case 3:
 								value = va_arg(arg, uint64_t);
+								i2hex(value, buffer, 16);
 							break;
 							case 4:
 								value = va_arg(arg, size_t);
+								i2hex(value, buffer, 16);
 							break;
 							case 5:
 								value = va_arg(arg, uintptr_t);
+								i2hex(value, buffer, 16);
 							break;
 						}
 						if(!precision_spec)
 							precision = 1;
-						i2hex(value, buffer, 64);
 						//Padding
 						size_t i;
 						for(i = 0; i < MIN(strlen(buffer), precision); i++)
