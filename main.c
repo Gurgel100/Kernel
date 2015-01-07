@@ -29,6 +29,9 @@
 #include "sound.h"
 
 #include "stdio.h"
+#include "stdlib.h"
+
+static multiboot_structure static_MBS;
 
 void Init(void);
 
@@ -48,6 +51,10 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 
 void Init()
 {
+	//MBS zwischenspeichern, bis Speicherverwaltung initialisiert ist, wenn nötig noch andere Strukturen sichern
+	MBS = memcpy(&static_MBS, MBS, sizeof(multiboot_structure));
+	MBS->mbs_mmap_addr = memcpy(__builtin_alloca(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
+
 	Display_Init();		//Anzeige Intialisieren
 	cpu_Init();			//CPU Initialisieren
 	fpu_Init();			//FPU Initialisieren
@@ -72,6 +79,10 @@ void Init()
 	dmng_Init();
 	cdi_init();			//CDI und -Treiber initialisieren
 	pm_Init();			//Tasks initialisieren
+
+	//MBS an einen richtigen Ort sichern
+	MBS->mbs_mmap_addr = memcpy(malloc(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
+
 	SysLog("SYSTEM", "Initialisierung abgeschlossen");
 	setColor(BG_BLACK | CL_WHITE);
 	#ifdef DEBUGMODE

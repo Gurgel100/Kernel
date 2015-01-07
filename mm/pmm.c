@@ -50,10 +50,6 @@ bool pmm_Init()
 	map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
 	mapLength = MBS->mbs_mmap_length;
 
-	//Map zwischenspeichern
-	map = memcpy(__builtin_alloca(mapLength), map, mapLength);
-	MBS->mbs_mmap_addr = (uintptr_t)map;
-
 	//"Nachschauen", wieviel Speicher vorhanden ist
 	uint32_t maxLength = mapLength / sizeof(mmap);
 	pmm_Speicher = 0;
@@ -118,9 +114,6 @@ bool pmm_Init()
 		Map[Address / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE)] &= ~(1ULL << ((((uintptr_t)Address) / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT));
 	}
 	list_destroy(reservedPages);
-
-	//MMap speichern
-	MBS->mbs_mmap_addr = memcpy(malloc(mapLength), map, mapLength);
 
 	SysLog("PMM", "Initialisierung abgeschlossen");
 	return true;
