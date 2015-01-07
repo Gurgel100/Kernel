@@ -908,99 +908,62 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 	return pos;
 }
 
+//Callback-Funktionen
+typedef struct{
+	char *buffer;
+	size_t size, bytes_written;
+}vasprintf_t;
+int vasprintf_putc(void *arg, char c)
+{
+	vasprintf_t *args = arg;
+	if(args->size == args->bytes_written)
+	{
+		args->size *= 2;
+		args->buffer = (char*)realloc(args->buffer, args->size);
+		if(args->buffer == NULL)
+			return -1;
+	}
+
+	args->buffer[args->bytes_written++] = c;
+
+	return 1;
+}
+
 int vasprintf(char **str, const char *format, va_list arg)
 {
-	uint64_t pos = 0;
-	char lpad = ' ';
-	uint64_t width = 0;
-	static char buffer[64];
-	*str = calloc(1, 1);
-	for(; *format; format++)
+	if(str == NULL)
+		return -1;
+
+	int retval;
+
+	vasprintf_t asarg = {
+			.buffer = malloc(ASPRINTF_INITIAL_BUFFER_SIZE),
+			.size = ASPRINTF_INITIAL_BUFFER_SIZE
+	};
+
+	jprintf_args args = {
+			.putc = &vasprintf_putc,
+			.arg = &asarg
+	};
+
+	if(asarg.buffer == NULL)
+		return -1;
+
+	retval = jvprintf(&args, format, arg);
+
+	//Den String nullterminieren
+	if(vasprintf_putc(&asarg, '\0') == -1)
+		return -1;
+
+	//Den Buffer wieder verkleinern, wenn wir können
+	if(asarg.bytes_written < asarg.size)
 	{
-		switch(*format)
-		{
-			case '%':	//Formatieren?
-				format++;
-				//% überspringen
-				if(*format == '%')
-				{
-					sputchar(str, '%');
-					pos++;
-					format++;
-				}
-
-				//Flags
-				switch(*format)
-				{
-					case '-':case '+':case ' ': case '#':
-						format++;
-					break;
-					case '0':
-						lpad = '0';
-						format++;
-					break;
-				}
-
-				//Width
-				if(*format >= '0' && *format <= '9')
-					width = strtol(format, (char**)&format, 10);
-				else if(*format == '*')
-				{
-					format++;
-					width = va_arg(arg, uint64_t);
-				}
-
-				switch(*format)
-				{
-					case 'u':	//Unsigned int
-						sputs(str, utoa(va_arg(arg, uint64_t), buffer));
-						pos += strlen(buffer);
-					break;
-					case 'i':	//Signed int
-					case 'd':
-						sputs(str, itoa(va_arg(arg, int64_t), buffer));
-						pos += strlen(buffer);
-					break;
-					case 'f':	//Float
-						sputs(str, ftoa(va_arg(arg, double), buffer));
-						pos += strlen(buffer);
-					break;
-					case 'X':	//Hex 8
-						sputs(str, i2hex(va_arg(arg, int64_t), buffer, 8));
-						pos += 8;
-					break;
-					case 'x':	//Hex 4
-						sputs(str, i2hex(va_arg(arg, int64_t), buffer, 4));
-						pos += 4;
-					break;
-					case 'y':	//Hex 2
-						sputs(str, i2hex(va_arg(arg, int64_t), buffer, 2));
-						pos += 2;
-					break;
-					case 's':	//String
-					{
-						char *temp = va_arg(arg, char*);
-						sputs(str, temp);
-						pos += strlen(temp);
-					}
-					break;
-					case 'c':	//Char
-						sputchar(str, (char)va_arg(arg, int64_t));
-						pos++;
-					break;
-					default:	//Ansonsten ungültig
-						format--;
-						//pos--;
-					break;
-				}
-			break;
-			default:	//Ansonsten schreibe das aktuelle Zeichen
-				sputchar(str, *format);
-				pos++;
-			break;
-		}
+		asarg.buffer = realloc(asarg.buffer, asarg.bytes_written);
 	}
-	return pos;
+
+	*str = asarg.buffer;
+
+	return retval;
 }
 
 int vfprintf(FILE *stream, const char *format, va_list arg)
