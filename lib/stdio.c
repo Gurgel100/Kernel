@@ -22,6 +22,7 @@
 #define ASPRINTF_INITIAL_BUFFER_SIZE 64
 
 #define MIN(x,y) ((x < y) ? x : y)
+#define MAX(x,y) ((x > y) ? x : y)
 
 struct asprintf_args{
 		char *buffer;
@@ -715,7 +716,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						utoa(value, buffer);
 						size_t len = strlen(buffer);
 						//Padding
-						for(; width > len + precision; width--)
+						for(; width > MAX(len, precision); width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
@@ -778,7 +779,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							}
 						}
 						//Padding
-						for(; width > precision + len ; width--)
+						for(; width > MAX(len, precision); width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
@@ -838,7 +839,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							precision = 1;
 						size_t len = strlen(buffer);
 						//Padding
-						for(; width > precision + len; width--)
+						for(; width > MAX(len, precision); width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
