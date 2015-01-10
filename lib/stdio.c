@@ -1009,9 +1009,37 @@ int vprintf(const char *format, va_list arg)
 	return jvprintf(&handler, format, arg);
 }
 
+//Callback-Funktionen
+typedef struct{
+	char *str;
+	size_t size;
+}vsprintf_t;
+int vsprintf_putc(void *arg, char c)
+{
+	vsprintf_t *args = arg;
+
+	args->str[args->size++] = c;
+
+	return 1;
+}
+
 int vsprintf(char *str, const char *format, va_list arg)
 {
-	return EOF;
+	vsprintf_t args = {
+			.str = str
+	};
+
+	jprintf_args handler = {
+			.putc = &vsprintf_putc,
+			.arg = &args
+	};
+
+	int retval = jvprintf(&handler, format, arg);
+
+	//String null-terminieren
+	args.str[args.size] = '\0';
+
+	return retval;
 }
 
 //scanf-Funktionen
