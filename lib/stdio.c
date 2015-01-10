@@ -538,7 +538,7 @@ int jprintf_putsn(jprintf_args *args, const char *str, int num)
 		size_t i;
 		int bytes_written = 0;
 
-		for(i = 0; (i < num || num == -1) && str[i] != '\0'; i++)
+		for(i = 0; (num == -1 || i < (unsigned int)num) && str[i] != '\0'; i++)
 		{
 			bytes_written += jprintf_putc(args, str[i]);
 		}
