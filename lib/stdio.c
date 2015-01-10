@@ -721,7 +721,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
-						if((precision_spec && precision != 0) || value != 0)
+						if(!((precision_spec && precision == 0) && value == 0))
 						{
 							for(; precision > len; precision--)
 							{
@@ -784,7 +784,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
-						if((precision_spec && precision != 0) || value != 0)
+						if(!((precision_spec && precision == 0) && value == 0))
 						{
 							for(; precision > len; precision--)
 							{
@@ -844,7 +844,7 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
-						if((precision_spec && precision != 0) || value != 0)
+						if(!((precision_spec && precision == 0) && value == 0))
 						{
 							for(; precision > strlen(buffer); precision--)
 							{
