@@ -112,6 +112,7 @@ void vfs_Init(void)
 		Node->Name = "stderr";
 		Node->Type = TYPE_FILE;
 		Node->Handler = Display_FileHandler;
+		Node->Next = NULL;
 	}
 
 	lastNode = Node;
@@ -299,7 +300,10 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 		return 1;
 
 	if((mount = getNode(Mountpath)) == NULL)
-		return 1;
+		return 2;
+
+	if(devNode->Type != TYPE_DEV)
+		return 3;
 
 	device_t *device = devNode->dev;
 
