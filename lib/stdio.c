@@ -24,12 +24,6 @@
 #define MIN(x,y) ((x < y) ? x : y)
 #define MAX(x,y) ((x > y) ? x : y)
 
-struct asprintf_args{
-		char *buffer;
-		size_t buflen;
-		size_t bytes_written;
-};
-
 FILE* stderr = NULL;
 FILE* stdin = NULL;
 FILE* stdout = NULL;
