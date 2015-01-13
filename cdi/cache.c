@@ -8,6 +8,7 @@
 #include "cache.h"
 #include "stdbool.h"
 #include "lists.h"
+#include "stdlib.h"
 
 typedef struct{
 		struct cdi_cache_block block;
@@ -25,7 +26,7 @@ typedef struct{
 		size_t block_used;
 
 		//Liste aller Blöcke
-		cdi_list_t *blocks;
+		cdi_list_t blocks;
 
 		/** Callback zum Lesen eines Blocks */
 		cdi_cache_read_block_t* read_block;
@@ -116,7 +117,6 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 {
 	cache_t *c;
 	block_t *b;
-	void *buffer;
 	c = (cache_t*)cache;
 
 	//Erst suchen, ob er nicht schon vorhanden ist
@@ -160,7 +160,7 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 		if(!c->read_block(cache, blocknum, 1, b->block.data, c->prv_data))
 		{
 			//Fehler: Cacheblock wieder freigeben
-			cache_t *tmp;
+			block_t *tmp;
 			size_t i = 0;
 			while((tmp = cdi_list_get(c->blocks, i)))
 			{
@@ -181,7 +181,7 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 	end:
 	b->ref_count++;
 
-	return b;
+	return &b->block;
 }
 
 /**
