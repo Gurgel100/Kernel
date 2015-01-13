@@ -47,7 +47,7 @@ void putch(unsigned char c)
 	{
 		case '\n':
 			Zeile++;
-			if(Zeile >= 24)
+			if(Zeile > 24)
 			{
 				scrollScreenDown();
 				Zeile = 24;
