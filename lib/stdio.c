@@ -125,7 +125,7 @@ FILE *fopen(const char *filename, const char *mode)
 		free(file);
 		return NULL;
 	}
-	setvbuf(file, malloc(BUFSIZ), _IOFBF, BUFSIZ);
+	setvbuf(file, NULL, _IOFBF, BUFSIZ);
 
 	return file;
 }
