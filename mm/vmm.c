@@ -686,6 +686,9 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
  */
 uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags)
 {
+	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
+	PDP_t *PDP = (PDP_t*)VMM_PDP_ADDRESS;
+	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
 	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 	//Einträge in die Page Tabellen
 	uint16_t PML4i = (vAddress & PG_PML4_INDEX) >> 39;
@@ -699,6 +702,8 @@ uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags)
 	bool RW = (flags & VMM_FLAGS_WRITE);
 	bool NX = (flags & VMM_FLAGS_NX);
 
+	PDP = (void*)PDP + (PML4i << 12);
+	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
 	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
 
 	if(vmm_getPageStatus(vAddress))
@@ -711,6 +716,11 @@ uint8_t vmm_ChangeMap(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags)
 			setPTEntry(PTi, PT, 1, RW, US, 1, 0, 0, 0, G, VMM_KERNELSPACE, 0, NX, pAddress);
 		else
 			setPTEntry(PTi, PT, 1, RW, US, 1, 0, 0, 0, G, 0, 0, NX, pAddress);
+
+		//Reserved bits zurücksetzen
+		PD->PDE[PDi] &= ~0x1C0;
+		PDP->PDPE[PDPi] &= ~0x1C0;
+		PML4->PML4E[PML4i] &= ~0x1C0;
 
 		InvalidateTLBEntry((void*)vAddress);
 	}
