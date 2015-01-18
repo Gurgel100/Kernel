@@ -369,11 +369,30 @@ int vfs_Unmount(const char *Mount)
 int vfs_MountRoot(void)
 {
 	char *DevPath;
-	int status;
-	vfs_node_t *node = getNode("dev");
-	asprintf(&DevPath, "dev/%s", node->Child->Name);
-	status = vfs_Mount("/mount", DevPath);
-	free(DevPath);
+	int status = -1;
+	vfs_node_t *dev = getNode("dev");
+	vfs_node_t *node = dev->Child;
+	do
+	{
+		if(node->Type == TYPE_DEV)
+		{
+			nextPartID = 0;
+			asprintf(&DevPath, "dev/%s", node->Name);
+			status = vfs_Mount("/mount", DevPath);
+			free(DevPath);
+			if(status == 0)
+			{
+				FILE *fp = fopen("/mount/0/kernel", "r");
+				if(fp != NULL)
+				{
+					fclose(fp);
+					break;
+				}
+				vfs_Unmount("mount/0");
+			}
+		}
+	}
+	while((node = node->Next) != NULL);
 	return status;
 }
 
