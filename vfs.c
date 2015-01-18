@@ -15,6 +15,8 @@
 #include "list.h"
 #include "display.h"
 
+#define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
+
 #define VFS_MODE_READ	0x1
 #define VFS_MODE_WRITE	0x2
 #define VFS_MODE_APPEND	0x4
@@ -44,14 +46,18 @@ size_t getDirs(char ***Dirs, const char *Path);
 vfs_node_t *getLastNode(const char *Path, char **remPath);
 vfs_node_t *getNode(const char *Path);
 char *splitPath(const char *path, char **file, char **dev);
+void freeRes(struct cdi_fs_res *res);
 struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path);
 
 static vfs_node_t root;
 static vfs_node_t *lastNode;
 static uint8_t nextPartID = 0;
+static list_t res_list;
 
 void vfs_Init(void)
 {
+	res_list = list_create();
+
 	//Root
 	root.Name = VFS_ROOT;
 	root.Next = NULL;
@@ -178,13 +184,13 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
  */
 void vfs_Close(vfs_stream_t *stream)
 {
-	if(stream != NULL)
+	if(stream == NULL)
 		return;
 
 	switch(stream->node->Type)
 	{
 		case TYPE_MOUNT:
-			stream->stream.res->res->unload(&stream->stream);
+			freeRes(stream->stream.res);
 		break;
 	}
 	free(stream);
@@ -533,20 +539,106 @@ void vfs_RegisterDevice(device_t *dev)
 	printf("Eingehaengt in: /dev/%s\n", Node->Name);
 }
 
+void removeChilds(cdi_list_t childs)
+{
+	struct cdi_fs_res *res, *res2;
+	size_t i = 0;
+	while((res = cdi_list_get(childs, i++)))
+	{
+		removeChilds(res->children);
+		size_t j = 0;
+		while((res2 = list_get(res_list, j)))
+		{
+			if(res2 == res)
+				list_remove(res_list, j);
+			j++;
+		}
+	}
+}
+
+//TODO: Wenn der RAM voll ist werden weniger Ressourcen gecacht
+//TODO: Wenn der RAM knapp wird kann die Speicherverwaltung das VFS auffordern den RAM ein bisschen frei zu machen
+/*
+ * Lädt wenn nötig eine Ressource
+ * Parameter:	res = Ressource, die geladen werden soll
+ * 				stream = Zu verwendenden Stream
+ * Rückgabe:	false = Fehler / Ressource konnte nicht geladen werden
+ * 				true = Ressource erfolgreich geladen
+ */
+bool loadRes(struct cdi_fs_res *res, struct cdi_fs_stream *stream)
+{
+	struct cdi_fs_stream tmpStream = {
+			.fs = stream->fs,
+			.res = res
+	};
+
+	if(!res->loaded)
+	{
+		if(list_size(res_list) >= MAX_RES_BUFFER)
+		{
+			struct cdi_fs_res *tmpRes;
+			size_t i = 0;
+			while((tmpRes = list_get(res_list, i)) != NULL)
+			{
+				//Wenn die Ressource nicht geladen ist löschen wir sie einfach aus der Liste
+				if(!tmpRes->loaded)
+				{
+					list_remove(res_list, i);
+					break;
+				}
+
+				//Wenn die Ressource nirgends verwendet wird, können wir sie entladen
+				if(tmpRes->stream_cnt <= 0)
+				{
+					struct cdi_fs_stream unload_stream = {
+							.fs = stream->fs,
+							.res = res
+					};
+
+					//Erst müssen wir alle Kinder noch von der Liste entfernen, da diese auch zerstört werden
+					removeChilds(tmpRes->children);
+
+					if(tmpRes->res->unload(&unload_stream))
+					{
+						list_remove(res_list, i);
+						break;
+					}
+				}
+				i++;
+			}
+			//Wenn keine Ressource freigegeben werden konnte, dann kann die neue Ressource nicht geladen werden
+			if(i >= list_size(res_list))
+				return false;
+		}
+
+		if(!res->res->load(&tmpStream))
+			return false;
+		list_push(res_list, res);
+	}
+	res->stream_cnt++;
+	return true;
+}
+
+void freeRes(struct cdi_fs_res *res)
+{
+	//Referenzzähler decrementieren
+	do
+	{
+		res->stream_cnt -= (res->stream_cnt > 0) ? 1 : 0;
+	}
+	while ((res = res->parent) != NULL);
+}
+
 struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 {
 	struct cdi_fs_res *res = NULL;
 	struct cdi_fs_res *prevRes = stream->fs->root_res;
-	struct cdi_fs_stream tmpStream = {
-		.fs = stream->fs,
-		.res = prevRes
-	};
 
 	char **dirs = NULL;
 	size_t dirSize = getDirs(&dirs, path);
 
-	if(!prevRes->loaded)
-		prevRes->res->load(&tmpStream);
+	if(!loadRes(prevRes, stream))
+		return NULL;
 
 	size_t i = 0;
 	size_t j = 0;
@@ -554,8 +646,11 @@ struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 	{
 		if(!strcmp(res->name, dirs[j]))
 		{
-			tmpStream.res = res;
-			res->res->load(&tmpStream);
+			if(!loadRes(res, stream))
+			{
+				freeRes(res);
+				return NULL;
+			}
 			prevRes = res;
 			j++;
 			i = 0;
