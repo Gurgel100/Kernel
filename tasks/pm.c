@@ -37,10 +37,18 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-pid_t pm_InitTask(pid_t parent, void *entry)
+pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
 	numTasks++;
+
+	//Argumente kopieren
+	newProcess->cmd = strdup(cmd);
+	if(newProcess->cmd == NULL)
+	{
+		free(newProcess);
+		return 0;
+	}
 
 	newProcess->PID = nextPID++;
 	newProcess->PPID = parent;
@@ -98,6 +106,7 @@ void pm_DestroyTask(pid_t PID)
 			list_remove(ProcessList, i);
 			deleteContext(process->Context);
 			mm_SysFree((uintptr_t)process->kernelStackBottom, 1);
+			free(process->cmd);
 			free(process);
 			numTasks--;
 			break;

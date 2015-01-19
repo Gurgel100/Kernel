@@ -24,13 +24,14 @@ typedef struct{
 		context_t *Context;
 		pid_t PID;
 		pid_t PPID;
+		char *cmd;
 		bool Active;
 		bool Sleeping;
 		void *kernelStackBottom, *kernelStack;
 }process_t;
 
 void pm_Init(void);
-pid_t pm_InitTask(pid_t parent, void *entry);
+pid_t pm_InitTask(pid_t parent, void *entry, char* cmd);
 void pm_DestroyTask(pid_t PID);
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code);
 void pm_HaltTask(pid_t PID);
