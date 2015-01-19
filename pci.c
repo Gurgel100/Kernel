@@ -191,7 +191,7 @@ void initDevice(uint8_t bus, uint8_t slot)
 		}
 	}
 
-	if(pciDevice->HeaderType == 0x00 || pciDevice->HeaderType == 0x01)
+	if((pciDevice->HeaderType & ~0x80) == 0x00 || (pciDevice->HeaderType & ~0x80) == 0x01)
 	{
 		uint8_t maxBars = 6 - (pciDevice->HeaderType * 4);
 		uint8_t Bar;
@@ -221,7 +221,7 @@ void initDevice(uint8_t bus, uint8_t slot)
 						{
 							pciDevice->BAR[Bar].Type = BAR_32;
 							pciDevice->BAR[Bar].Address = Data & 0xFFFFFFF0;
-							pciDevice->BAR[Bar].Size = ~(Data & 0xFFFFFFF0) + 1;
+							pciDevice->BAR[Bar].Size = ~(tmp & 0xFFFFFFF0) + 1;
 						}
 					break;
 					case 0x2:	//64-Bit BAR
@@ -236,7 +236,7 @@ void initDevice(uint8_t bus, uint8_t slot)
 							ConfigWrite(bus, slot, 0, BarOffset, 4, 0xFFFFFFF0);
 							ConfigWrite(bus, slot, 0, BarOffset + 4, 4, 0xFFFFFFFF);
 
-							uint64_t tmp = ConfigRead(bus, slot, 0, BarOffset, 4) | (ConfigRead(bus, slot, 0, BarOffset + 4, 4) << 32);
+							uint64_t tmp = ConfigRead(bus, slot, 0, BarOffset, 4) | ((uint64_t)ConfigRead(bus, slot, 0, BarOffset + 4, 4) << 32);
 							//Daten zurückschreiben
 							ConfigWrite(bus, slot, 0, BarOffset, 4, Data);
 							ConfigWrite(bus, slot, 0, BarOffset + 4, 4, tmp_high);
@@ -249,7 +249,7 @@ void initDevice(uint8_t bus, uint8_t slot)
 								Bar++;									//Bar erhöhen, da die nachfolgende die oberen 32 Bit enthält
 								pciDevice->BAR[Bar].Type = BAR_64HI;
 								pciDevice->BAR[Bar].Address = tmp_high;
-								pciDevice->BAR[Bar].Size = ~(((tmp_high) << 32) | (Data & 0xFFFFFFF0)) + 1;
+								pciDevice->BAR[Bar].Size = ~(tmp & ~0xF) + 1;
 							}
 						}
 					break;
@@ -272,7 +272,7 @@ void initDevice(uint8_t bus, uint8_t slot)
 				{
 					pciDevice->BAR[Bar].Type = BAR_IO;
 					pciDevice->BAR[Bar].Address = Data & 0xFFFFFFFC;
-					pciDevice->BAR[Bar].Size = ~(Data & 0xFFFFFFFC) + 1;
+					pciDevice->BAR[Bar].Size = ~(tmp & 0xFFFFFFFC) + 1;
 				}
 			}
 		}
