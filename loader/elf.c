@@ -204,7 +204,7 @@ char elfLoad(FILE *fp)
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry);
+	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, "");
 	process_t *task = pm_getTask(taskID);
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
