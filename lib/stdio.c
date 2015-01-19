@@ -441,6 +441,11 @@ int fgetpos(FILE *stream, fpos_t *pos)
 	return 0;
 }
 
+int feof(FILE *stream)
+{
+	return stream->eof;
+}
+
 int fgetc(FILE *stream)
 {
 	char buffer;

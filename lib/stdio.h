@@ -76,6 +76,7 @@ extern int fseek(FILE *stream, long int offset, int whence);
 extern long int ftell(FILE *stream);
 extern int fsetpos(FILE *stream, const fpos_t *pos);
 extern int fgetpos(FILE *stream, fpos_t *pos);
+extern int feof(FILE *stream);
 
 extern int fgetc(FILE *stream);
 extern char *fgets(char *str, int n, FILE *stream);
