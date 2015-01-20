@@ -352,17 +352,40 @@ void free(void *ptr)
 		//TODO
 		//Wenn möglich unnötige Speicherseiten freigeben
 		//Dabei behalten wir immer eine Page
-		if(Heap->Length > 4096)
+		if(Heap->Length > 4096 && Heap->Length % 4096 > 0)
 		{
 			uint64_t Pages = Heap->Length / 4096;
 			Heap->Length -= Pages * 4096;
 			FreePage((void*)Heap + sizeof(heap_t) + Heap->Length, Pages);
 		}
-		else if(Heap->Length + sizeof(heap_t) > 4096)
+		else if(Heap->Length + sizeof(heap_t) > 4096 && (Heap->Length + sizeof(heap_t)) % 4096 > 0)
 		{
-			uint64_t Pages = (Heap->Length + sizeof(heap_t)) / 4096;
-			Heap->Length -= Pages * 4096;
-			FreePage((void*)Heap + sizeof(heap_t) + Heap->Length, Pages);
+			//Aufrunden auf nächste Pagegrenze
+			uintptr_t bottom = ((uintptr_t)Heap & ~0xFFF) + 4096;
+			//Die Page des nächsten Heaps dürfen wir nicht freigeben
+			uintptr_t top = ((uintptr_t)Heap + Heap->Length) & ~0xFFF;
+			if(Heap->Next != NULL)
+				top = (uintptr_t)Heap->Next & ~0xFFF;
+
+			uint64_t Pages = (top - bottom) / 4096;
+
+			//Wenn nötig müssen wir einen neuen Heap anlegen
+			if(Heap->Next != NULL && (uintptr_t)Heap->Next - top > 0)
+			{
+				//Wenn nicht mehr genügend Platz da ist, um einen neuen Heap anzulegen, dann geben wir eine Page weniger frei
+				if((uintptr_t)Heap->Next - top < sizeof(heap_t) && Pages > 0)
+					Pages--;
+
+				if(Pages == 0) return;
+
+				heap_t *tmpHeap = (heap_t*)(bottom + Pages * 4096);
+				top = (uintptr_t)tmpHeap;
+				setupNewHeapEntry(Heap, tmpHeap);
+				tmpHeap->Length = (uintptr_t)tmpHeap->Next - (uintptr_t)tmpHeap - sizeof(heap_t);
+			}
+
+			Heap->Length = bottom - (uintptr_t)Heap - sizeof(heap_t);
+			FreePage((void*)bottom, Pages);
 		}
 	}
 }
