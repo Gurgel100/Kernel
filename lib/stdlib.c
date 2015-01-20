@@ -630,6 +630,8 @@ void setupNewHeapEntry(heap_t *old, heap_t *new)
 {
 	new->Prev = old;
 	new->Next = old->Next;
+	if(new->Next != NULL)
+		((heap_t*)new->Next)->Prev = new;
 	old->Next = new;
 	new->Flags = HEAP_FLAGS;
 	Heap_Entries++;
