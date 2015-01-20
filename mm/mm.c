@@ -30,7 +30,7 @@ uintptr_t mm_Alloc(uint64_t Pages)
 
 void mm_Free(uintptr_t Address, uint64_t Pages)
 {
-	if(Address > USERSPACE_START || Address < MAX_ADDRESS)	//Kontrolle ob richtiger Adress-
+	if(Address < USERSPACE_START || Address > USERSPACE_END)	//Kontrolle ob richtiger Adress-
 		Panic("MM", "Ungueltiger Adressbereich");			//bereich
 	vmm_Free(Address, Pages);
 }
