@@ -81,7 +81,7 @@ bool pmm_Init()
 	if(pages == 0)
 	{
 		//neuen Speicher für die Bitmap anfordern und zwar so viel wie nötig
-		Map = memcpy(calloc(pmm_Speicher / MM_BLOCK_SIZE / 8, sizeof(*Map)), Map, mapSize * sizeof(*Map));
+		Map = memcpy(calloc(pmm_Speicher / MM_BLOCK_SIZE / 8, 1), Map, mapSize * sizeof(*Map));
 		mapSize = pmm_Speicher / MM_BLOCK_SIZE / 8 / sizeof(*Map);
 		//Weiter Speicher freigeben
 		while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
