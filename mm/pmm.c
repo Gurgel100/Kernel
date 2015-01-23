@@ -20,6 +20,7 @@
 #endif
 
 #define PMM_BITS_PER_ELEMENT	(sizeof(*Map) * 8)
+#define PMM_MAP_ALIGN_SIZE(x)	((x + (sizeof(*Map) - 1)) & ~(sizeof(*Map) - 1))
 
 //Anfang und Ende des Kernels
 extern uint8_t kernel_start;
@@ -81,8 +82,8 @@ bool pmm_Init()
 	if(pages == 0)
 	{
 		//neuen Speicher für die Bitmap anfordern und zwar so viel wie nötig
-		Map = memcpy(calloc(pmm_Speicher / MM_BLOCK_SIZE / 8, 1), Map, mapSize * sizeof(*Map));
-		mapSize = pmm_Speicher / MM_BLOCK_SIZE / 8 / sizeof(*Map);
+		Map = memcpy(calloc(PMM_MAP_ALIGN_SIZE(pmm_Speicher / MM_BLOCK_SIZE / 8), 1), Map, mapSize * sizeof(*Map));
+		mapSize = PMM_MAP_ALIGN_SIZE(pmm_Speicher / MM_BLOCK_SIZE / 8) / sizeof(*Map);
 		//Weiter Speicher freigeben
 		while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
 		{
