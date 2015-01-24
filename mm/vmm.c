@@ -975,7 +975,10 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 
 	//PML4 Tabelle bearbeiten
 	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
+	{
+		PML4->PML4E[PML4i] &= ~0x1C0;
 		return 1;
+	}
 
 	//PDP mappen
 	PDP = (PDP_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
@@ -983,7 +986,12 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 
 	//PDP Tabelle bearbeiten
 	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
+	{
+		PDP->PDPE[PDPi] &= ~0x1C0;
+		PML4->PML4E[PML4i] &= ~0x1C0;
+		vmm_UnMap((uintptr_t)PDP);
 		return 1;
+	}
 
 	//PD mappen
 	PD = (PD_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
@@ -991,7 +999,14 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 
 	//PD Tabelle bearbeiten
 	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
+	{
+		PD->PDE[PDi] &= ~0x1C0;
+		PDP->PDPE[PDPi] &= ~0x1C0;
+		PML4->PML4E[PML4i] &= ~0x1C0;
+		vmm_UnMap((uintptr_t)PD);
+		vmm_UnMap((uintptr_t)PDP);
 		return 1;
+	}
 
 	//PT mappen
 	PT = (PT_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
@@ -1081,7 +1096,16 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 		return 0;
 	}
 	else
+	{
+		PT->PTE[PTi] &= ~0x1C0;
+		PD->PDE[PDi] &= ~0x1C0;
+		PDP->PDPE[PDPi] &= ~0x1C0;
+		PML4->PML4E[PML4i] &= ~0x1C0;
+		vmm_UnMap((uintptr_t)PT);
+		vmm_UnMap((uintptr_t)PD);
+		vmm_UnMap((uintptr_t)PDP);
 		return 1;
+	}
 }
 
 /*
