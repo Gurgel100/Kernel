@@ -45,7 +45,7 @@ bool pmm_Init()
 {
 	mmap *map;
 	uint32_t mapLength;
-	uintptr_t i;
+	uintptr_t i, maxAddress;
 
 	pmm_Kernelsize = &kernel_end - &kernel_start;
 	map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
@@ -55,7 +55,10 @@ bool pmm_Init()
 	uint32_t maxLength = mapLength / sizeof(mmap);
 	pmm_Speicher = 0;
 	for(i = 0; i < maxLength; i++)
+	{
 		pmm_Speicher += map[i].length;
+		maxAddress = map[i].base_addr + map[i].length;
+	}
 
 	//Stack auf den ersten Stackframe legen
 
@@ -64,26 +67,24 @@ bool pmm_Init()
 
 	//Die ersten 1GB eintragen
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
-	size_t pages = 1 * 1024 * 1024 * 1024 / 4096;	//Anzahl der Pages für den Anfang
 	do
 	{
 		if(map->type == 1)
-			for(i = map->base_addr;pages > 0 && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
+			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
 				if(i < vmm_getPhysAddress((uintptr_t)&kernel_start) || i > vmm_getPhysAddress((uintptr_t)&kernel_end))
 				{
 					pmm_Free((void*)i);
-					pages--;
 				}
-		if(pages > 0)
+		if(i < MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT)
 			map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
-	while(pages > 0 && map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength));
+	while(i < MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT && map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength));
 
-	if(pages == 0)
+	if(i >= MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT)
 	{
 		//neuen Speicher für die Bitmap anfordern und zwar so viel wie nötig
-		Map = memcpy(calloc(PMM_MAP_ALIGN_SIZE(pmm_Speicher / MM_BLOCK_SIZE / 8), 1), Map, mapSize * sizeof(*Map));
-		mapSize = PMM_MAP_ALIGN_SIZE(pmm_Speicher / MM_BLOCK_SIZE / 8) / sizeof(*Map);
+		Map = memcpy(calloc(PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8), 1), Map, mapSize * sizeof(*Map));
+		mapSize = PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8) / sizeof(*Map);
 		//Weiter Speicher freigeben
 		while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
 		{
