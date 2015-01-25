@@ -14,6 +14,7 @@
 //Speiherverwaltung
 #define MALLOC	0
 #define FREE	1
+#define UNUSE	2
 
 //Programmaufruf und Beendung
 #define EXEC	10

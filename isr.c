@@ -318,20 +318,6 @@ void exception_GeneralProtection(ihs_t *ihs)
 //Page fault
 void exception_PageFault(ihs_t *ihs)
 {
-	uint64_t CR2;
-	Display_Clear();
-	setColor(BG_BLACK | CL_RED);
-	printf("Exception 14: Page Fault\n");
-	setColor(BG_BLACK | CL_WHITE);
-	printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
-
-	asm volatile("mov %%cr2,%0" : "=r"(CR2));
-	printf("CR2: 0x%X%X\n", CR2 >> 32, CR2 & 0xFFFFFFFF);
-
-	traceRegisters(ihs);
-	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 20);
-
 	//Virtuelle Adressen der Tabellen
 	#define VMM_PML4_ADDRESS		0xFFFFFFFFFFFFF000
 	#define VMM_PDP_ADDRESS			0xFFFFFFFFFFE00000
@@ -343,6 +329,9 @@ void exception_PageFault(ihs_t *ihs)
 	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
 	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 
+	uint64_t CR2;
+	asm volatile("mov %%cr2,%0" : "=r"(CR2));
+
 	//Einträge in die Page Tabellen
 	uint16_t PML4i = (CR2 & PG_PML4_INDEX) >> 39;
 	uint16_t PDPi = (CR2 & PG_PDP_INDEX) >> 30;
@@ -352,18 +341,38 @@ void exception_PageFault(ihs_t *ihs)
 	PDP = (void*)PDP + (PML4i << 12);
 	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
 	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
-	printf("PML4e: 0x%lX             ", PML4->PML4E[PML4i]);
-	if(PML4->PML4E[PML4i] & 1)
+
+	if(PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE)
 	{
-		printf("PDPe: 0x%lX\n", PDP->PDPE[PDPi]);
-		if(PDP->PDPE[PDPi] & 1)
-		{
-			printf("PDe:   0x%lX             ", PD->PDE[PDi]);
-			if(PD->PDE[PDi] & 1)
-				printf("PTe:  0x%lX", PT->PTE[PTi]);
-		}
+		vmm_usePages(CR2, 1);
 	}
-	asm volatile("cli;hlt");
+	else
+	{
+		Display_Clear();
+		setColor(BG_BLACK | CL_RED);
+		printf("Exception 14: Page Fault\n");
+		setColor(BG_BLACK | CL_WHITE);
+		printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
+
+
+		printf("CR2: 0x%X%X\n", CR2 >> 32, CR2 & 0xFFFFFFFF);
+
+		traceRegisters(ihs);
+		printf("Stack-backtrace:\n");
+		traceStack(ihs->rsp, 20);
+		printf("PML4e: 0x%lX             ", PML4->PML4E[PML4i]);
+		if(PML4->PML4E[PML4i] & 1)
+		{
+			printf("PDPe: 0x%lX\n", PDP->PDPE[PDPi]);
+			if(PDP->PDPE[PDPi] & 1)
+			{
+				printf("PDe:   0x%lX             ", PD->PDE[PDi]);
+				if(PD->PDE[PDi] & 1)
+					printf("PTe:  0x%lX", PT->PTE[PTi]);
+			}
+		}
+		asm volatile("cli;hlt");
+	}
 }
 
 //x87 floating point

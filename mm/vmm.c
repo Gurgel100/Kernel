@@ -621,7 +621,8 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		//Wird die PT noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE) return 0; //Wird die PT noch benötigt, sind wir fertig
+			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
+				return 0; //Wird die PT noch benötigt, sind wir fertig
 		}
 		//Ansonsten geben wir den Speicherplatz für die PT frei
 		pmm_Free((void*)(PD->PDE[PDi] & PG_ADDRESS));
@@ -1024,7 +1025,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 		//Wird die PT noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
+			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
 			{
 				PT->PTE[PTi] &= ~0x1C0;
 				PD->PDE[PDi] &= ~0x1C0;
@@ -1159,7 +1160,7 @@ bool vmm_getPageStatus(uintptr_t Address)
 	else if((PD->PDE[PDi] & PG_P) == 0)		//Wenn PD-Eintrag vorhanden ist
 		return true;
 	//Ansonsten überprüfe PT-Eintrag
-	else if((PT->PTE[PTi] & PG_P) == 0)		//Wenn PT-Eintrag vorhanden ist
+	else if((PT->PTE[PTi] & PG_P) == 0 && !(PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))		//Wenn PT-Eintrag vorhanden ist
 		return true;
 	else									//Ansonsten ist die Page schon belegt
 		return false;
@@ -1178,6 +1179,53 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress)
 	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
 
 	return PT->PTE[PTi] & PG_ADDRESS;
+}
+
+void vmm_unusePages(void *virt, size_t pages)
+{
+	uintptr_t address = (uintptr_t)virt;
+	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
+
+	for(; address < (uintptr_t)virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
+	{
+		//Einträge in die Page Tabellen
+		const uint16_t PML4i = (address & PG_PML4_INDEX) >> 39;
+		const uint16_t PDPi = (address & PG_PDP_INDEX) >> 30;
+		const uint16_t PDi = (address & PG_PD_INDEX) >> 21;
+		const uint16_t PTi = (address & PG_PT_INDEX) >> 12;
+
+		PT = (void*)PT + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
+
+		if(!vmm_getPageStatus(address))
+		{
+			uint64_t entry = PT->PTE[PTi];
+			pmm_Free((void*)(entry & PG_ADDRESS));
+			setPTEntry(PTi, PT, 0, !!(entry & PG_RW), !!(entry & PG_US), !!(entry & PG_PWT), !!(entry & PG_PCD), !!(entry & PG_A),
+					!!(entry & PG_D), !!(entry & PG_G), PG_AVL(entry) | VMM_UNUSED_PAGE, !!(entry & PG_PAT), !!(entry & PG_NX), 0);
+		}
+	}
+}
+
+void vmm_usePages(void *virt, size_t pages)
+{
+	uintptr_t address = (uintptr_t)virt;
+	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
+
+	for(; address < (uintptr_t)virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
+	{
+		//Einträge in die Page Tabellen
+		const uint16_t PML4i = (address & PG_PML4_INDEX) >> 39;
+		const uint16_t PDPi = (address & PG_PDP_INDEX) >> 30;
+		const uint16_t PDi = (address & PG_PD_INDEX) >> 21;
+		const uint16_t PTi = (address & PG_PT_INDEX) >> 12;
+
+		PT = (void*)PT + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
+
+		uint64_t entry = PT->PTE[PTi];
+		uintptr_t pAddr = (uintptr_t)pmm_Alloc();
+		setPTEntry(PTi, PT, 1, !!(entry & PG_RW), !!(entry & PG_US), !!(entry & PG_PWT), !!(entry & PG_PCD), !!(entry & PG_A),
+				!!(entry & PG_D), !!(entry & PG_G), PG_AVL(entry) & ~VMM_UNUSED_PAGE, !!(entry & PG_PAT), !!(entry & PG_NX), pAddr);
+	}
 }
 
 

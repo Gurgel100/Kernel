@@ -20,6 +20,8 @@
 #define VMM_FLAGS_USER		(1 << 2)	//Bestimmt, ob die Page im Usermode ist oder nicht
 #define VMM_FLAGS_NX		(1 << 3)	//Bestimmt, ob in der Page ausführbare Daten sind
 
+#define VMM_UNUSED_PAGE		0x4		//Marks page as unused by process
+
 typedef struct{
 	uintptr_t physAddress;
 	void *virtualAddress;
@@ -42,6 +44,9 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress);
 uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context, uintptr_t dst, size_t length, uint8_t flags);
 uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddress, uint8_t flags);
 uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress);
+
+void vmm_unusePages(void *virt, size_t pages);
+void vmm_usePages(void *virt, size_t pages);
 
 context_t *createContext(void);
 void deleteContext(context_t *context);

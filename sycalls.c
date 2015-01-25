@@ -38,6 +38,11 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			mm_Free(ihs->rbx, ihs->rcx);
 		break;
 
+		//Parameter: 	rbx = Adresse, rcx = Grösse
+		case UNUSE:
+			vmm_unusePages((void*)ihs->rbx, ihs->rcx);
+		break;
+
 		//Rückgabewert:	al = ASCII-Zeichen
 		case GETCH:
 			ihs->rax = (uint64_t)getch();
