@@ -163,76 +163,143 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	//Schauen, ob die angeforderten Daten im Cache sind
 	if(stream->bufMode != IO_MODE_NO_BUFFER)
 	{
-		if(stream->bufMode == IO_MODE_LINE_BUFFER)
+		size_t cacheLength = 0;
+		uint64_t cacheOff = 0;
+		//Schauen wieviel Daten im Cache sind
+		if(stream->bufStart <= stream->posRead)
 		{
-			if(stream->bufStart <= stream->posRead && stream->bufStart + stream->bufPos >= stream->posRead + length)
-			{
-				//Alles im Buffer
-				memcpy(ptr, stream->buffer, length);
-				stream->posRead += length;
-				readData += length;
-			}
+			cacheOff = stream->posRead - stream->bufStart;
+			if(stream->bufStart + stream->bufPos >= stream->posRead + length)
+				cacheLength = length;
+			else if(stream->bufStart + stream->bufPos > stream->posRead)
+				cacheLength = stream->bufStart + stream->bufPos - stream->posRead;
+		}
+		else if(stream->bufStart < stream->posRead + length)
+		{
+			if(stream->bufStart + stream->bufPos >= stream->posRead + length)
+				cacheLength = stream->posRead + length - stream->bufStart;
 			else
-			{
-				//Nicht alles im Buffer
-				//Wir lesen hier einfach noch mal alles aus
-				//TODO: Besserer Algorithmus finden
-				stream->bufPos = 0;
-				stream->bufStart = stream->posRead;
+				cacheLength = stream->bufSize;
+		}
 
-				uint8_t tmp;
-				size_t i;
-				for(i = 0; i < length; i++)
-				{
+		//Daten im Cache kopieren
+		memcpy(ptr + stream->bufStart - stream->posRead + cacheOff, stream->buffer + cacheOff, cacheLength);
+
+		//Daten, die nicht im Cache sind laden
+		char *tmp;
+		size_t tmpLength;
+		if(stream->bufStart > stream->posRead)
+		{
+			tmpLength = MIN(stream->bufStart - stream->posRead, length);
+			tmp = malloc(tmpLength + 1);
+			size_t size;
 #ifdef BUILD_KERNEL
-					size_t size = vfs_Read(stream->stream, stream->posRead++, 1, &tmp);
+			size = vfs_Read(stream->stream, stream->posRead, tmpLength, tmp);
 #else
-					size_t size = syscall_fread(stream->stream, stream->posRead++, 1, &tmp);
+			size = syscall_fread(stream->stream, stream->posRead, tmpLength, tmp);
 #endif
-					stream->buffer[stream->bufPos++] = tmp;
-					if(tmp == '\n' && i < length)
+
+			if(size < tmpLength)
+			{
+				stream->eof = true;
+				if(size == 0)
+					return EOF;
+			}
+			memcpy(ptr + readData, tmp, size);
+			readData += size;
+
+			//Wenn diese Daten direkt vor den Daten im Cache sind können wir diese einfach in den Cache laden
+			if(stream->bufStart == (size_t)EOF
+					|| (stream->bufStart > stream->posRead && stream->bufStart <= stream->posRead + length))
+			{
+				if(stream->bufMode == IO_MODE_FULL_BUFFER)
+				{
+					if(stream->bufPos + size <= stream->bufSize)
 					{
-						memcpy(ptr, stream->buffer, stream->bufPos);
-						stream->bufPos = 0;
+						memmove(stream->buffer + size, stream->buffer, stream->bufPos);
+						memcpy(stream->buffer, tmp, size);
 						stream->bufStart = stream->posRead;
+						stream->bufPos += size;
 					}
 				}
-				if(tmp != '\n')
-					memcpy(ptr, stream->buffer, stream->bufPos);
-			}
-		}
-		else
-		{
-			if(stream->bufStart + stream->bufPos < stream->posRead && stream->bufPos >= length)
-			{
-				memcpy(ptr, stream->buffer + stream->bufStart - stream->posRead, length);
-				readData = length;
-			}
-			//Ansonsten einfach den ganzen Buffer nochmal laden
-			else
-			{
-				size_t size = 0;
-				size_t i, tmp;
-				for(i = 0; i < length; i += stream->bufSize)
+				//Mode = IO_MODE_LINE_BUFFER
+				else
 				{
-#ifdef BUILD_KERNEL
-					tmp = vfs_Read(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
-#else
-					tmp = syscall_fread(stream->stream, stream->posRead, MIN(length, stream->bufSize), stream->buffer);
-#endif
-					stream->bufPos = tmp;
-					stream->bufStart = stream->posRead;
-					stream->posRead += tmp;
-					memcpy(ptr + i, stream->buffer, tmp);
-					size += tmp;
-					if(tmp == 0)
-						break;
+					tmp[tmpLength] = '\0';
+					char *substr = strrchr(tmp, '\n');
+					if(substr == NULL)
+						substr = tmp;
+					if(strlen(substr) > 0)
+					{
+						memmove(stream->buffer + size, stream->buffer, stream->bufPos);
+						memcpy(stream->buffer, substr, strlen(substr));
+					}
 				}
-				if(size < length)
-					stream->eof = true;
-				readData = size;
 			}
+			//Ansonsten laden wir sie in den Cache, wenn sie Datenmenge grösser ist
+			else if(stream->bufPos < size && stream->bufMode == IO_MODE_FULL_BUFFER)
+			{
+				//Erst müssen wir den Cache leeren
+				fflush(stream);
+				memcpy(stream->buffer, tmp, MIN(stream->bufSize, size));
+				stream->bufStart = stream->posRead;
+				stream->bufPos = MIN(stream->bufSize, size);
+			}
+
+			free(tmp);
 		}
+		readData += cacheLength;
+		//Daten hinter dem Cache laden
+		if(stream->bufStart + stream->bufPos < stream->posRead + length)
+		{
+			tmpLength = stream->posRead + length - (stream->bufStart + stream->bufPos);
+			tmp = malloc(tmpLength + 1);
+			size_t size;
+#ifdef BUILD_KERNEL
+			size = vfs_Read(stream->stream, stream->posRead, tmpLength, tmp);
+#else
+			size = syscall_fread(stream->stream, stream->posRead, tmpLength, tmp);
+#endif
+
+			if(size < tmpLength)
+			{
+				stream->eof = true;
+				if(size == 0)
+					return EOF;
+			}
+			memcpy(ptr + readData, tmp, size);
+			readData += size;
+
+			//Wenn diese Daten direkt nach den Daten im Cache sind können wir diese einfach in den Cache laden
+			if(stream->bufStart == (size_t)EOF
+					|| (stream->bufStart + stream->bufPos >= stream->posRead && stream->bufStart + stream->bufPos < stream->posRead + length))
+			{
+				if(stream->bufMode == IO_MODE_FULL_BUFFER)
+				{
+					if(stream->bufPos + size <= stream->bufSize)
+					{
+						memcpy(stream->buffer + stream->bufPos, tmp, size);
+						stream->bufPos += size;
+					}
+				}
+				//Mode = IO_MODE_LINE_BUFFER
+				else
+				{
+					//TODO
+				}
+			}
+			//Ansonsten laden wir sie in den Cache, wenn sie Datenmenge grösser ist
+			else if(stream->bufPos < size && stream->bufMode == IO_MODE_FULL_BUFFER)
+			{
+				//Erst müssen wir den Cache leeren
+				fflush(stream);
+				memcpy(stream->buffer, tmp, MIN(stream->bufSize, size));
+				stream->bufStart = stream->posRead;
+				stream->bufPos = MIN(stream->bufSize, size);
+			}
+			free(tmp);
+		}
+		stream->posRead += readData;
 	}
 	else
 	{
