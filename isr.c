@@ -17,6 +17,8 @@
 #include "pic.h"
 #include "debug.h"
 #include "pit.h"
+#include "vmm.h"
+#include "paging.h"
 
 typedef struct{
 		void (*Handler)(ihs_t *ihs);
@@ -229,9 +231,9 @@ ihs_t *exception_Debug(ihs_t *ihs)
 	else	//Wenn schon Debugged wurde wieder normalen Zustand herstellen
 	{
 		if(ihs->rax == DEBUG_SINGLESTEP)
-			oldState->rflags |= 0x100;
+			oldState->rflags |= 0x10100;
 		if(ihs->rax == DEBUG_CONTINUE)
-			oldState->rflags &= ~0x100;
+			oldState->rflags = oldState->rflags & ~0x100 | 0x10000;
 		Debugged = false;
 		return oldState;
 	}
@@ -262,7 +264,7 @@ void exception_InvalidOpcode(ihs_t *ihs)
 	printf("Exception 6: Invalid Opcode\n");
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 10);
+	traceStack(ihs->rsp, 22);
 	asm volatile("cli;hlt");
 }
 
@@ -279,7 +281,7 @@ void exception_DoubleFault(ihs_t *ihs)
 	printf("Exception 8: Double Fault\n\r");
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 10);
+	traceStack(ihs->rsp, 22);
 	asm volatile("cli;hlt");
 }
 
@@ -309,7 +311,7 @@ void exception_GeneralProtection(ihs_t *ihs)
 	printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 10);
+	traceStack(ihs->rsp, 22);
 	asm volatile("cli;hlt");
 }
 
@@ -328,7 +330,39 @@ void exception_PageFault(ihs_t *ihs)
 
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 10);
+	traceStack(ihs->rsp, 20);
+
+	//Virtuelle Adressen der Tabellen
+	#define VMM_PML4_ADDRESS		0xFFFFFFFFFFFFF000
+	#define VMM_PDP_ADDRESS			0xFFFFFFFFFFE00000
+	#define VMM_PD_ADDRESS			0xFFFFFFFFC0000000
+	#define VMM_PT_ADDRESS			0xFFFFFF8000000000
+
+	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
+	PDP_t *PDP = (PDP_t*)VMM_PDP_ADDRESS;
+	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
+	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
+
+	//Einträge in die Page Tabellen
+	uint16_t PML4i = (CR2 & PG_PML4_INDEX) >> 39;
+	uint16_t PDPi = (CR2 & PG_PDP_INDEX) >> 30;
+	uint16_t PDi = (CR2 & PG_PD_INDEX) >> 21;
+	uint16_t PTi = (CR2 & PG_PT_INDEX) >> 12;
+
+	PDP = (void*)PDP + (PML4i << 12);
+	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
+	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+	printf("PML4e: 0x%lX             ", PML4->PML4E[PML4i]);
+	if(PML4->PML4E[PML4i] & 1)
+	{
+		printf("PDPe: 0x%lX\n", PDP->PDPE[PDPi]);
+		if(PDP->PDPE[PDPi] & 1)
+		{
+			printf("PDe:   0x%lX             ", PD->PDE[PDi]);
+			if(PD->PDE[PDi] & 1)
+				printf("PTe:  0x%lX", PT->PTE[PTi]);
+		}
+	}
 	asm volatile("cli;hlt");
 }
 
@@ -406,10 +440,12 @@ void traceRegisters(ihs_t *ihs)
 void traceStack(uint64_t rsp, uint8_t length)
 {
 	uint8_t i;
-	for(i = 0; i < length; i++)
+	for(i = 0; i < length; i += 2)
 	{
 		uint64_t *Value = (rsp + i * 8);
-		printf("%u: 0x%X%X\n", i + 1, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
+		printf("%u: 0x%X%X                ", i + 1, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
+		Value = (rsp + (i + 1) * 8);
+		printf("%u: 0x%X%X\n", i + 2, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
 	}
 }
 
