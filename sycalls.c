@@ -58,6 +58,12 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			setCursor(ihs->rbx & 0xFFFF, ihs->rcx & 0xFFFF);
 		break;
 
+		//Parameter:	rbx = Filepointer
+		//Rückgabewert: rax = PID des neuen Prozesses
+		case EXEC:
+			ihs->rax = loader_load((void*)ihs->rbx);
+		break;
+
 		//Parameter:	rbx = Rückgabecode
 		case EXIT:
 			ihs = pm_ExitTask(ihs, ihs->rbx);
