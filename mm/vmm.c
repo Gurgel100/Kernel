@@ -621,7 +621,7 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		//Wird die PT noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
+			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[i]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
 				return 0; //Wird die PT noch benötigt, sind wir fertig
 		}
 		//Ansonsten geben wir den Speicherplatz für die PT frei
@@ -637,7 +637,7 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		//Wird die PD noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE) return 0; //Wid die PD noch benötigt, sind wir fertig
+			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[i]) == VMM_KERNELSPACE) return 0; //Wid die PD noch benötigt, sind wir fertig
 		}
 		//Ansonsten geben wir den Speicherplatz für die PD frei
 		pmm_Free((void*)(PDP->PDPE[PDPi] & PG_ADDRESS));
@@ -653,7 +653,7 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
 			//Wird die PDP noch benötigt, sind wir fertig
-			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE) return 0;
+			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[i]) == VMM_KERNELSPACE) return 0;
 		}
 		//Ansonsten geben wir den Speicherplatz für die PDP frei
 		pmm_Free((void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
@@ -1025,7 +1025,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 		//Wird die PT noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
+			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[i]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
 			{
 				PT->PTE[PTi] &= ~0x1C0;
 				PD->PDE[PDi] &= ~0x1C0;
@@ -1050,7 +1050,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 		//Wird die PD noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[i]) == VMM_KERNELSPACE)
 			{
 				PD->PDE[PDi] &= ~0x1C0;
 				PDP->PDPE[PDPi] &= ~0x1C0;
@@ -1074,7 +1074,7 @@ uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress)
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
 			//Wird die PDP noch benötigt, sind wir fertig
-			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[i]) == VMM_KERNELSPACE)
 			{
 				PDP->PDPE[PDPi] &= ~0x1C0;
 				PML4->PML4E[PML4i] &= ~0x1C0;
