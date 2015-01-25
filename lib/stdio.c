@@ -373,12 +373,14 @@ int fflush(FILE *stream)
 	if(stream == NULL)
 		return 0;
 
-	if(stream->bufMode != IO_MODE_NO_BUFFER)
+	if(stream->bufMode != IO_MODE_NO_BUFFER && stream->mode.write && stream->bufStart != EOF && stream->bufDirty)
+	{
 #ifdef BUILD_KERNEL
 		vfs_Write(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
 #else
 		syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
 #endif
+	}
 
 	return 0;
 }
@@ -404,6 +406,7 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 		stream->bufSize = 0;
 		stream->posRead = 0;
 		stream->posWrite = 0;
+		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_NO_BUFFER;
 		break;
 	case _IOLBF:
@@ -418,6 +421,7 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 		stream->bufPos = 0;
 		stream->posRead = 0;
 		stream->posWrite = 0;
+		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_LINE_BUFFER;
 		break;
 	case _IOFBF:
@@ -432,6 +436,7 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 		stream->bufPos = 0;
 		stream->posRead = 0;
 		stream->posWrite = 0;
+		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_FULL_BUFFER;
 		break;
 	default:
