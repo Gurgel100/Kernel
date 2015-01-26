@@ -33,6 +33,13 @@ inline void syscall_putch(unsigned char c)
 	asm volatile("int $0x30" : : "a"(21), "b"(c));
 }
 
+inline pid_t syscall_createProcess(const char *path, const char *cmd)
+{
+	pid_t pid;
+	asm volatile("int $0x30" :"=a"(pid) : "a"(10), "b"(path), "c"(cmd));
+	return pid;
+}
+
 inline void __attribute__((noreturn)) syscall_exit(int status)
 {
 	asm volatile("int $0x30" : : "a"(11), "b"(status));

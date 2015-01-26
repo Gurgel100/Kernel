@@ -22,12 +22,15 @@ typedef enum{
 	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
 }vfs_fileinfo_t;
 
+typedef uint64_t pid_t;
+
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
 
 inline char syscall_getch();
 inline void syscall_putch(unsigned char c);
 
+inline pid_t syscall_createProcess(const char *path, const char *cmd);
 inline void syscall_exit(int status);
 
 inline void *syscall_fopen(char *path, vfs_mode_t mode);

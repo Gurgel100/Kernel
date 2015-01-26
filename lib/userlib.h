@@ -10,6 +10,9 @@
 
 #ifndef BUILD_KERNEL
 #include "stdint.h"
+#include "syscall.h"
+
+#define createProcess(path, cmd) syscall_createProcess(path, cmd)
 
 typedef struct{
 		uint64_t	physSpeicher;
