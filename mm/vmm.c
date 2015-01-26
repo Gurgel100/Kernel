@@ -1184,10 +1184,10 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress)
 void vmm_unusePages(void *virt, size_t pages)
 {
 	uintptr_t address = (uintptr_t)virt;
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 
 	for(; address < (uintptr_t)virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
 	{
+		PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 		//Einträge in die Page Tabellen
 		const uint16_t PML4i = (address & PG_PML4_INDEX) >> 39;
 		const uint16_t PDPi = (address & PG_PDP_INDEX) >> 30;
@@ -1209,10 +1209,10 @@ void vmm_unusePages(void *virt, size_t pages)
 void vmm_usePages(void *virt, size_t pages)
 {
 	uintptr_t address = (uintptr_t)virt;
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 
 	for(; address < (uintptr_t)virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
 	{
+		PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 		//Einträge in die Page Tabellen
 		const uint16_t PML4i = (address & PG_PML4_INDEX) >> 39;
 		const uint16_t PDPi = (address & PG_PDP_INDEX) >> 30;
