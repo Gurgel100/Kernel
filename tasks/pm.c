@@ -82,7 +82,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 	newProcess->Context = createContext();
 
 	//Stack mappen (1 Page)
-	vmm_ContextMap(newProcess->Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
+	vmm_ContextMap(newProcess->Context, MM_USER_STACK, (uintptr_t)pmm_Alloc(), VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);
