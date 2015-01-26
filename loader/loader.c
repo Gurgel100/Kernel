@@ -7,11 +7,37 @@
 
 
 #include "loader.h"
+#include "stdio.h"
+#include "elf.h"
+#include "string.h"
 
 
-int loader_load(FILE *fp)
+pid_t loader_load(const char *path, const char *cmd)
 {
-	if(elfLoad(fp) != 0)
-		return -1;
-	return 0;
+	pid_t pid = 0;
+	char *bin;
+
+	if(path == NULL || cmd == NULL)
+		return 0;
+
+	//Zuerst erstellen wir den Pfad zur Datei, die geöffnet werden soll
+	char cmdline[strlen(cmd) + 1];
+	strcpy(cmdline, cmd);
+	bin = strtok(cmdline, " ");
+	if(bin == NULL)
+		return 0;
+	char binpath[strlen(path) + 1 + strlen(cmdline) + 1];
+	strcpy(binpath, path);
+	binpath[strlen(binpath) + 1] = '\0';
+	binpath[strlen(binpath)] = '/';
+	strcat(binpath, cmd);
+
+	//Jetzt können wir die Datei öffnen
+	FILE *fp = fopen(binpath, "rb");
+	if(fp == NULL)
+		return 0;
+
+	pid = elfLoad(fp, cmd);
+	fclose(fp);
+	return pid;
 }

@@ -8,8 +8,8 @@
 #ifndef LOADER_H_
 #define LOADER_H_
 
-#include "stdio.h"
+#include "pm.h"
 
-int loader_load(FILE *fp);
+pid_t loader_load(const char *path, const char *cmd);
 
 #endif /* LOADER_H_ */

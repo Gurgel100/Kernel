@@ -12,6 +12,7 @@
 #include "cmos.h"
 #include "pm.h"
 #include "vfs.h"
+#include "loader.h"
 
 extern void putch(char);
 extern char getch(void);
@@ -63,10 +64,10 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			setCursor(ihs->rbx & 0xFFFF, ihs->rcx & 0xFFFF);
 		break;
 
-		//Parameter:	rbx = Filepointer
+		//Parameter:	rbx = Pfad, rcx = Commandozeile
 		//Rückgabewert: rax = PID des neuen Prozesses
 		case EXEC:
-			ihs->rax = loader_load((void*)ihs->rbx);
+			ihs->rax = loader_load((const char*)ihs->rbx, (const char*)ihs->rcx);
 		break;
 
 		//Parameter:	rbx = Rückgabecode

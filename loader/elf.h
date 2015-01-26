@@ -10,10 +10,10 @@
 #ifndef ELF_H_
 #define ELF_H_
 
-#include "stdint.h"
 #include "stdio.h"
+#include "pm.h"
 
 //Funktionen
-char elfLoad(FILE *fp);	//Par.: Datei = Addresse der Datei im Speicher; Segment = Segment in das kopiert werden soll (GDT)
+pid_t elfLoad(FILE *fp, const char *cmd);	//Par.: Datei = Addresse der Datei im Speicher; Segment = Segment in das kopiert werden soll (GDT)
 
 #endif /* ELF_H_ */

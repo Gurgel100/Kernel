@@ -5,7 +5,7 @@
  *      Author: pascal
  */
 #include "elf.h"
-#include "pm.h"
+#include "stdint.h"
 #include "mm.h"
 #include "memory.h"
 #include "string.h"
@@ -181,7 +181,7 @@ uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse 
 	return ElfHeader->e_entry;
 }
 
-char elfLoad(FILE *fp)
+pid_t elfLoad(FILE *fp, const char *cmd)
 {
 	elf_header *Header;
 	char *Ziel;
@@ -204,7 +204,7 @@ char elfLoad(FILE *fp)
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, "");
+	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, cmd);
 	process_t *task = pm_getTask(taskID);
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
@@ -242,5 +242,5 @@ char elfLoad(FILE *fp)
 
 	//Prozess aktivieren
 	pm_ActivateTask(taskID);
-	return 0;
+	return taskID;
 }
