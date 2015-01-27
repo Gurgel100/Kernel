@@ -15,6 +15,12 @@
 
 #include <cdi.h>
 
+#define CDI_GLUE(x,y) x ## y
+#define CDI_BUILD_ASSERT(cnt) CDI_GLUE(__cdi_build_assert, cnt)
+#define CDI_BUILD_BUG_ON(x) \
+    struct CDI_BUILD_ASSERT(__COUNTER__) { int assertion[(x) ? -1 : 1];  };
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif

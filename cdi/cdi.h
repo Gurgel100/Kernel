@@ -8,7 +8,8 @@
  * http://sam.zoy.org/projects/COPYING.WTFPL for more details.
  */
 
-/*
+/**
+ * \german
  * Core ist das Basismodul von CDI. Es stellt die grundlegenden Datenstrukturen
  * und Funktionen bereit, auf die andere Module aufbauen.
  *
@@ -49,12 +50,57 @@
  *    \n
  *    @todo Für jedes Gerät scan_bus aufrufen und die dabei gefundenen
  *    Geräte wiederum initialisieren.
+ *\endgerman
+ *
+ * \english
+ * The Core module contains the fundamental CDI data structures and functions
+ * on which the other modules are based.
+ *
+ * \section Data structures
+ * CDI is based on three basic structures. The other modules extend these
+ * structures in a compatible way: For example, cdi_net_driver is a structure
+ * that contains a cdi_driver as its first element so that it can be cast to
+ * cdi_device. The structures are:
+ *
+ * - cdi_device describes a device. Amongst others, it contains fields that
+ *   reference the corresponding driver and an address that identifies the
+ *   device uniquely on its bus.
+ * - cdi_driver describes a driver. It has a type which determines to which
+ *   CDI module the driver belongs (and thus which type the struct may be cast
+ *   to). Moreover, each driver has some function points which can be used by
+ *   the CDI library to call driver functions (e.g. for sending a network
+ *   packet)
+ * - cdi_bus_data contains bus specific information on a device, like the
+ *   address of the device on the bus (e.g. bus.dev.func for PCI) or other
+ *   bus related information (e.g. device/vendor ID). This structure is used
+ *   for initialisation of devices, i.e. when the device itself doesn't exist
+ *   yet.
+ *
+ * \section core_init Initialisation
+ *
+ * Drivers are initialised in the following steps:
+ *
+ * -# Initialisation of drivers: The init() callback of each driver is called.
+ *    After the driver has returned from there, it is registered with CDI and
+ *    the operating system. The driver needs not to be able to handle requests
+ *    before it has completed its init() call, but it must be prepared for them
+ *    immediately afterwards.
+ * -# Search for and initialisation of devices: For each device init_device is
+ *    called in the available drivers until a driver accepts the device (or all
+ *    of the drivers reject it).
+ *    \n
+ *    @todo Call scan_bus for each device and initialise possible child devices
+ * \endenglish
+ *
+ *
+ * \defgroup core
  */
 
 #ifndef _CDI_H_
 #define _CDI_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <cdi-osdep.h>
 #include <cdi/lists.h>
@@ -71,6 +117,7 @@ typedef enum {
     CDI_USB             = 8,
     CDI_FILESYSTEM      = 9,
     CDI_PCI             = 10,
+    CDI_AHCI            = 11,
 } cdi_device_type_t;
 
 struct cdi_driver;
@@ -147,6 +194,17 @@ struct cdi_driver {
     cdi_device_type_t   type;
     cdi_device_type_t   bus;
     const char*         name;
+
+    /**
+     * \german
+     * Wird von der CDI-Implementierung auf true gesetzt, sobald .init()
+     * aufgerufen wurde.
+     * \endgerman
+     * \english
+     * Set by the CDI implementation to true as soon as .init() was called.
+     * \endenglish
+     */
+    bool                initialised;
 
     /**
      * \german
@@ -299,6 +357,56 @@ void cdi_driver_register(struct cdi_driver* driver);
  * \endenglish
  */
 int cdi_provide_device(struct cdi_bus_data* device);
+
+/**
+ * \german
+ * Informiert das Betriebssystem, dass ein neues Gerät angeschlossen wurde und
+ * von einem internen Treiber (d.h. einem Treiber, der in dieselbe Binary
+ * gelinkt ist) angesteuert werden muss.
+ *
+ * Diese Funktion kann benutzt werden, um Treibern mit mehreren Komponenten
+ * eine klarere Struktur zu geben (z.B. SATA-Platten als vom AHCI-Controller
+ * getrennte CDI-Geräte zu modellieren).
+ *
+ * Vorsicht: Sie sollte nur benutzt werden, wenn eine enge Kopplung zwischen
+ * Gerät und Untergeräte unvermeidlich ist, da sie voraussetzt, dass beide
+ * Treiber in dieselbe Binary gelinkt sind. Dies mag für monolithische Kernel
+ * kein Problem darstellen, aber CDI wird auch in Betriebssystemen mit anderem
+ * Design benutzt.
+ *
+ * Falls der Treiber noch nicht initialisiert ist, wird er initialisiert, bevor
+ * das neue Gerät erstellt wird.
+ *
+ * @param device Adressinformation für den Treiber, um das Gerät zu finden
+ * @param driver Treiber, der für das Gerät benutzt werden soll
+ *
+ * @return 0 bei Erfolg, -1 im Fehlerfall
+ * \endgerman
+ * \english
+ * Informs the operating system that a new device has become available and
+ * is to be handled by an internal driver (i.e. a driver linked into the same
+ * binary).
+ *
+ * This function can be used to give drivers for devices with multiple
+ * components a clearer structure (e.g. model SATA disks as CDI devices
+ * separate from the AHCI controller).
+ *
+ * Be careful though: It should only be used if a tight coupling between device
+ * and subdevice is unvoidable, as it requires linking the code of both drivers
+ * into the same binary. This might not be a problem for monolithic kernels,
+ * but CDI is used in OSes of different designs.
+ *
+ * If the driver isn't initialised yet, it is initialised before creating the
+ * new device.
+ *
+ * @param device Addressing information for the driver to find the device
+ * @param driver Driver that must be used for this device
+ *
+ * @return 0 on success or -1 if an error was encountered.
+ * \endenglish
+ */
+int cdi_provide_device_internal_drv(struct cdi_bus_data* device,
+                                    struct cdi_driver* driver);
 
 #endif
 
