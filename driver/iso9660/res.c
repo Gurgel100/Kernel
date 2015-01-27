@@ -45,12 +45,26 @@ struct iso9660_fs_res *iso9660_fs_res_create(const char *name,struct iso9660_fs_
   res->res.parent = (struct cdi_fs_res*)parent;
   res->class = class;
   res->res.type = type;
-  if (class==CDI_FS_CLASS_DIR) res->res.dir = &iso9660_fs_res_dir;
-  else res->res.file = &iso9660_fs_res_file;
-  res->res.flags.read = 1;
-  res->res.flags.execute = 1;
-  res->res.flags.browse = 1;
-  res->res.flags.read_link = 1;
+
+    switch (class) {
+        case CDI_FS_CLASS_DIR:
+            res->res.dir = &iso9660_fs_res_dir;
+            res->res.flags.browse = 1;
+            break;
+#if 0
+        case CDI_FS_CLASS_LINK:
+            res->res.link = &iso9660_fs_res_link;
+            res->res.flags.read_link = 1;
+            break;
+#endif
+        case CDI_FS_CLASS_FILE:
+        case CDI_FS_CLASS_SPECIAL:
+        default:
+            res->res.file = &iso9660_fs_res_file;
+            res->res.flags.read = 1;
+            res->res.flags.execute = 1;
+            break;
+    }
 
   if (parent!=NULL) {
     res->voldesc = parent->voldesc;
@@ -73,6 +87,7 @@ int iso9660_fs_res_destroy(struct iso9660_fs_res *res) {
     for (i=0;(child = cdi_list_get(res->res.children,i));i++) iso9660_fs_res_destroy(child);
     cdi_list_destroy(res->res.children);
   }
+  free(res);
   return 0;
 }
 
