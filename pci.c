@@ -106,7 +106,6 @@ uint32_t ConfigRead(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_
 	return Data;
 }
 
-//TODO: momentan nur für 4-Byte-Werte
 void ConfigWrite(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length, uint32_t Data)
 {
 	//Adressse generieren und schreiben
@@ -121,16 +120,15 @@ void ConfigWrite(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t l
 	switch(length)
 	{
 		case 1:
-			Data &= 0xFF;
+			outb(CONFIG_DATA, Data);
 		break;
 		case 2:
-			Data &= 0xFFFF;
+			outw(CONFIG_DATA, Data);
 		break;
 		case 4:
-			Data &= 0xFFFFFFFF;
+			outd(CONFIG_DATA, Data);
 		break;
 	}
-	outd(CONFIG_DATA, Data);
 }
 
 bool checkDevice(uint8_t bus, uint8_t slot, uint8_t func)
