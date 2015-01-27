@@ -17,6 +17,9 @@
 #include <cdi-osdep.h>
 #include <cdi/lists.h>
 
+#define PCI_CLASS_STORAGE         0x01
+#define PCI_SUBCLASS_ST_SATA      0x06
+
 #define PCI_CLASS_MULTIMEDIA      0x04
 #define PCI_SUBCLASS_MM_HDAUDIO   0x03
 
