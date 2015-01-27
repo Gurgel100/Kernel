@@ -85,16 +85,6 @@ void putch(unsigned char c)
 }
 
 /*
- * Erste Version von der Funktion print(). Wird aber nur im Kernel benutzt und ist
- * nicht empfohlen für Anwendungen. Wird irgendeinmal mal durch printf() ersetzt werden.
- */
-/*void print(char *Text, uint8_t Background, uint8_t Color)
-{
-	setColor(Background | Color);
-	printf(Text);
-}*/
-
-/*
  * Scrollt den Bildschirm um eine Zeile nach unten.
  */
 void scrollScreenDown()
