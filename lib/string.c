@@ -209,22 +209,24 @@ void *memset(void *block, int c, size_t n)
 	return block;
 }
 
-// TODO: Schauen, dass sich die Daten nicht überschreiben
 void *memmove(void *to, const void *from, size_t size)
 {
 	size_t i;
 	char *dest = to;
 	const char *src = from;
-	if(from + size > to)	//Von hinten nach vorne kopieren
+	if(from < to)	//Von hinten nach vorne kopieren
 	{
 		for(i = size; i > 0 ; i--)
 		{
 			dest[i - 1] = src[i - 1];
 		}
 	}
-	else
+	else			//Von vorne nach hinten kopieren
 	{
-		return memcpy(to, from, size);
+		for(i = 0; i < size ; i++)
+		{
+			dest[i] = src[i];
+		}
 	}
 	return to;
 }
