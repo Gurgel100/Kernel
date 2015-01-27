@@ -40,6 +40,10 @@ list_t vmm_getTables(context_t *context);
 void vmm_MapModule(mods *mod);
 void vmm_UnMapModule(mods *mod);
 
+uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t avl);
+
+void *getFreePages(void *start, void *end, size_t pages);
+
 uint64_t vmm_getPhysAddress(uint64_t virtualAddress);
 uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context, uintptr_t dst, size_t length, uint8_t flags, uint16_t avl);
 uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t avl);
