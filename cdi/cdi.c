@@ -49,10 +49,11 @@ void cdi_init()
 	for(pdrv = &__start_cdi_drivers; pdrv < &__stop_cdi_drivers; pdrv++)
 	{
 		drv = *pdrv;
-		if(drv->init != NULL)
+		if(drv->init != NULL && !drv->initialised)
 		{
 			drv->init();
 			cdi_driver_register(drv);
+			drv->initialised = true;
 		}
 	}
 
@@ -62,7 +63,7 @@ void cdi_init()
 	struct cdi_pci_device *pci;
 	struct cdi_driver *driver;
 	struct cdi_device *device;
-	while(!(pci = cdi_list_pop(pci_devices)))
+	while((pci = cdi_list_pop(pci_devices)))
 	{
 
 		// I/O-Ports, MMIO und Busmastering aktivieren
@@ -138,4 +139,73 @@ void cdi_driver_register(struct cdi_driver* driver)
 {
 	printf("Registered Driver: %s\n", driver->name);
 	cdi_list_push(drivers, driver);
+}
+
+/**
+ * \german
+ * Informiert das Betriebssystem, dass ein neues Gerät angeschlossen wurde und
+ * von einem internen Treiber (d.h. einem Treiber, der in dieselbe Binary
+ * gelinkt ist) angesteuert werden muss.
+ *
+ * Diese Funktion kann benutzt werden, um Treibern mit mehreren Komponenten
+ * eine klarere Struktur zu geben (z.B. SATA-Platten als vom AHCI-Controller
+ * getrennte CDI-Geräte zu modellieren).
+ *
+ * Vorsicht: Sie sollte nur benutzt werden, wenn eine enge Kopplung zwischen
+ * Gerät und Untergeräte unvermeidlich ist, da sie voraussetzt, dass beide
+ * Treiber in dieselbe Binary gelinkt sind. Dies mag für monolithische Kernel
+ * kein Problem darstellen, aber CDI wird auch in Betriebssystemen mit anderem
+ * Design benutzt.
+ *
+ * Falls der Treiber noch nicht initialisiert ist, wird er initialisiert, bevor
+ * das neue Gerät erstellt wird.
+ *
+ * @param device Adressinformation für den Treiber, um das Gerät zu finden
+ * @param driver Treiber, der für das Gerät benutzt werden soll
+ *
+ * @return 0 bei Erfolg, -1 im Fehlerfall
+ * \endgerman
+ * \english
+ * Informs the operating system that a new device has become available and
+ * is to be handled by an internal driver (i.e. a driver linked into the same
+ * binary).
+ *
+ * This function can be used to give drivers for devices with multiple
+ * components a clearer structure (e.g. model SATA disks as CDI devices
+ * separate from the AHCI controller).
+ *
+ * Be careful though: It should only be used if a tight coupling between device
+ * and subdevice is unvoidable, as it requires linking the code of both drivers
+ * into the same binary. This might not be a problem for monolithic kernels,
+ * but CDI is used in OSes of different designs.
+ *
+ * If the driver isn't initialised yet, it is initialised before creating the
+ * new device.
+ *
+ * @param device Addressing information for the driver to find the device
+ * @param driver Driver that must be used for this device
+ *
+ * @return 0 on success or -1 if an error was encountered.
+ * \endenglish
+ */
+int cdi_provide_device_internal_drv(struct cdi_bus_data* device, struct cdi_driver* driver)
+{
+	if(!driver->initialised)
+	{
+		if(driver->init)
+		{
+			driver->init();
+			cdi_driver_register(driver);
+			driver->initialised = true;
+		}
+	}
+	if(driver->initialised && driver->init_device)
+	{
+		struct cdi_device *dev = driver->init_device(device);
+		if(!dev)
+			return -1;
+		dev->driver = driver;
+		cdi_list_push(driver->devices, dev);
+	}
+	return 0;
 }
