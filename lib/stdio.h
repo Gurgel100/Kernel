@@ -50,6 +50,7 @@ typedef struct{
 	char *buffer;
 	size_t bufSize, bufStart, bufPos;
 	size_t posRead, posWrite;
+	bool bufDirty;
 	bufMode_t bufMode;
 	bool intBuf;
 	bool eof;
