@@ -7,6 +7,7 @@
 
 #include "cdi.h"
 #include "isr.h"
+#include "pci.h"
 
 extern struct cdi_driver *__start_cdi_drivers;
 extern struct cdi_driver *__stop_cdi_drivers;
@@ -54,6 +55,42 @@ void cdi_init()
 			cdi_driver_register(drv);
 		}
 	}
+
+	//Gibt es PCI-Geräte für einen Treiber?
+	cdi_list_t pci_devices = cdi_list_create();
+	cdi_pci_get_all_devices(pci_devices);
+	struct cdi_pci_device *pci;
+	struct cdi_driver *driver;
+	struct cdi_device *device;
+	while(!(pci = cdi_list_pop(pci_devices)))
+	{
+
+		// I/O-Ports, MMIO und Busmastering aktivieren
+		uint16_t val = cdi_pci_config_readw(pci, 4);
+		cdi_pci_config_writew(pci, 4, val | 0x7);
+
+		device = NULL;
+
+		//Treiber suchen
+		size_t j;
+		for(j = 0; (driver = cdi_list_get(drivers, j)); j++)
+		{
+			if(driver->bus == CDI_PCI && driver->init_device)
+			{
+				device = driver->init_device(&pci->bus_data);
+				break;
+			}
+		}
+		if(device != NULL)
+		{
+			cdi_list_push(driver->devices, device);
+		}
+		else
+		{
+			cdi_pci_device_destroy(pci);
+		}
+	}
+	cdi_list_destroy(pci_devices);
 }
 
 /**
