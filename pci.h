@@ -37,6 +37,8 @@ pciDevice_t *pci_firstDevice;
 uint64_t NumDevices;
 
 void pci_Init();
+uint32_t ConfigRead(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length);
+void ConfigWrite(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length, uint32_t Data);
 
 #endif /* PCI_H_ */
 

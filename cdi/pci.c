@@ -91,3 +91,58 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 		cdi_list_push(list, cdi_pciDevice);
 	}
 }
+
+/**
+ * \german
+ * Gibt die Information zu einem PCI-Gerät frei
+ * \endgerman
+ * \english
+ * Frees the information for a PCI device
+ * \endenglish
+ */
+void cdi_pci_device_destroy(struct cdi_pci_device* device)
+{
+	free(device);
+}
+
+/**
+ * \if german
+ * Liest ein Word (16 Bit) aus dem PCI-Konfigurationsraum eines PCI-Geraets
+ *
+ * @param device Das Geraet
+ * @param offset Der Offset im Konfigurationsraum
+ *
+ * @return Der Wert an diesem Offset
+ * \elseif english
+ * Reads a word (16 bit) from the PCI configuration space of a PCI device
+ *
+ * @param device The device
+ * @param offset The offset in the configuration space
+ *
+ * @return The corresponding value
+ * \endif
+ */
+uint16_t cdi_pci_config_readw(struct cdi_pci_device* device, uint8_t offset)
+{
+	return (uint16_t)ConfigRead(device->bus, device->dev, device->function, offset, 2);
+}
+
+/**
+ * \if german
+ * Schreibt ein Word (16 Bit) in den PCI-Konfigurationsraum eines PCI-Geraets
+ *
+ * @param device Das Geraet
+ * @param offset Der Offset im Konfigurationsraum
+ * @param value Der zu setzende Wert
+ * \elseif english
+ * Writes a word (16 bit) into the PCI configuration space of a PCI device
+ *
+ * @param device The device
+ * @param offset The offset in the configuration space
+ * @param value Value to be set
+ * \endif
+ */
+void cdi_pci_config_writew(struct cdi_pci_device* device, uint8_t offset, uint16_t value)
+{
+	ConfigWrite(device->bus, device->dev, device->function, offset, 2, value);
+}
