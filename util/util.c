@@ -82,7 +82,7 @@ void Sleep(uint64_t msec)
 	uint64_t start = Uptime;
 	while(1)
 	{
-		if(start + msec == Uptime)
+		if(start + msec <= Uptime)
 			break;
 		asm volatile("hlt");
 	}
