@@ -187,7 +187,8 @@ void *pmm_AllocDMA(void *maxAddress, size_t Size)
 	size_t startBit;
 	uintptr_t i;
 	bool found = false;
-	for(i = 0; i < (uintptr_t)maxAddress; i += MM_BLOCK_SIZE)
+	//NULL ist eine ungültige Adresse deshalb fangen wir bei der 2. Page an zu suchen
+	for(i = MM_BLOCK_SIZE; i < (uintptr_t)maxAddress; i += MM_BLOCK_SIZE)
 	{
 		uint64_t Index = i / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE);
 		startBit = (i / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
