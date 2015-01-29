@@ -307,7 +307,7 @@ void vmm_UnMapModule(mods *mod)
 /*
  * Reserviert Speicher für DMA und mappt diesen
  * Params:	maxAddress = maximale physische Adresse für den Speicherbereich
- * 			size = Die Grösse des Speicherbereichs
+ * 			size = Anzahl Pages des Speicherbereichs
  * 			phys = Zeiger auf Variable, in der die phys. Adresse geschrieben wird
  */
 void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys)
@@ -318,8 +318,7 @@ void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys)
 	uint8_t Fehler;
 
 	//Freie virt. Adresse finden
-	uint64_t Pages = Size / VMM_SIZE_PER_PAGE;
-	if(Size % VMM_SIZE_PER_PAGE) Pages++;
+	uint64_t Pages = Size;
 
 	//Physischen Speicher allozieren
 	*Phys = pmm_AllocDMA(maxAddress, Size);
