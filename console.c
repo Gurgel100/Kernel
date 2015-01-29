@@ -58,6 +58,14 @@ console_t *console_create(uint8_t page)
 	return console;
 }
 
+console_t *console_createChild(console_t *parent)
+{
+	uint8_t page = 0;
+	if(parent != NULL)
+		page = parent->page;
+	return console_create(page);
+}
+
 void console_write(console_t *console, char c)
 {
 	if(console != NULL)

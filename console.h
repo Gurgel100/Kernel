@@ -30,6 +30,7 @@ extern console_t initConsole;
 
 void console_Init();
 console_t *console_create(uint8_t page);
+console_t *console_createChild(console_t *parent);
 void console_write(console_t *console, char c);
 void console_clear(console_t *console);
 void console_switch(uint8_t page);
