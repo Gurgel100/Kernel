@@ -60,10 +60,14 @@ console_t *console_create(uint8_t page)
 
 console_t *console_createChild(console_t *parent)
 {
+	console_t *console;
 	uint8_t page = 0;
 	if(parent != NULL)
 		page = parent->page;
-	return console_create(page);
+	console = console_create(page);
+	console->cursor = parent->cursor;
+	console->color = parent->color;
+	return console;
 }
 
 void console_write(console_t *console, char c)
