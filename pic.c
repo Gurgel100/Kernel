@@ -33,7 +33,7 @@ void pic_Init()
 	pic_Remap(32);
 
 	//Maskiere alle nicht gebrauchten IRQs (alle ausser PS/2 Port 1 und 2)
-	pic_MaskIRQ(0b1110111111111000);
+	pic_MaskIRQ(0x0);
 	SysLog("PIC", "Initialisierung abgeschlossen");
 }
 
