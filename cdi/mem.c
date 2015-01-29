@@ -58,6 +58,8 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 	else if(flags & CDI_MEM_DMA_4G)
 		maxAddress = 4294967296;
 	vaddr = vmm_AllocDMA(maxAddress, size / MM_BLOCK_SIZE, &paddr);
+	if(vaddr == NULL)
+		return NULL;
 
 	//Wie oben erwähnt Alignment umsetzen
 	if(alignment > 12)
