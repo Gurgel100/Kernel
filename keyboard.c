@@ -15,6 +15,8 @@
 #include "display.h"
 #include "stdbool.h"
 #include "keyboard_SWISS.h"
+#include "console.h"
+#include "ctype.h"
 
 //Ports
 #define KEYBOARD_PORT		0x60
@@ -141,14 +143,21 @@ void keyboard_Handler(ihs_t *ihs)
 	char Zeichen = keyboard_KeyToASCII(Key);
 	if(Zeichen != 0)
 	{
-		Puffer_t *NewPuffer = malloc(sizeof(Puffer_t));
-		NewPuffer->Char = Zeichen;
-		NewPuffer->Next = NULL;
-		if(ActualPuffer != NULL)
-			ActualPuffer->Next = NewPuffer;
-		ActualPuffer = NewPuffer;
-		if(Puffer == NULL)
-			Puffer = ActualPuffer;
+		if(PressedKeys[KEY_LALT] && isalnum(Zeichen))
+		{
+			console_switch(Zeichen - '0');
+		}
+		else
+		{
+			Puffer_t *NewPuffer = malloc(sizeof(Puffer_t));
+			NewPuffer->Char = Zeichen;
+			NewPuffer->Next = NULL;
+			if(ActualPuffer != NULL)
+				ActualPuffer->Next = NewPuffer;
+			ActualPuffer = NewPuffer;
+			if(Puffer == NULL)
+				Puffer = ActualPuffer;
+		}
 	}
 	}
 }
