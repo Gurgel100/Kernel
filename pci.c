@@ -120,10 +120,10 @@ void ConfigWrite(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t l
 	switch(length)
 	{
 		case 1:
-			outb(CONFIG_DATA, Data);
+			outb(CONFIG_DATA + (reg & 0x3), Data);
 		break;
 		case 2:
-			outw(CONFIG_DATA, Data);
+			outw(CONFIG_DATA + (reg & 0x2), Data);
 		break;
 		case 4:
 			outd(CONFIG_DATA, Data);
@@ -178,7 +178,7 @@ void initDevice(uint8_t bus, uint8_t slot)
 	pciDevice->irq = ConfigRead(bus, slot, 0, PCI_IRQLINE, 1);
 
 	pciDevice->Functions = 0;
-	if((pciDevice->HeaderType & 0x80) == 1)	//Mehrere Funktionen werden unterstützt
+	if(pciDevice->HeaderType & 0x80)	//Mehrere Funktionen werden unterstützt
 	{
 		//Überprüfe jede Funktion ob verfügbar
 		uint8_t func;
