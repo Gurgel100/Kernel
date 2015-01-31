@@ -191,6 +191,10 @@ void console_ansi_write(console_t *console, char c)
 				break;
 			}
 		}
+		else
+		{
+			console_write(console, c);
+		}
 	}
 }
 
