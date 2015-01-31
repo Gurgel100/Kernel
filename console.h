@@ -22,6 +22,9 @@ typedef struct{
 	void *buffer;
 	uint8_t color;
 	cursor_t *cursor;
+
+	char ansi_buf[16];
+	uint8_t ansi_buf_ofs;
 }console_t;
 
 extern console_t initConsole;

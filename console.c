@@ -21,6 +21,12 @@
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
 
+#define ASCII_ESC		'\e'
+
+typedef enum{
+	INVALID, NEED_MORE, SUCCESS
+}esc_seq_status_t;
+
 static cursor_t initCursor = {
 	.x = 0,
 	.y = 0
@@ -70,6 +76,122 @@ console_t *console_createChild(console_t *parent)
 	console->cursor = parent->cursor;
 	console->color = parent->color;
 	return console;
+}
+
+static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
+{
+	static char colors[8] = {CL_BLACK, CL_RED, CL_GREEN, CL_YELLOW, CL_BLUE, CL_MAGENTA, CL_CYAN, CL_WHITE};
+
+	switch(n)
+	{
+		case 0:	//Alles zurücksetzen
+			console->color = BG_BLACK | CL_LIGHT_GREY;
+		break;
+		case 30 ... 37:
+			console->color = (console->color & 0xF0) | colors[n - 30];
+		break;
+		case 40 ... 47:
+		console->color = (console->color & 0x0F) | (colors[n - 40] << 4);
+		break;
+		default:
+			return INVALID;
+	}
+
+	return SUCCESS;
+}
+
+static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_buf, uint8_t ansi_buf_len)
+{
+	uint8_t i;
+	uint8_t n1 = 0, n2 = 0;
+	bool delimiter = false;
+	bool have_n1 = false, have_n2 = false;
+
+	if(ansi_buf_len == 0)
+	{
+		return NEED_MORE;
+	}
+	if(ansi_buf[0] != ASCII_ESC)
+	{
+		return INVALID;
+	}
+	if(ansi_buf_len == 1)
+	{
+		return NEED_MORE;
+	}
+	if(ansi_buf[1] != '[')
+	{
+		return INVALID;
+	}
+	if(ansi_buf_len == 2)
+	{
+		return NEED_MORE;
+	}
+
+	for(i = 0; i < ansi_buf_len; i++)
+	{
+		switch(ansi_buf[i])
+		{
+			case '0' ... '9':
+				if(!delimiter)
+				{
+					n1 = n1 * 10 + ansi_buf[i] - '0';
+					have_n1 = true;
+				}
+				else
+				{
+					n2 = n2 * 10 + ansi_buf[i] - '0';
+					have_n2 = true;
+				}
+			break;
+			case ';':
+				if(delimiter)
+					return INVALID;
+				delimiter = true;
+			break;
+			case 'm':	//ESC[#;#m oder ESC[#m für Vordergrund und/oder Hintergrundfarbe
+				if(!have_n1)
+					return INVALID;
+				if(handle_ansi_formatting(console, n1) != SUCCESS)
+					return INVALID;
+				if(have_n2)
+				{
+					if(handle_ansi_formatting(console, n2) != SUCCESS)
+						return INVALID;
+				}
+			break;
+		}
+	}
+
+	return SUCCESS;
+}
+
+void console_ansi_write(console_t *console, char c)
+{
+	if(console != NULL)
+	{
+		if(c == ASCII_ESC || console->ansi_buf_ofs > 0)
+		{
+			uint8_t i;
+			console->ansi_buf[console->ansi_buf_ofs++] = c;
+			esc_seq_status_t status = console_ansi_parse(console, console->ansi_buf, console->ansi_buf_ofs);
+			switch(status)
+			{
+				case NEED_MORE:
+					if(console->ansi_buf_ofs <= sizeof(console->ansi_buf))
+						break;
+				case INVALID:
+					for(i = 0; i < console->ansi_buf_ofs; i++)
+						console_write(console, console->ansi_buf[i]);
+
+					console->ansi_buf_ofs = 0;
+				break;
+				case SUCCESS:
+					console->ansi_buf_ofs = 0;
+				break;
+			}
+		}
+	}
 }
 
 void console_write(console_t *console, char c)
