@@ -21,14 +21,16 @@
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
 
+static cursor_t initCursor = {
+	.x = 0,
+	.y = 0
+};
+
 console_t initConsole = {
 	.page = 0,
 	.buffer = (void*)GRAFIKSPEICHER,
 	.color = BG_BLACK | CL_WHITE,
-	.cursor = {
-		.x = 0,
-		.y = 0
-	}
+	.cursor = &initCursor
 };
 
 static list_t consoles;
@@ -79,42 +81,42 @@ void console_write(console_t *console, char c)
 		switch(c)
 		{
 			case '\n':
-				console->cursor.y++;
-				if(console->cursor.y > 24)
+				console->cursor->y++;
+				if(console->cursor->y > 24)
 				{
 					console_scrollDown(console);
-					console->cursor.y = 24;
+					console->cursor->y = 24;
 				}
 				//bei '\n' soll auch an den Anfang der Zeile gesprungen werden.
 				/* no break */
 			case '\r':
-				console->cursor.x = 0;
+				console->cursor->x = 0;
 			break;
 			case '\b':
-				if(console->cursor.x == 0)
+				if(console->cursor->x == 0)
 				{
-					console->cursor.x = 79;
-					console->cursor.y -= (console->cursor.y == 0) ? 0 : 1;
+					console->cursor->x = 79;
+					console->cursor->y -= (console->cursor->y == 0) ? 0 : 1;
 				}
 				else
-					console->cursor.x--;
-				gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
+					console->cursor->x--;
+				gs[console->cursor->y * COLS + console->cursor->x] = ' ';	//Das vorhandene Zeichen "löschen"
 			break;
 			default:
 				//Zeichen in den Grafikspeicher kopieren
-				gs[console->cursor.y * COLS + console->cursor.x] = (c | (Farbwert << 8));
-				if(++console->cursor.x > 79)
+				gs[console->cursor->y * COLS + console->cursor->x] = (c | (Farbwert << 8));
+				if(++console->cursor->x > 79)
 				{
-					console->cursor.x = 0;
-					if(++console->cursor.y > 24)
+					console->cursor->x = 0;
+					if(++console->cursor->y > 24)
 					{
 						console_scrollDown(console);
-						console->cursor.y = 24;
+						console->cursor->y = 24;
 					}
 				}
 			break;
 		}
-		setCursor(console->cursor.x, console->cursor.y);
+		setCursor(console->cursor->x, console->cursor->y);
 	}
 }
 
@@ -160,6 +162,6 @@ void console_setCursor(console_t *console, cursor_t cursor)
 {
 	if(console != NULL)
 	{
-		console->cursor = cursor;
+		*console->cursor = cursor;
 	}
 }

@@ -11,19 +11,17 @@
 #include "stddef.h"
 #include "stdint.h"
 #include "stdbool.h"
-#include "pm.h"
 
 typedef struct{
 	uint8_t x, y;
 }cursor_t;
 
 typedef struct{
-	pid_t pid;
 	uint8_t page;
 
 	void *buffer;
 	uint8_t color;
-	cursor_t cursor;
+	cursor_t *cursor;
 }console_t;
 
 extern console_t initConsole;
