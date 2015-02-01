@@ -13,6 +13,8 @@
 #include "pm.h"
 #include "vfs.h"
 #include "loader.h"
+#include "pit.h"
+#include "system.h"
 
 extern void putch(char);
 extern char getch(void);
@@ -104,16 +106,16 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			ihs->rax = vfs_getFileinfo((vfs_stream_t*)ihs->rbx, ihs->rcx);
 		break;
 
-		//Parameter:	rax = Adresse
+		//Parameter:	rbx = Adresse
 		//Rückgabewert:	rax = Adresse
 		case TIME:
-			ihs->rax = cmos_GetTime(ihs->rax);
+			ihs->rax = (uint64_t)cmos_GetTime((Time_t*)ihs->rbx);
 		break;
 
-		//Parameter:	rax = Adresse
+		//Parameter:	rbx = Adresse
 		//Rückgabewert:	rax = Adresse
 		case DATE:
-			ihs->rax = cmos_GetDate(ihs->rax);
+			ihs->rax = (uint64_t)cmos_GetDate((Date_t*)ihs->rbx);
 		break;
 
 		//Parameter:	rbx = Milisekunden
@@ -121,9 +123,9 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			pit_RegisterTimer(currentProcess->PID, ihs->rbx);
 		break;
 
-		//Rückgabewert:	rax = Adresse zur Informationsstruktur
+		//Rückgabewert:	rbx = Adresse zur Informationsstruktur
 		case SYSINF:
-			getSystemInformation(ihs->rbx);
+			getSystemInformation((SIS*)ihs->rbx);
 		break;
 	}
 	return ihs;
