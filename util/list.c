@@ -119,6 +119,43 @@ void* list_get(list_t list, size_t index)
 }
 
 /*
+ * Fuegt ein neues Listenelement ein. Der Index aller Elemente, die bisher
+ * einen groesseeren oder gleich grossen Index haben, verschieben sich
+ * um eine Position nach hinten.
+ *
+ * @param list Liste, in die eingefuegt werden soll
+ * @param index Zukuenftiger Index des neu einzufuegenden Elements
+ * @param value Neu einzufuegendes Element
+ *
+ * @return Die Liste, in die eingefuegt wurde, oder NULL, wenn nicht eingefuegt
+ * werden konnte (z.B. weil der Index zu gross ist)
+ */
+list_t list_insert(list_t list, size_t index, void* value)
+{
+	size_t i;
+	struct list_node *newNode;
+	struct list_node *Node = NULL;
+	struct list_node *prevNode = list->Anchor;
+	for(i = 0; i < index && (Node = prevNode->Next); i++)
+	{
+		prevNode = Node;
+	}
+
+	if(prevNode == NULL)
+		return NULL;
+
+	newNode = malloc(sizeof(*newNode));
+	newNode->Value = value;
+
+	newNode->Next = prevNode->Next;
+	prevNode->Next = newNode;
+
+	list->Size++;
+
+	return list;
+}
+
+/*
  * Loescht ein Listenelement
  *
  * @param list Liste, aus der entfernt werden soll
