@@ -159,11 +159,11 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 					if(handle_ansi_formatting(console, n2) != SUCCESS)
 						return INVALID;
 				}
-			break;
+			return SUCCESS;
 		}
 	}
 
-	return SUCCESS;
+	return NEED_MORE;
 }
 
 void console_ansi_write(console_t *console, char c)
