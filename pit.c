@@ -63,7 +63,7 @@ void pit_RegisterTimer(pid_t PID, uint64_t msec)
 	prevTimer = Timer;
 
 	//Entsprechenden Task schlafen legen
-	pm_SleepTask(PID);
+	pm_BlockTask(PID);
 }
 
 void pit_Handler(void)
@@ -76,7 +76,7 @@ void pit_Handler(void)
 		{
 			Timer->msec--;
 			if(Timer->msec == 0)
-				pm_WakeTask(Timer->PID);
+				pm_ActivateTask(Timer->PID);
 		}
 	}
 }
