@@ -37,6 +37,7 @@
 //Verschiedene Funktionen
 #define TIME	50
 #define DATE	51
+#define SLEEP	52
 
 //Systemfunktionen
 #define SYSINF	60

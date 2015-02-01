@@ -116,6 +116,11 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			ihs->rax = cmos_GetDate(ihs->rax);
 		break;
 
+		//Parameter:	rbx = Milisekunden
+		case SLEEP:
+			pit_RegisterTimer(currentProcess->PID, ihs->rbx);
+		break;
+
 		//Rückgabewert:	rax = Adresse zur Informationsstruktur
 		case SYSINF:
 			getSystemInformation(ihs->rbx);
