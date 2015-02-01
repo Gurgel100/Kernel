@@ -14,6 +14,7 @@
 #include "stdlib.h"
 #include "list.h"
 #include "display.h"
+#include "stdio.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
