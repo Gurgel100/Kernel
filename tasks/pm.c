@@ -18,7 +18,7 @@
 static pid_t nextPID;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
-static process_t *currentProcess = NULL;	//Aktueller Prozess
+process_t *currentProcess = NULL;			//Aktueller Prozess
 static process_t *idleTask;					//Handler für idle-Task
 
 ihs_t *pm_Schedule(ihs_t *cpu);

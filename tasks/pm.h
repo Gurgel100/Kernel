@@ -33,6 +33,8 @@ typedef struct{
 		void *kernelStackBottom, *kernelStack;
 }process_t;
 
+extern process_t *currentProcess;			//Aktueller Prozess
+
 void pm_Init(void);
 pid_t pm_InitTask(pid_t parent, void *entry, char* cmd);
 void pm_DestroyTask(pid_t PID);
