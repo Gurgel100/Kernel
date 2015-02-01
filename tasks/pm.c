@@ -15,12 +15,22 @@
 #include "tss.h"
 #include "list.h"
 
-static pid_t nextPID = 1;
+static pid_t nextPID;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
 static process_t *currentProcess = NULL;	//Aktueller Prozess
+static process_t *idleTask;					//Handler für idle-Task
 
 ihs_t *pm_Schedule(ihs_t *cpu);
+
+/*
+ * Idle-Task
+ * Wird ausgeführt, wenn kein anderer Task ausgeführt wird
+ */
+static void idle(void)
+{
+	while(1) asm volatile("hlt");
+}
 
 /*
  * Prozessverwaltung initialisieren
@@ -28,6 +38,26 @@ ihs_t *pm_Schedule(ihs_t *cpu);
 void pm_Init()
 {
 	ProcessList = list_create();
+
+	idleTask = pm_getTask(pm_InitTask(0, idle, ""));
+	idleTask->State->cs = 0x8;
+	idleTask->State->ds = idleTask->State->es = idleTask->State->ss = 0x10;
+	idleTask->PID = 0;
+	free(idleTask->cmd);
+	nextPID = 1;
+
+	//Jetzt den Task noch aus der Prozessliste löschen
+	size_t i = 0;
+	process_t *tmp;
+	while((tmp = list_get(ProcessList, i)))
+	{
+		if(tmp == idleTask)
+		{
+			list_remove(ProcessList, i);
+			break;
+		}
+		i++;
+	}
 }
 
 /*
