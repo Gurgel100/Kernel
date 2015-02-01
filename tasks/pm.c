@@ -172,7 +172,7 @@ ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
  * Hält einen Task an ohne ihn zu beenden
  * Params:	PID = PID des Tasks
  */
-void pm_HaltTask(pid_t PID)
+void pm_BlockTask(pid_t PID)
 {
 	process_t *Process = pm_getTask(PID);
 
