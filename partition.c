@@ -29,6 +29,11 @@ int partition_getPartitions(device_t *dev)
 	if(!dmng_Read(dev, 0, 512, buffer))
 		return 1;
 
+	//Gültige Partitionstabelle?
+	uint16_t *sig = buffer + 0x1FE;
+	if(*sig != 0xAA55)
+		return -1;
+
 	//Partitionstabelle durchsuchen
 	PartitionTable_t *ptable = buffer + 0x1BE;
 	uint8_t i;
