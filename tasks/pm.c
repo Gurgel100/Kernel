@@ -83,6 +83,8 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 	//Stack mappen (1 Page)
 	vmm_ContextMap(newProcess->Context, MM_USER_STACK, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
 
+	newProcess->console = NULL;
+
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);
 
@@ -211,6 +213,37 @@ process_t *pm_getTask(pid_t PID)
 	return NULL;
 }
 
+/*
+ * Gibt die Konsole des aktuell ausgeführten Tasks zurück
+ */
+console_t *pm_getConsole()
+{
+	if(currentProcess)
+	{
+		if(currentProcess->console == NULL)
+		{
+			//Neue Konsole anlegen
+			if(currentProcess->PPID > 0)
+			{
+				process_t *parent = pm_getTask(currentProcess->PPID);
+				if(parent)
+				{
+					currentProcess->console = console_createChild(parent->console);
+				}
+				else
+				{
+					currentProcess->console = console_createChild(&initConsole);
+				}
+			}
+			else
+			{
+				currentProcess->console = console_createChild(&initConsole);
+			}
+		}
+		return currentProcess->console;
+	}
+	return &initConsole;
+}
 
 /*
  * Scheduler. Gibt den Prozessorzustand des nächsten Tasks zurück. Der aktuelle

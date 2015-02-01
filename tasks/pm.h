@@ -11,6 +11,7 @@
 #include "isr.h"
 #include "stdint.h"
 #include "vmm.h"
+#include "console.h"
 
 typedef uint64_t pid_t;
 
@@ -28,6 +29,7 @@ typedef struct{
 		bool Active;
 		bool Sleeping;
 		void *kernelStackBottom, *kernelStack;
+		console_t *console;
 }process_t;
 
 void pm_Init(void);
@@ -39,5 +41,6 @@ void pm_ActivateTask(pid_t PID);
 void pm_SleepTask(pid_t PID);
 void pm_WakeTask(pid_t PID);
 process_t *pm_getTask(pid_t PID);
+console_t *pm_getConsole();
 
 #endif /* PM_H_ */
