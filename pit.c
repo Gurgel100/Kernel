@@ -9,6 +9,8 @@
 
 #include "pit.h"
 #include "util.h"
+#include "list.h"
+#include "stdlib.h"
 
 #define CH0		0x40
 #define CH1		0x41
@@ -20,17 +22,16 @@
 
 typedef struct{
 	pid_t PID;
-	uint64_t msec;
-	void *Next;
-}timerlist_t;
+	uint64_t timeout;
+}timer_t;
 
-static timerlist_t *Timerlist, *prevTimer;
+static list_t Timerlist;
 
 void pit_Init(uint32_t freq)
 {
 	pit_InitChannel(0, 2, (uint64_t)(FRQB / freq));
 
-	Timerlist = prevTimer = NULL;
+	Timerlist = NULL;
 	Uptime = 0;
 }
 
@@ -45,38 +46,48 @@ void pit_InitChannel(uint8_t channel, uint8_t mode, uint16_t data)
 //Registriert einen Timer
 void pit_RegisterTimer(pid_t PID, uint64_t msec)
 {
-	timerlist_t *Timer;
+	timer_t *Timer;
+	size_t i;
+
 	if(Timerlist == NULL)
-	{
-		Timerlist = malloc(sizeof(timerlist_t));
-		Timer = Timerlist;
-	}
-	else
-		Timer = malloc(sizeof(timerlist_t));
+		Timerlist = list_create();
 
-	Timer->Next = NULL;
+	Timer = malloc(sizeof(timer_t));
+
 	Timer->PID = PID;
-	Timer->msec = msec;
+	Timer->timeout = Uptime + msec;
 
-	if(prevTimer != NULL)
-		prevTimer->Next = Timer;
-	prevTimer = Timer;
+	//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
+	//zuerst abläuft
+	timer_t *item;
+	for(i = 0; (item = list_get(Timerlist, i)); i++)
+	{
+		if(item->timeout > Timer->timeout)
+			break;
+	}
+
+	list_insert(Timerlist, i, Timer);
 
 	//Entsprechenden Task schlafen legen
 	pm_BlockTask(PID);
+
+	//TODO: Task switchen (yielden)
 }
 
 void pit_Handler(void)
 {
-	timerlist_t *Timer;
+	timer_t *Timer;
+	size_t i = 0;
 	Uptime++;
 	if(Timerlist)
 	{
-		for(Timer = Timerlist; Timer->Next != NULL; Timer = Timer->Next)
+		while((Timer = list_get(Timerlist, i)))
 		{
-			Timer->msec--;
-			if(Timer->msec == 0)
-				pm_ActivateTask(Timer->PID);
+			if(Timer->timeout > Uptime)
+				break;
+			pm_ActivateTask(Timer->PID);
+			free(list_remove(Timerlist, i));
+			i++;
 		}
 	}
 }
