@@ -316,8 +316,9 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	//Jede Partition durchgehen
 	partition_t *part;
 	size_t i = 0;
-	while((part = list_get(device->partitions, i++)))
+	while((part = list_get(device->partitions, i)))
 	{
+		i++;
 		vfs_node_t *new = calloc(1, sizeof(vfs_node_t));
 		asprintf(&new->Name, "%u", nextPartID++);
 		new->Type = TYPE_MOUNT;
