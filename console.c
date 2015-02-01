@@ -291,3 +291,32 @@ void console_setCursor(console_t *console, cursor_t cursor)
 		*console->cursor = cursor;
 	}
 }
+
+size_t console_handler_stdout(char *name, uint64_t start, size_t length, const void *buffer)
+{
+	size_t size = 0;
+	console_t *console = pm_getConsole();
+	char *str = buffer;
+	if(console != NULL)
+	{
+		while(length-- && *str != '\0')
+		{
+			console_ansi_write(console, *str++);
+		}
+	}
+	return size;
+}
+
+size_t console_handler_stdin(char *name, uint64_t start, size_t length, const void *buffer)
+{
+	size_t size = 0;
+	char *buf = buffer;
+
+	while(length-- != 0)
+	{
+		buf[length] = getch();
+		size++;
+	}
+
+	return size;
+}
