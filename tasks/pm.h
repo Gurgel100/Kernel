@@ -19,14 +19,17 @@ typedef struct{
 		uint128_t ymm[16][2];		//YMM-Register sind 256-Bit breit
 }__attribute__((aligned(16)))ihs_extended_t;
 
+typedef enum{
+	READY, BLOCKED, RUNNING
+}pm_status_t;
+
 typedef struct{
 		ihs_t *State;
 		context_t *Context;
 		pid_t PID;
 		pid_t PPID;
 		char *cmd;
-		bool Active;
-		bool Sleeping;
+		pm_status_t Status;
 		void *kernelStackBottom, *kernelStack;
 }process_t;
 
@@ -34,10 +37,8 @@ void pm_Init(void);
 pid_t pm_InitTask(pid_t parent, void *entry, char* cmd);
 void pm_DestroyTask(pid_t PID);
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code);
-void pm_HaltTask(pid_t PID);
+void pm_BlockTask(pid_t PID);
 void pm_ActivateTask(pid_t PID);
-void pm_SleepTask(pid_t PID);
-void pm_WakeTask(pid_t PID);
 process_t *pm_getTask(pid_t PID);
 
 #endif /* PM_H_ */
