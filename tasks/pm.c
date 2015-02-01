@@ -45,6 +45,9 @@ void pm_Init()
 	idleTask->PID = 0;
 	free(idleTask->cmd);
 	nextPID = 1;
+	//Als Stack nehmen wir den Kernelstack, weshalb wir hier den Stack wieder freigeben (1 Page)
+	idleTask->State->rsp = (uint64_t)idleTask->kernelStack;
+	vmm_ContextUnMap(idleTask->Context, MM_USER_STACK);
 
 	//Jetzt den Task noch aus der Prozessliste löschen
 	size_t i = 0;
@@ -81,8 +84,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 
 	newProcess->PID = nextPID++;
 	newProcess->PPID = parent;
-	newProcess->Active = false;
-	newProcess->Sleeping = false;
+	newProcess->Status = BLOCKED;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
 			.cs = 0x18 + 3,	//Userspace
@@ -152,16 +154,16 @@ void pm_DestroyTask(pid_t PID)
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
 {
 	process_t *process = currentProcess;
-	//Erst wechseln wir den Task
-	cpu = pm_Schedule(cpu);
+	//Aktueller Task blockieren
+	process->Status = BLOCKED;
+	//Jetzt wechseln wir in den idle-Task
+	currentProcess = idleTask;
+	activateContext(currentProcess->Context);
+	TSS_setStack(currentProcess->kernelStack);
+	cpu = currentProcess->State;
 
-	//Erst überprüfen wir aber, ob der neue Task immer noch wir sind
-	//Wenn ja, dann wird der Task nicht gelöscht
-	if(process->PID != currentProcess->PID)
-	{
-		//Jetzt können wir den Task löschen
-		pm_DestroyTask(process->PID);
-	}
+	//Jetzt können wir den Task löschen
+	pm_DestroyTask(process->PID);
 
 	return cpu;
 }
@@ -176,7 +178,7 @@ void pm_HaltTask(pid_t PID)
 
 	if(Process != NULL)
 	{
-		Process->Active = false;
+		Process->Status = BLOCKED;
 	}
 }
 
@@ -190,35 +192,7 @@ void pm_ActivateTask(pid_t PID)
 
 	if(Process != NULL)
 	{
-		Process->Active = true;
-	}
-}
-
-/*
- * Legt einen Task schlafen
- * Params:	PID = PID des Tasks
- */
-void pm_SleepTask(pid_t PID)
-{
-	process_t *Process = pm_getTask(PID);
-
-	if(Process != NULL)
-	{
-		Process->Sleeping = true;
-	}
-}
-
-/*
- * Weckt einen Task auf
- * Params:	PID = PID des Tasks
- */
-void pm_WakeTask(pid_t PID)
-{
-	process_t *Process = pm_getTask(PID);
-
-	if(Process != NULL)
-	{
-		Process->Sleeping = false;
+		Process->Status = READY;
 	}
 }
 
@@ -256,19 +230,26 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		if(currentProcess != NULL)	//Wenn wir noch in keinem Task sind dann müssen wir auch nichts speichern
 		{
 			process_t *newProcess;
+
+			currentProcess->Status = READY;
+
 			do
 			{
 				newProcess = list_get(ProcessList, actualProcessIndex);
 				actualProcessIndex = (actualProcessIndex + 1 < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
 			}
-			while(!newProcess->Active || newProcess->Sleeping);
-			if(newProcess == currentProcess)
-				return cpu;
+			while(newProcess->Status != READY && newProcess != currentProcess);
+
+			//Es ist kein anderer Prozess bereit also gehen wir in den Idle-Task
+			if(newProcess == currentProcess && newProcess->Status != READY)
+				newProcess = idleTask;
+
 			//Jetzt alten Prozessorzustand speichern
 			currentProcess->State = cpu;
 
 			//Hier findet der eigentliche Taskswitch statt
 			currentProcess = newProcess;
+			currentProcess->Status = RUNNING;
 			activateContext(currentProcess->Context);
 			TSS_setStack(currentProcess->kernelStack);
 			cpu = currentProcess->State;
@@ -282,9 +263,9 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 				newProcess = list_get(ProcessList, actualProcessIndex);
 				actualProcessIndex = (actualProcessIndex + 1 < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
 			}
-			while((!newProcess->Active || newProcess->Sleeping) && actualProcessIndex != 0);
+			while(newProcess->Status != READY && actualProcessIndex != 0);
 			//Wenn keine erster Prozess gefunden wurde, wechseln wir auch nicht den Task
-			if(newProcess == NULL || !newProcess->Active || newProcess->Sleeping)
+			if(newProcess == NULL || newProcess->Status != READY)
 				return cpu;
 
 			currentProcess = newProcess;
