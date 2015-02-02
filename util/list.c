@@ -132,23 +132,33 @@ void* list_get(list_t list, size_t index)
  */
 list_t list_insert(list_t list, size_t index, void* value)
 {
-	size_t i;
 	struct list_node *newNode;
-	struct list_node *Node = NULL;
-	struct list_node *prevNode = list->Anchor;
-	for(i = 0; i < index && (Node = prevNode->Next); i++)
+	if(index)
 	{
-		prevNode = Node;
+		struct list_node *Node = NULL;
+		struct list_node *prevNode = list->Anchor;
+		for(; index && (Node = prevNode->Next); index--)
+		{
+			prevNode = Node;
+		}
+
+		if(prevNode == NULL)
+			return NULL;
+
+		newNode = malloc(sizeof(*newNode));
+		newNode->Value = value;
+
+		newNode->Next = prevNode->Next;
+		prevNode->Next = newNode;
 	}
+	else
+	{
+		newNode = malloc(sizeof(*newNode));
+		newNode->Value = value;
 
-	if(prevNode == NULL)
-		return NULL;
-
-	newNode = malloc(sizeof(*newNode));
-	newNode->Value = value;
-
-	newNode->Next = prevNode->Next;
-	prevNode->Next = newNode;
+		newNode->Next = list->Anchor;
+		list->Anchor = newNode;
+	}
 
 	list->Size++;
 
