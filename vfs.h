@@ -71,6 +71,8 @@ void vfs_Close(vfs_stream_t *stream);
 size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
 size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
 
+vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data);
+
 uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info);
 
 int vfs_Mount(const char *Mountpath, const char *Dev);

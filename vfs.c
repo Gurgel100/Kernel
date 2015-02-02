@@ -262,6 +262,39 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
 	return sizeWritten;
 }
 
+vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data)
+{
+	vfs_node_t *child;
+	char *rempath = NULL;
+	vfs_node_t *node = getLastNode(path, &rempath);
+
+	if(node->Type != TYPE_DIR)
+		return NULL;
+	child = calloc(1, sizeof(vfs_node_t));
+	child->Name = strdup(name);
+	child->Parent = node;
+	child->Next = node->Child;
+	node->Child = child;
+	child->Type = type;
+	switch(type)
+	{
+		case TYPE_DEV:
+			child->dev = data;
+		break;
+		case TYPE_FILE:
+			child->Handler = data;
+		break;
+		case TYPE_LINK:
+			child->Child = data;
+		break;
+		case TYPE_MOUNT:
+			child->partition = data;
+		break;
+	}
+
+	return child;
+}
+
 /*
  * Gibt die Metainformationen einer Datei zurück
  * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)
