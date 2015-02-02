@@ -215,7 +215,9 @@ size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void 
 	if(!stream->mode.read)
 		return 0;
 
-	switch(stream->node->Type)
+	vfs_node_t *node = (stream->node->Type == TYPE_LINK) ? stream->node->Child : stream->node;
+
+	switch(node->Type)
 	{
 		case TYPE_DEV:
 			sizeRead = dmng_Read(stream->node->dev, start, length, buffer);
@@ -238,7 +240,9 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
 	if(!stream->mode.write)
 		return 0;
 
-	switch(stream->node->Type)
+	vfs_node_t *node = (stream->node->Type == TYPE_LINK) ? stream->node->Child : stream->node;
+
+	switch(node->Type)
 	{
 		case TYPE_DEV:
 			sizeWritten = dmng_Read(stream->node->dev, start, length, buffer);
