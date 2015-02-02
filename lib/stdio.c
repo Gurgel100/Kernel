@@ -1055,7 +1055,7 @@ int vprintf_putsn(void *arg, const char *str, int n)
 
 	if(len <= n || n == -1)
 	{
-		return puts(str);
+		return putsn(strlen(str), str);
 	}
 	else
 	{
@@ -1235,6 +1235,17 @@ int sputs(char **dest, const char *str)
 	{
 		if(sputchar(dest, str[i]) == EOF)
 			return EOF;
+	}
+	return 1;
+}
+
+//Gibt n Zeichen aus. Nullbytes werden ignoriert
+int putsn(size_t n, const char *str)
+{
+	size_t i;
+	for(i = 0; i < n; i++)
+	{
+		putc(str[i], stdout);
 	}
 	return 1;
 }
