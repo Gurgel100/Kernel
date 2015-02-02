@@ -269,7 +269,11 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
 	vfs_node_t *node = getLastNode(path, &rempath);
 
 	if(node->Type != TYPE_DIR)
+	{
+		free(rempath);
 		return NULL;
+	}
+
 	child = calloc(1, sizeof(vfs_node_t));
 	child->Name = strdup(name);
 	child->Parent = node;
@@ -291,6 +295,8 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
 			child->partition = data;
 		break;
 	}
+
+	free(rempath);
 
 	return child;
 }
