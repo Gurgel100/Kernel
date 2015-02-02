@@ -1212,6 +1212,9 @@ int puts(const char *str)
 		if(putc(str[i], stdout) == EOF)
 			return EOF;
 	}
+	//Newline ausgeben
+	if(putc('\n', stdout) == EOF)
+		return EOF;
 	return 1;
 }
 
