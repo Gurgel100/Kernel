@@ -231,7 +231,8 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		{
 			process_t *newProcess;
 
-			currentProcess->Status = READY;
+			if(currentProcess->Status == RUNNING)
+				currentProcess->Status = READY;
 
 			do
 			{
