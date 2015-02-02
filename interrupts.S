@@ -138,4 +138,60 @@ add $16,%rsp
 
 #Rücksprung
 iretq
+
+
+.global isr_syscall
+.extern syscall_syscallHandler
+.extern tss
+#Parameter:
+#rax = Funktion
+#rbx = 1. Parameter
+#rbp = 2. Parameter
+#rdx = 3. Parameter
+#rdi = 4. Parameter
+#rsi = 5. Parameter
+isr_syscall:
+#5. Parameter
+mov %rsi,%r9
+#1. Parameter
+mov %rbx,%rsi
+#2. Parameter
+mov %rbp,%rdx
+
+#rsp sichern
+mov %rsp,%rbp
+#Den Kernelstackpointer laden wir einfach aus der TSS
+movq (tss+0x4),%rsp
+
+push %r12
+
+#rip sichern
+mov %rcx,%rbx
+#rflags sichern
+mov %r11,%r12
+
+
+
+#3. Parameter
+mov %rdx,%rcx
+#4. Parameter
+mov %rdi,%r8
+
+#Funktion
+mov %rax,%rdi
+
+call syscall_syscallHandler
+
+#rip laden
+mov %rbx,%rcx
+#rflags laden
+mov %r12,%r11
+pop %r12
+
+#Interrupts deaktivieren, weil sonst kann das böse enden (Stack)
+cli
+#rsp laden
+mov %rbp,%rsp
+sysret
+
 .endif
