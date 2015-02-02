@@ -100,6 +100,7 @@ void cpu_Init()
 
 	Temp = cpu_CPUID(0x80000001, EDX);
 	cpuInfo.nx = Temp & (1 << 20);
+	cpuInfo.syscall = Temp & (1 << 11);
 
 	//Namen des Prozessors
 	if(cpuInfo.maxextCPUID >= 0x80000003 && cpuInfo.Vendor == INTEL)
