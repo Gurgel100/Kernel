@@ -13,7 +13,7 @@
 
 #define SELECTOR	5
 
-static tss_entry_t tss;
+tss_entry_t tss;
 
 void TSS_Init()
 {
