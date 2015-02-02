@@ -72,6 +72,8 @@ void pit_RegisterTimer(pid_t PID, uint64_t msec)
 	pm_BlockTask(PID);
 
 	//TODO: Task switchen (yielden)
+
+	asm volatile("hlt");
 }
 
 void pit_Handler(void)
