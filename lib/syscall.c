@@ -79,4 +79,9 @@ inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info)
 	return ret;
 }
 
+inline void syscall_sleep(uint64_t msec)
+{
+	asm volatile("int $0x30" : : "a"(52), "b"(msec));
+}
+
 #endif

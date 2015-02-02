@@ -39,6 +39,8 @@ inline size_t syscall_fread(void *stream, uint64_t start, size_t length, const v
 inline size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer);
 inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
 
+inline void syscall_sleep(uint64_t msec);
+
 #endif /* SYSCALL_H_ */
 
 #endif

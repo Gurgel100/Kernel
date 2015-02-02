@@ -13,6 +13,7 @@
 #include "syscall.h"
 
 #define createProcess(path, cmd) syscall_createProcess(path, cmd)
+#define sleep(msec)	syscall_sleep(msec)
 
 typedef struct{
 		uint64_t	physSpeicher;
