@@ -223,7 +223,8 @@ size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void 
 			sizeRead = dmng_Read(stream->node->dev, start, length, buffer);
 		break;
 		case TYPE_MOUNT:
-			sizeRead = stream->stream.res->file->read(&stream->stream, start, length, buffer);
+			if(stream->stream.res->flags.read)
+				sizeRead = stream->stream.res->file->read(&stream->stream, start, length, buffer);
 		break;
 	}
 	return sizeRead;
