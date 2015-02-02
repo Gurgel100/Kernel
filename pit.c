@@ -11,6 +11,7 @@
 #include "util.h"
 #include "list.h"
 #include "stdlib.h"
+#include "pm.h"
 
 #define CH0		0x40
 #define CH1		0x41
@@ -72,8 +73,8 @@ void pit_RegisterTimer(pid_t PID, uint64_t msec)
 	pm_BlockTask(PID);
 
 	//TODO: Task switchen (yielden)
-
-	asm volatile("hlt");
+	//HACK
+	while(currentProcess->Status == BLOCKED) asm volatile("hlt");
 }
 
 void pit_Handler(void)
