@@ -93,11 +93,6 @@ uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uin
 			return loader_load((const char*)arg1, (const char*)arg2);
 		break;
 
-		//Parameter:	rbx = Rückgabecode
-		case EXIT:	//TODO
-			return pm_ExitTask(0, arg1);
-		break;
-
 		//Parameter:	rbx = Pfad, rcx = Addresse zur Modusstruktur
 		//Rückgabewert:	rax = Pointer zur Systemdateistruktur
 		case FOPEN:
