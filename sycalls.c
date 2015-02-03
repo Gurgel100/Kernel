@@ -152,22 +152,22 @@ uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uin
  */
 ihs_t *syscall_Handler(ihs_t *ihs)
 {
-	switch(ihs->rax)
+	switch(ihs->rdi)
 	{
-		//Parameter: 	rbx = Grösse
+		//Parameter: 	rsi = Grösse
 		//Rückgabewert:	rax = Adresse
 		case MALLOC:
-			ihs->rax = mm_Alloc(ihs->rbx);
+			ihs->rax = mm_Alloc(ihs->rsi);
 		break;
 
-		//Parameter: 	rbx = Adresse, rcx = Grösse
+		//Parameter: 	rsi = Adresse, rdx = Grösse
 		case FREE:
-			mm_Free(ihs->rbx, ihs->rcx);
+			mm_Free(ihs->rsi, ihs->rdx);
 		break;
 
-		//Parameter: 	rbx = Adresse, rcx = Grösse
+		//Parameter: 	rsi = Adresse, rdx = Grösse
 		case UNUSE:
-			vmm_unusePages((void*)ihs->rbx, ihs->rcx);
+			vmm_unusePages((void*)ihs->rsi, ihs->rdx);
 		break;
 
 		//Rückgabewert:	al = ASCII-Zeichen
@@ -175,81 +175,81 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 			ihs->rax = (uint64_t)getch();
 		break;
 
-		//Parameter: 	bl = ASCII-Zeichen
+		//Parameter: 	rsi = ASCII-Zeichen
 		case PUTCH:
-			putch((char)(ihs->rbx & 0xFF));
+			putch((char)(ihs->rsi & 0xFF));
 		break;
 
-		//Parameter: 	ebx = Farbwert
+		//Parameter: 	rsi = Farbwert
 		case COLOR:
-			setColor((uint8_t)(ihs->rbx & 0xFFFF));
+			setColor((uint8_t)(ihs->rsi & 0xFFFF));
 		break;
 
-		//Parameter:	bx = X, cx = Y
+		//Parameter:	rsi = X, dx = Y
 		case CURSOR:
-			setCursor(ihs->rbx & 0xFFFF, ihs->rcx & 0xFFFF);
+			setCursor(ihs->rsi & 0xFFFF, ihs->rdx & 0xFFFF);
 		break;
 
-		//Parameter:	rbx = Pfad, rcx = Commandozeile
+		//Parameter:	rsi = Pfad, rdx = Commandozeile
 		//Rückgabewert: rax = PID des neuen Prozesses
 		case EXEC:
-			ihs->rax = loader_load((const char*)ihs->rbx, (const char*)ihs->rcx);
+			ihs->rax = loader_load((const char*)ihs->rsi, (const char*)ihs->rdx);
 		break;
 
-		//Parameter:	rbx = Rückgabecode
+		//Parameter:	rsi = Rückgabecode
 		case EXIT:
 			ihs = pm_ExitTask(ihs, ihs->rbx);
 		break;
 
-		//Parameter:	rbx = Pfad, rcx = Addresse zur Modusstruktur
+		//Parameter:	rsi = Pfad, rdx = Addresse zur Modusstruktur
 		//Rückgabewert:	rax = Pointer zur Systemdateistruktur
 		case FOPEN:
-			ihs->rax = (uintptr_t)vfs_Open((char*)ihs->rbx, *((vfs_mode_t*)ihs->rcx));
+			ihs->rax = (uintptr_t)vfs_Open((char*)ihs->rsi, *((vfs_mode_t*)ihs->rdx));
 		break;
 
-		//Parameter:	rbx = Pointer zur Systemdateistruktur
+		//Parameter:	rsi = Pointer zur Systemdateistruktur
 		case FCLOSE:
-			vfs_Close((vfs_stream_t*)ihs->rbx);
+			vfs_Close((vfs_stream_t*)ihs->rsi);
 		break;
 
-		//Parameter:	rbx = Systemdateistruktur, rcx = Start, rdx = Länge, rdi = Buffer
+		//Parameter:	rsi = Systemdateistruktur, rdx = Start, rcx = Länge, r8 = Buffer
 		//Rückgabewert:	rax = Bytes, die erfolgreich gelesen wurden
 		case FREAD:
-			ihs->rax = vfs_Read((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, (void*)ihs->rdi);
+			ihs->rax = vfs_Read((vfs_stream_t*)ihs->rsi, ihs->rdx, ihs->rcx, (void*)ihs->r8);
 		break;
 
-		//Parameter:	rbx = Systemdateistruktur, rcx = Start, rdx = Länge, rdi = Buffer
+		//Parameter:	rsi = Systemdateistruktur, rdx = Start, rcx = Länge, r8 = Buffer
 		//Rückgabewert:	rax = Bytes, die erfolgreich geschrieben wurden
 		case FWRITE:
-			ihs->rax = vfs_Write((vfs_stream_t*)ihs->rbx, ihs->rcx, ihs->rdx, (void*)ihs->rdi);
+			ihs->rax = vfs_Write((vfs_stream_t*)ihs->rsi, ihs->rdx, ihs->rcx, (void*)ihs->r8);
 		break;
 
-		//Parameter:	rbx = Systemdateistruktur, rcx = Informationstyp
+		//Parameter:	rsi = Systemdateistruktur, rdx = Informationstyp
 		//Rückgabewert:	rax = Wert für den entsprechenden Informationstyp
 		case FINFO:
-			ihs->rax = vfs_getFileinfo((vfs_stream_t*)ihs->rbx, ihs->rcx);
+			ihs->rax = vfs_getFileinfo((vfs_stream_t*)ihs->rsi, ihs->rdx);
 		break;
 
-		//Parameter:	rbx = Adresse
+		//Parameter:	rsi = Adresse
 		//Rückgabewert:	rax = Adresse
 		case TIME:
-			ihs->rax = (uint64_t)cmos_GetTime((Time_t*)ihs->rbx);
+			ihs->rax = (uint64_t)cmos_GetTime((Time_t*)ihs->rsi);
 		break;
 
-		//Parameter:	rbx = Adresse
+		//Parameter:	rsi = Adresse
 		//Rückgabewert:	rax = Adresse
 		case DATE:
-			ihs->rax = (uint64_t)cmos_GetDate((Date_t*)ihs->rbx);
+			ihs->rax = (uint64_t)cmos_GetDate((Date_t*)ihs->rsi);
 		break;
 
-		//Parameter:	rbx = Milisekunden
+		//Parameter:	rsi = Milisekunden
 		case SLEEP:
-			pit_RegisterTimer(currentProcess->PID, ihs->rbx);
+			pit_RegisterTimer(currentProcess->PID, ihs->rsi);
 		break;
 
-		//Rückgabewert:	rbx = Adresse zur Informationsstruktur
+		//Rückgabewert:	rsi = Adresse zur Informationsstruktur
 		case SYSINF:
-			getSystemInformation((SIS*)ihs->rbx);
+			getSystemInformation((SIS*)ihs->rsi);
 		break;
 	}
 	return ihs;
