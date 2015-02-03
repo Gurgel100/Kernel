@@ -151,10 +151,17 @@ iretq
 #rdi = 4. Parameter
 #rsi = 5. Parameter
 isr_syscall:
+#rip zwischenspeichern
+mov %rcx,%r10
+
 #5. Parameter
 mov %rsi,%r9
 #1. Parameter
 mov %rbx,%rsi
+#3. Parameter
+mov %rdx,%rcx
+#4. Parameter
+mov %rdi,%r8
 #2. Parameter
 mov %rbp,%rdx
 
@@ -166,16 +173,9 @@ movq (tss+0x4),%rsp
 push %r12
 
 #rip sichern
-mov %rcx,%rbx
+mov %r10,%rbx
 #rflags sichern
 mov %r11,%r12
-
-
-
-#3. Parameter
-mov %rdx,%rcx
-#4. Parameter
-mov %rdi,%r8
 
 #Funktion
 mov %rax,%rdi
@@ -192,6 +192,6 @@ pop %r12
 cli
 #rsp laden
 mov %rbp,%rsp
-sysret
+sysretq
 
 .endif
