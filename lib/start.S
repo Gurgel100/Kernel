@@ -15,7 +15,7 @@ push %rbx
 test $1,%rcx
 lea interrupt(%rip),%rax
 lea syscall(%rip),%rdx
-cmove %rdx,%rax
+cmovne %rdx,%rax
 mov %rax,_syscall(%rip)
 
 call initLib
