@@ -38,6 +38,10 @@ void syscall_Init()
 		cpu_MSRwrite(STAR, (0x8ul << 32) | (0xbul << 48));	//Segementregister
 		cpu_MSRwrite(LSTAR, (uintptr_t)isr_syscall);		//Einsprungspunkt
 		cpu_MSRwrite(SFMASK, 0);							//Wir setzen keine Bits zurück (Interrupts bleiben auch aktiviert)
+
+		//Syscall-Instruktion aktivieren (ansonsten #UD)
+		//Bit 0
+		cpu_MSRwrite(0xC0000080, cpu_MSRread(0xC0000080) | 1);
 	}
 }
 
