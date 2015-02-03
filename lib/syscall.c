@@ -73,4 +73,9 @@ inline void syscall_sleep(uint64_t msec)
 	_syscall(52, msec);
 }
 
+inline void syscall_getSysInfo(void *Struktur)
+{
+	_syscall(60, Struktur);
+}
+
 #endif

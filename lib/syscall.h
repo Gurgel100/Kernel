@@ -41,6 +41,8 @@ inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
 
 inline void syscall_sleep(uint64_t msec);
 
+inline void syscall_getSysInfo(void *Struktur);
+
 #endif /* SYSCALL_H_ */
 
 #endif

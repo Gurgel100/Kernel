@@ -14,6 +14,7 @@
 
 #define createProcess(path, cmd) syscall_createProcess(path, cmd)
 #define sleep(msec)	syscall_sleep(msec)
+#define getSysInfo(Struktur) syscall_getSysInfo(Struktur)
 
 typedef struct{
 		uint64_t	physSpeicher;
@@ -23,10 +24,6 @@ typedef struct{
 #endif
 
 void initLib(void);
-
-#ifndef BUILD_KERNEL
-void getSysInfo(SIS *Struktur);
-#endif
 
 void reverse(char *s);
 
