@@ -14,6 +14,7 @@
 #include "string.h"
 #include "tss.h"
 #include "list.h"
+#include "cpu.h"
 
 static pid_t nextPID;
 static uint64_t numTasks = 0;
@@ -93,6 +94,8 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 			.ds = 0x10,
 			.gs = 0x10,
 			.fs = 0x10,
+
+			.rcx = cpuInfo.syscall,
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
