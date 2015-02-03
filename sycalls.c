@@ -35,7 +35,7 @@ void syscall_Init()
 	//Prüfen, ob syscall/sysret unterstützt wird
 	if(cpuInfo.syscall)
 	{
-		cpu_MSRwrite(STAR, (0x8ul << 32) | (0xbul << 48));	//Segementregister
+		cpu_MSRwrite(STAR, (0x8ul << 32) | (0x13ul << 48));	//Segementregister
 		cpu_MSRwrite(LSTAR, (uintptr_t)isr_syscall);		//Einsprungspunkt
 		cpu_MSRwrite(SFMASK, 0);							//Wir setzen keine Bits zurück (Interrupts bleiben auch aktiviert)
 
