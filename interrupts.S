@@ -144,54 +144,41 @@ iretq
 .extern syscall_syscallHandler
 .extern tss
 #Parameter:
-#rax = Funktion
-#rbx = 1. Parameter
-#rbp = 2. Parameter
-#rdx = 3. Parameter
-#rdi = 4. Parameter
-#rsi = 5. Parameter
+#rdi = Funktion
+#rsi = 1. Parameter
+#rdx = 2. Parameter
+#r10 = 3. Parameter
+#r8  = 4. Parameter
+#r9  = 5. Parameter
 isr_syscall:
-#rip zwischenspeichern
-mov %rcx,%r10
-
-#5. Parameter
-mov %rsi,%r9
-#1. Parameter
-mov %rbx,%rsi
-#3. Parameter
-mov %rdx,%rcx
-#4. Parameter
-mov %rdi,%r8
-#2. Parameter
-mov %rbp,%rdx
-
-#rsp sichern
-mov %rsp,%rbp
+#rsp zwischenspeichern
+mov %rsp,%rax
 #Den Kernelstackpointer laden wir einfach aus der TSS
 movq (tss+0x4),%rsp
 
-push %r12
-
 #rip sichern
-mov %r10,%rbx
+push %rcx
+#rsp sichern
+push %rax
 #rflags sichern
-mov %r11,%r12
+push %r11
 
-#Funktion
-mov %rax,%rdi
+#3. Parameter an die richtige Position verschieben
+mov %r10,%rcx
 
 call syscall_syscallHandler
 
-#rip laden
-mov %rbx,%rcx
 #rflags laden
-mov %r12,%r11
-pop %r12
+pop %r11
+#rsp zwischenladen
+pop %r10
+#rip laden
+pop %rcx
 
 #Interrupts deaktivieren, weil sonst kann das böse enden (Stack)
 cli
 #rsp laden
-mov %rbp,%rsp
+mov %r10,%rsp
 sysretq
 
 .endif
