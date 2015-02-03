@@ -21,6 +21,11 @@ inline void FreePage(void *Address, size_t Pages)
 	_syscall(1, Address, Pages);
 }
 
+inline void syscall_unusePage(void *Address, size_t Pages)
+{
+	_syscall(2, Address, Pages);
+}
+
 inline char syscall_getch()
 {
 	return (char)_syscall(20);

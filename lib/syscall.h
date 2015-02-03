@@ -26,6 +26,7 @@ typedef uint64_t pid_t;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
+inline void syscall_unusePage(void *Address, size_t Pages);
 
 inline char syscall_getch();
 inline void syscall_putch(unsigned char c);
