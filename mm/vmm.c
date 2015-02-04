@@ -1198,6 +1198,7 @@ void vmm_unusePages(void *virt, size_t pages)
 			pmm_Free((void*)(entry & PG_ADDRESS));
 			setPTEntry(PTi, PT, 0, !!(entry & PG_RW), !!(entry & PG_US), !!(entry & PG_PWT), !!(entry & PG_PCD), !!(entry & PG_A),
 					!!(entry & PG_D), !!(entry & PG_G), PG_AVL(entry) | VMM_UNUSED_PAGE, !!(entry & PG_PAT), !!(entry & PG_NX), 0);
+			InvalidateTLBEntry(address);
 		}
 	}
 }
