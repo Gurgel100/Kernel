@@ -14,6 +14,7 @@
 #ifdef BUILD_KERNEL
 #include "mm.h"
 #include "cpu.h"
+#include "vmm.h"
 #else
 #include "syscall.h"
 #endif
@@ -352,40 +353,26 @@ void free(void *ptr)
 		//TODO
 		//Wenn möglich unnötige Speicherseiten freigeben
 		//Dabei behalten wir immer eine Page
-		if(Heap->Length + sizeof(heap_t) > 4096)
+		if(Heap->Length > 4096)
 		{
 			//Aufrunden auf nächste Pagegrenze
-			uintptr_t bottom = (uintptr_t)Heap & ~0xFFF;
+			uintptr_t bottom = ((uintptr_t)Heap + 0xFFF) & ~0xFFF;
 			//Die Page des nächsten Heaps dürfen wir nicht freigeben
 			uintptr_t top = ((uintptr_t)Heap + Heap->Length + sizeof(heap_t)) & ~0xFFF;
-			if(Heap->Next != NULL)
-				top = (uintptr_t)Heap->Next & ~0xFFF;
 
 			if(top > bottom)
 			{
-				if(Heap > bottom) bottom += 4096;
+				if(Heap >= bottom) bottom += 4096;
 
 				uint64_t Pages = (top - bottom) / 4096;
 
-				//Wenn nötig müssen wir einen neuen Heap anlegen
-				if(Heap->Next != NULL && (uintptr_t)Heap->Next - top > 0)
-				{
-					//Wenn nicht mehr genügend Platz da ist, um einen neuen Heap anzulegen, dann geben wir eine Page weniger frei
-					if((uintptr_t)Heap->Next - top < sizeof(heap_t) && Pages > 0)
-						Pages--;
-
-					if(Pages == 0) return;
-
-					heap_t *tmpHeap = (heap_t*)(bottom + Pages * 4096);
-					top = (uintptr_t)tmpHeap;
-					setupNewHeapEntry(Heap, tmpHeap);
-					tmpHeap->Length = (uintptr_t)tmpHeap->Next - (uintptr_t)tmpHeap - sizeof(heap_t);
-				}
-
 				if(Pages > 0)
 				{
-					Heap->Length = bottom - (uintptr_t)Heap - sizeof(heap_t);
-					FreePage((void*)bottom, Pages);
+#ifdef BUILD_KERNEL
+					vmm_unusePages((void*)bottom, Pages);
+#else
+					syscall_unusePage((void*)bottom, Pages);
+#endif
 				}
 			}
 		}
