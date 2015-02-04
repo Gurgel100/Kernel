@@ -65,6 +65,7 @@ void Init()
 	pic_Init();			//PIC initialisieren
 	cmos_Init();		//CMOS initialisieren
 	keyboard_Init();	//Tastatur(treiber) initialisieren
+	syscall_Init();		//Syscall initialisieren
 	#ifdef DEBUGMODE
 	Debug_Init();
 	#endif
