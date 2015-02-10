@@ -10,11 +10,11 @@
 #include "display.h"
 #include "util.h"
 #include "string.h"
+#include "console.h"
+#include "pm.h"
 
 #define GRAFIKSPEICHER 0xB8000
 
-static uint8_t Textcolor;
-static uint8_t Background;
 uint8_t Spalte, Zeile;
 
 void Display_Init()
@@ -31,8 +31,7 @@ void Display_Init()
 
 void setColor(uint8_t Color)
 {
-	Textcolor = Color & 0xF;
-	Background = Color & 0x70;
+	console_changeColor(pm_getConsole(), Color);
 }
 
 /*
@@ -41,47 +40,7 @@ void setColor(uint8_t Color)
  */
 void putch(unsigned char c)
 {
-	uint8_t Farbwert = Background | Textcolor;
-	uint16_t *gs = (uint16_t*)GRAFIKSPEICHER;
-	switch(c)
-	{
-		case '\n':
-			Zeile++;
-			if(Zeile > 24)
-			{
-				scrollScreenDown();
-				Zeile = 24;
-			}
-			//bei '\n' soll auch an den Anfang der Zeile gesprungen werden.
-			/* no break */
-		case '\r':
-			Spalte = 0;
-		break;
-		case '\b':
-			if(Spalte == 0)
-			{
-				Spalte = 79;
-				Zeile -= (Zeile == 0) ? 0 : 1;
-			}
-			else
-				Spalte--;
-			gs[Zeile * 80 + Spalte] = ' ';	//Das vorhandene Zeichen "löschen"
-		break;
-		default:
-			//Zeichen in den Grafikspeicher kopieren
-			gs[Zeile * 80 + Spalte] = (c | (Farbwert << 8));
-			if(++Spalte > 79)
-			{
-				Spalte = 0;
-				if(++Zeile > 24)
-				{
-					scrollScreenDown();
-					Zeile = 24;
-				}
-			}
-		break;
-	}
-	setCursor(Spalte, Zeile);
+	console_ansi_write(pm_getConsole(), c);
 }
 
 /*

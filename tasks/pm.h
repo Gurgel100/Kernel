@@ -11,6 +11,7 @@
 #include "isr.h"
 #include "stdint.h"
 #include "vmm.h"
+#include "console.h"
 
 typedef uint64_t pid_t;
 
@@ -31,6 +32,7 @@ typedef struct{
 		char *cmd;
 		pm_status_t Status;
 		void *kernelStackBottom, *kernelStack;
+		console_t *console;
 }process_t;
 
 extern process_t *currentProcess;			//Aktueller Prozess
@@ -42,5 +44,6 @@ ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code);
 void pm_BlockTask(pid_t PID);
 void pm_ActivateTask(pid_t PID);
 process_t *pm_getTask(pid_t PID);
+console_t *pm_getConsole();
 
 #endif /* PM_H_ */

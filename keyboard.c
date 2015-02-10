@@ -15,6 +15,8 @@
 #include "display.h"
 #include "stdbool.h"
 #include "keyboard_SWISS.h"
+#include "console.h"
+#include "ctype.h"
 
 //Ports
 #define KEYBOARD_PORT		0x60
@@ -137,6 +139,33 @@ void keyboard_Handler(ihs_t *ihs)
 	//Ist nur für den Kernel notwendig
 	if(make)
 	{
+		if(PressedKeys[KEY_LALT])
+		{
+			if(PressedKeys[KEY_F1])
+				console_switch(0);
+			else if(PressedKeys[KEY_F2])
+				console_switch(1);
+			else if(PressedKeys[KEY_F3])
+				console_switch(2);
+			else if(PressedKeys[KEY_F4])
+				console_switch(3);
+			else if(PressedKeys[KEY_F5])
+				console_switch(4);
+			else if(PressedKeys[KEY_F6])
+				console_switch(5);
+			else if(PressedKeys[KEY_F7])
+				console_switch(6);
+			else if(PressedKeys[KEY_F8])
+				console_switch(7);
+			else if(PressedKeys[KEY_F9])
+				console_switch(8);
+			else if(PressedKeys[KEY_F10])
+				console_switch(9);
+			else if(PressedKeys[KEY_F11])
+				console_switch(10);
+			else if(PressedKeys[KEY_F12])
+				console_switch(11);
+		}
 	//Zeichen in Puffer schreiben, wenn es ein ASCII-Zeichen ist
 	char Zeichen = keyboard_KeyToASCII(Key);
 	if(Zeichen != 0)
