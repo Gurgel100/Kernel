@@ -106,7 +106,7 @@ size_t list_empty(list_t list)
 {
 	if(!list) return 1;
 
-	return (list->Size > 0);
+	return (list->Size == 0);
 }
 
 /*
