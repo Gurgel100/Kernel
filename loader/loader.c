@@ -12,7 +12,7 @@
 #include "string.h"
 
 
-pid_t loader_load(const char *path, const char *cmd)
+pid_t loader_load(const char *path, const char *cmd, bool newConsole)
 {
 	pid_t pid = 0;
 	char *bin;
@@ -37,7 +37,7 @@ pid_t loader_load(const char *path, const char *cmd)
 	if(fp == NULL)
 		return 0;
 
-	pid = elfLoad(fp, cmd);
+	pid = elfLoad(fp, cmd, newConsole);
 	fclose(fp);
 	return pid;
 }

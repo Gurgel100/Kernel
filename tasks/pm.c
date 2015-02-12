@@ -40,7 +40,7 @@ void pm_Init()
 {
 	ProcessList = list_create();
 
-	idleTask = pm_getTask(pm_InitTask(0, idle, ""));
+	idleTask = pm_getTask(pm_InitTask(0, idle, "", false));
 	idleTask->State->cs = 0x8;
 	idleTask->State->ds = idleTask->State->es = idleTask->State->ss = 0x10;
 	idleTask->PID = 0;
@@ -70,7 +70,7 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
+pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
 	numTasks++;
@@ -118,7 +118,16 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 	//Stack mappen (1 Page)
 	vmm_ContextMap(newProcess->Context, MM_USER_STACK, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
 
-	newProcess->console = NULL;
+	static uint8_t actualPage = 0;
+	if(newConsole)
+		newProcess->console = console_create(++actualPage);
+	else
+	{
+		context_t *c = &initConsole;
+		if(parent)
+			c = pm_getTask(parent)->console;
+		newProcess->console = console_createChild(c);
+	}
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);

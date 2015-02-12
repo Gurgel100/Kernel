@@ -36,9 +36,9 @@ inline void syscall_putch(unsigned char c)
 	_syscall(21, c);
 }
 
-inline pid_t syscall_createProcess(const char *path, const char *cmd)
+inline pid_t syscall_createProcess(const char *path, const char *cmd, bool newConsole)
 {
-	return (pid_t)_syscall(10, path, cmd);
+	return (pid_t)_syscall(10, path, cmd, newConsole);
 }
 
 inline void __attribute__((noreturn)) syscall_exit(int status)

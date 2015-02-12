@@ -181,7 +181,7 @@ uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse 
 	return ElfHeader->e_entry;
 }
 
-pid_t elfLoad(FILE *fp, const char *cmd)
+pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 {
 	elf_header *Header;
 	char *Ziel;
@@ -204,7 +204,7 @@ pid_t elfLoad(FILE *fp, const char *cmd)
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, cmd);
+	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, cmd, newConsole);
 	process_t *task = pm_getTask(taskID);
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));

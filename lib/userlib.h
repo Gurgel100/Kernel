@@ -12,7 +12,7 @@
 #include "stdint.h"
 #include "syscall.h"
 
-#define createProcess(path, cmd) syscall_createProcess(path, cmd)
+#define createProcess(path, cmd) syscall_createProcess(path, cmd, false)
 #define sleep(msec)	syscall_sleep(msec)
 #define getSysInfo(Struktur) syscall_getSysInfo(Struktur)
 

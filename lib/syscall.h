@@ -31,7 +31,7 @@ inline void syscall_unusePage(void *Address, size_t Pages);
 inline char syscall_getch();
 inline void syscall_putch(unsigned char c);
 
-inline pid_t syscall_createProcess(const char *path, const char *cmd);
+inline pid_t syscall_createProcess(const char *path, const char *cmd, bool newConsole);
 inline void syscall_exit(int status);
 
 inline void *syscall_fopen(char *path, vfs_mode_t mode);

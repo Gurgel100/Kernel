@@ -90,7 +90,7 @@ uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uin
 		//Parameter:	rbx = Pfad, rcx = Commandozeile
 		//Rückgabewert: rax = PID des neuen Prozesses
 		case EXEC:
-			return loader_load((const char*)arg1, (const char*)arg2);
+			return loader_load((const char*)arg1, (const char*)arg2, (bool)arg3);
 		break;
 
 		//Parameter:	rbx = Pfad, rcx = Addresse zur Modusstruktur
@@ -193,7 +193,7 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 		//Parameter:	rsi = Pfad, rdx = Commandozeile
 		//Rückgabewert: rax = PID des neuen Prozesses
 		case EXEC:
-			ihs->rax = loader_load((const char*)ihs->rsi, (const char*)ihs->rdx);
+			ihs->rax = loader_load((const char*)ihs->rsi, (const char*)ihs->rdx, (bool)ihs->rcx);
 		break;
 
 		//Parameter:	rsi = Rückgabecode

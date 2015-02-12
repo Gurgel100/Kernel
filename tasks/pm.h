@@ -38,7 +38,7 @@ typedef struct{
 extern process_t *currentProcess;			//Aktueller Prozess
 
 void pm_Init(void);
-pid_t pm_InitTask(pid_t parent, void *entry, char* cmd);
+pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole);
 void pm_DestroyTask(pid_t PID);
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code);
 void pm_BlockTask(pid_t PID);
