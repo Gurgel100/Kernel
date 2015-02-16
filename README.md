@@ -16,11 +16,11 @@
 - ISO9660
 
 ## License
-The hole **YourOS** code is available under the MIT license:
+The whole **YourOS** code is available under the MIT license:
 ```
 The MIT License (MIT)
 
-Copyright (c) 2014 Pascal Störzbach
+Copyright (c) 2015 Pascal Störzbach
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
