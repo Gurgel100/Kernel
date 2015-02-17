@@ -188,10 +188,9 @@ void vmm_Free(uintptr_t vAddress, uint64_t Pages)
  * Rückgabewert:	virt. Addresse des angeforderten Speicherbereichs
  * 					0 = Erfolgreich an der virt. Adresse vAddress Reserviert
  * 					1 = Nicht genügend phys. Speicherplatz vorhanden
- * 					2 = Virtuelle Addresse schon belegt
- * 					3 = Kein virt. Speicher mehr vorhanden
- *///TODO
-uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
+ * 					2 = Kein virt. Speicher mehr vorhanden
+ */
+uintptr_t vmm_SysAlloc(uint64_t Length)
 {
 	uintptr_t startAddress = 0;
 	uintptr_t i, j;
@@ -200,64 +199,42 @@ uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore)
 
 	lock(&vmm_lock);
 
-	if(Ignore)		//Ignoriere Addresse, d.h. bestimme virt. Addresse
+	for(i = KERNELSPACE_START & 0x1000; i <= KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
 	{
-		for(i = KERNELSPACE_START & 0x1000; i <= KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
+		if(vmm_getPageStatus(i))	//Wenn Page frei ist,
 		{
-			if(vmm_getPageStatus(i))	//Wenn Page frei ist,
+			if(k == 0)				//und k = 0 ist,
 			{
-				if(k == 0)				//und k = 0 ist,
+				startAddress = i;	//dann speichere die Addresse (i) in startAddress
+				k = 1;
+			}
+			else if(k < Length)
+			{
+				if(i == startAddress + k * VMM_SIZE_PER_PAGE)
+					k++;
+				else
+					k = 0;
+			}
+			else	//Wenn zusammenhängende Speicherseiten gefunden, dann reserviere diese
+			{
+				for(j = 0; j < k; j++)
 				{
-					startAddress = i;	//dann speichere die Addresse (i) in startAddress
-					k = 1;
-				}
-				else if(k < Length)
-				{
-					if(i == startAddress + k * VMM_SIZE_PER_PAGE)
-						k++;
-					else
-						k = 0;
-				}
-				else	//Wenn zusammenhängende Speicherseiten gefunden, dann reserviere diese
-				{
-					for(j = 0; j < k; j++)
+					Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX,
+							VMM_KERNELSPACE | VMM_UNUSED_PAGE);
+					if(Fehler == 1) return 1;
+					if(Fehler == 2)		//Virt. Adresse schon belegt? Also weiter suchen
 					{
-						Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX,
-								VMM_KERNELSPACE | VMM_UNUSED_PAGE);
-						if(Fehler == 1) return 1;
-						if(Fehler == 2)		//Virt. Adresse schon belegt? Also weiter suchen
-						{
-							k = 0;
-							continue;
-						}
+						k = 0;
+						continue;
 					}
-					unlock(&vmm_lock);
-					return startAddress;	//Virtuelle Addresse zurückgeben
 				}
+				unlock(&vmm_lock);
+				return startAddress;	//Virtuelle Addresse zurückgeben
 			}
 		}
-		unlock(&vmm_lock);
-		return 3;						//Keine virt. Addresse gefunden
 	}
-	else		//Ignoriere die Addresse nicht
-	{
-		for(i = 0; i < Length; i++)
-		{
-			Fehler = vmm_Map(vAddress + i * VMM_SIZE_PER_PAGE, 0, 0, VMM_KERNELSPACE | VMM_UNUSED_PAGE);
-			if(Fehler == 1)
-			{
-				unlock(&vmm_lock);
-				return 1;
-			}
-			if(Fehler == 2)
-			{
-				unlock(&vmm_lock);
-				return 2;
-			}
-		}
-		unlock(&vmm_lock);
-		return 0;
-	}
+	unlock(&vmm_lock);
+	return 2;						//Keine virt. Addresse gefunden
 }
 
 /*
@@ -1233,7 +1210,7 @@ void vmm_usePages(void *virt, size_t pages)
 context_t *createContext()
 {
 	context_t *context = malloc(sizeof(context_t));
-	PML4_t *newPML4 = (PML4_t*)memset((void*)vmm_SysAlloc(0, 1, true), 0, MM_BLOCK_SIZE);
+	PML4_t *newPML4 = (PML4_t*)memset((void*)vmm_SysAlloc(1), 0, MM_BLOCK_SIZE);
 
 	//Kernel in den Adressraum einbinden
 	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;

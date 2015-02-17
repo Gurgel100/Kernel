@@ -44,31 +44,11 @@ void mm_Free(uintptr_t Address, uint64_t Pages)
 uintptr_t mm_SysAlloc(uint64_t Size)
 {
 	uintptr_t Address;
-	Address = vmm_SysAlloc(0, Size, true);
+	Address = vmm_SysAlloc(Size);
 	if(Address == 1) Panic("MM", "Nicht genuegend physikalischer Speicher vorhanden");
 	if(Address == 2) Panic("MM", "Virtuelle Adresse ist schon belegt");
 	if(Address == 3) Panic("MM", "Nich genuegend virtueller Speicher vorhanden");
 	return Address;
-}
-
-/*
- * Reserviert Speicher für das System an der angegeben Addresse
- * Parameter:	Address = virt. Addresse des Speicherbereichs
- * 				Size = Grösse des Speicherbereichs
- *
- * Rückgabewert:	true = Speicherbereich erfolgreich reserviert
- * 					false = Fehler beim reservieren des Speicherbereichs
- */
-bool mm_SysAllocAddr(uintptr_t Address, uint64_t Size)
-{
-	uint64_t Pages;
-	uint8_t Fehler;
-	Pages = Size / MM_BLOCK_SIZE;
-	if(Size % MM_BLOCK_SIZE > 0) Pages++;	//Aufrunden
-	Fehler = vmm_SysAlloc(Address, Pages, false);
-	if(Fehler == 1) Panic("MM", "Nich genügend physikalischer Speicher vorhanden");
-	if(Fehler == 2 || Fehler == 3) return false;
-	return true;
 }
 
 /*
