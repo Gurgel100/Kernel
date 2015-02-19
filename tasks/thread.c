@@ -116,3 +116,8 @@ void thread_destroy(thread_t *thread)
 
 	free(thread);
 }
+
+void thread_prepare(thread_t *thread)
+{
+	TSS_setStack(thread->kernelStack);
+}
