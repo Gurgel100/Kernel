@@ -97,6 +97,17 @@ void* list_pop(list_t list)
 }
 
 /*
+ * Prueft, ob die Liste leer ist.
+ *
+ * @param list Liste, die ueberprueft werden soll
+ * @return 1, wenn die Liste leer ist; 0, wenn sie Elemente enthaelt
+ */
+size_t list_empty(list_t list)
+{
+	return (list->Size) ? 0 : 1;
+}
+
+/*
  * Gibt ein Listenelement zurueck
  *
  * @param list Liste, aus der das Element gelesen werden soll
