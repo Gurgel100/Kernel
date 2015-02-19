@@ -11,6 +11,7 @@
 #include "isr.h"
 #include "stdint.h"
 #include "vmm.h"
+#include "list.h"
 
 typedef uint64_t pid_t;
 
@@ -24,13 +25,12 @@ typedef enum{
 }pm_status_t;
 
 typedef struct{
-		ihs_t *State;
 		context_t *Context;
 		pid_t PID;
 		pid_t PPID;
 		char *cmd;
 		pm_status_t Status;
-		void *kernelStackBottom, *kernelStack;
+		list_t threads;
 }process_t;
 
 extern process_t *currentProcess;			//Aktueller Prozess

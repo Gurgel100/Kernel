@@ -13,8 +13,8 @@
 #include "stdlib.h"
 #include "string.h"
 #include "tss.h"
-#include "list.h"
 #include "cpu.h"
+#include "thread.h"
 
 static pid_t nextPID;
 static uint64_t numTasks = 0;
@@ -41,13 +41,14 @@ void pm_Init()
 	ProcessList = list_create();
 
 	idleTask = pm_getTask(pm_InitTask(0, idle, ""));
-	idleTask->State->cs = 0x8;
-	idleTask->State->ds = idleTask->State->es = idleTask->State->ss = 0x10;
+	thread_t *thread = list_get(idleTask->threads, 0);
+	thread->State->cs = 0x8;
+	thread->State->ds = thread->State->es = thread->State->ss = 0x10;
 	idleTask->PID = 0;
 	free(idleTask->cmd);
 	nextPID = 1;
 	//Als Stack nehmen wir den Kernelstack, weshalb wir hier den Stack wieder freigeben (1 Page)
-	idleTask->State->rsp = (uint64_t)idleTask->kernelStack;
+	thread->State->rsp = (uint64_t)thread->kernelStack;
 	vmm_ContextUnMap(idleTask->Context, MM_USER_STACK);
 
 	//Jetzt den Task noch aus der Prozessliste löschen
@@ -85,38 +86,14 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd)
 
 	newProcess->PID = nextPID++;
 	newProcess->PPID = parent;
-	newProcess->Status = BLOCKED;
-	// CPU-Zustand für den neuen Task festlegen
-	ihs_t new_state = {
-			.cs = 0x20 + 3,	//Userspace
-			.ss = 0x18 + 3,
-			.es = 0x10,
-			.ds = 0x10,
-			.gs = 0x10,
-			.fs = 0x10,
-
-			.rcx = cpuInfo.syscall,
-
-			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
-
-			.rsp = MM_USER_STACK + 1,
-
-			//IRQs einschalten (IF = 1)
-			.rflags = 0x202,
-
-			//Interrupt ist beim Schedulen 32
-			.interrupt = 32
-	};
-	//Kernelstack vorbereiten
-	newProcess->kernelStackBottom = (void*)mm_SysAlloc(1);
-	newProcess->kernelStack = newProcess->kernelStackBottom + MM_BLOCK_SIZE;
-	newProcess->State = (ihs_t*)(newProcess->kernelStack - sizeof(ihs_t));
-	memcpy(newProcess->State, &new_state, sizeof(ihs_t));
 
 	newProcess->Context = createContext();
 
-	//Stack mappen (1 Page)
-	vmm_ContextMap(newProcess->Context, MM_USER_STACK, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
+	//Liste der Threads erstellen
+	newProcess->threads = list_create();
+
+	//Mainthread erstellen
+	thread_create(newProcess, entry);
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);
@@ -138,8 +115,11 @@ void pm_DestroyTask(pid_t PID)
 		if(process->PID == PID)
 		{	//Wenn der richtige Prozess gefunden wurde, alle Datenstrukturen des Prozesses freigeben
 			list_remove(ProcessList, i);
+			//Alle Threads beenden
+			thread_t *thread;
+			while((thread = list_get(process->threads, 0)))
+				thread_destroy(thread);
 			deleteContext(process->Context);
-			mm_SysFree((uintptr_t)process->kernelStackBottom, 1);
 			free(process->cmd);
 			free(process);
 			numTasks--;
@@ -162,7 +142,7 @@ ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
 	//Jetzt wechseln wir in den idle-Task
 	currentProcess = idleTask;
 	activateContext(currentProcess->Context);
-	TSS_setStack(currentProcess->kernelStack);
+	TSS_setStack(((thread_t*)list_get(currentProcess->threads, 0))->kernelStack);
 	cpu = currentProcess->State;
 
 	//Jetzt können wir den Task löschen
