@@ -9,6 +9,7 @@
 #define APIC_H_
 
 #include "stdbool.h"
+#include "stdint.h"
 
 void apic_Init();
 bool apic_available();

@@ -9,7 +9,6 @@
 #include "cpu.h"
 #include "memory.h"
 #include "vmm.h"
-#include "stdint.h"
 
 #define APIC_BASE_MSR	0x1B
 
