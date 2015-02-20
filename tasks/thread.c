@@ -5,6 +5,7 @@
  *      Author: pascal
  */
 
+#include "thread.h"
 #include "list.h"
 #include "lock.h"
 #include "memory.h"
