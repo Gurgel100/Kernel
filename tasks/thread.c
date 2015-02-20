@@ -11,6 +11,9 @@
 #include "memory.h"
 #include "tss.h"
 #include "vmm.h"
+#include "stdlib.h"
+#include "string.h"
+#include "cpu.h"
 
 list_t threadList;
 tid_t nextTID = 0;
@@ -31,7 +34,7 @@ tid_t get_tid()
 
 thread_t *thread_create(process_t *process, void *entry)
 {
-	thread_t *thread = malloc(sizeof(thread_t));
+	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
 	if(thread == NULL)
 		return NULL;
 
