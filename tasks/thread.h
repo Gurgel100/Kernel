@@ -26,5 +26,7 @@ typedef struct{
 
 void thread_Init();
 thread_t *thread_create(process_t *process, void *entry);
+void thread_destroy(thread_t *thread);
+void thread_prepare(thread_t *thread);
 
 #endif /* THREAD_H_ */
