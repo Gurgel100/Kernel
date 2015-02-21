@@ -75,6 +75,7 @@ void Init()
 	asm volatile("int $0x1");
 	#endif
 	//isr_Init();
+	apic_Init();
 	vfs_Init();			//VFS initialisieren
 	pci_Init();			//PCI-Treiber initialisieren
 	dmng_Init();

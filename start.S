@@ -2,6 +2,7 @@
 .code64
 .extern main
 .global _start
+.global stack
 
 _start:
 #Initialisiere Stack

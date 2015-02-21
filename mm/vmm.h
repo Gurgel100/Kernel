@@ -31,7 +31,7 @@ bool vmm_Init(uint64_t Speicher);									//Initialisiert virtuelle Speicherverw
 uintptr_t vmm_Alloc(uint64_t Size);						//Reserviert eine virtuelle Speicherst.
 void vmm_Free(uintptr_t Address, uint64_t Size);		//Gibt eine Speicherstelle frei
 
-uintptr_t vmm_SysAlloc(uintptr_t vAddress, uint64_t Length, bool Ignore);
+uintptr_t vmm_SysAlloc(uint64_t Length);
 void vmm_SysFree(uintptr_t vAddress, uint64_t Length);
 
 void *vmm_AllocDMA(void *maxAddress, size_t Size, void **Phys);

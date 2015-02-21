@@ -618,6 +618,122 @@ int jprintf_putsn(jprintf_args *args, const char *str, int num)
 	}
 }
 
+int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
+{
+	int n = 0;
+	bool minus = (x < 0) ? true : false;
+
+	//Herausfinden, wieviele Stellen vor dem Dezimalpunkt sind
+	size_t i = 0;
+	while(x >= 10)
+	{
+		i++;
+		x /= 10.0;
+	}
+
+	size_t length = i + ((x < 0 || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
+	if(x < 0) x = -x;
+
+	while(width-- > length)
+		jprintf_putc(args, lpad);
+
+	//Minuszeichen
+	if(minus)
+	{
+		jprintf_putc(args, '-');
+		n++;
+	}
+	else
+	{
+		if(sign)
+		{
+			jprintf_putc(args, '+');
+			n++;
+		}
+		else if(space_sign)
+		{
+			jprintf_putc(args, ' ');
+			n++;
+		}
+	}
+
+	//Zahlen ausgeben
+	while(i-- + prec + 1)
+	{
+		jprintf_putc(args, ((uint64_t)x % 10) + '0');
+		n++;
+		x -= (uint64_t)x;
+		x *= 10.0;
+		if(i == (uint64_t)-1)
+		{
+			if(point || prec)
+			{
+				jprintf_putc(args, '.');
+				n++;
+			}
+		}
+	}
+	return n;
+}
+
+int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
+{
+	int n = 0;
+	bool minus = (x < 0) ? true : false;
+
+	//Herausfinden, wieviele Stellen vor dem Dezimalpunkt sind
+	size_t i = 0;
+	while(x >= 10)
+	{
+		i++;
+		x /= 10.0;
+	}
+
+	size_t length = i + ((x < 0 || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
+	if(x < 0) x = -x;
+
+	while(width-- > length)
+		jprintf_putc(args, lpad);
+
+	//Minuszeichen
+	if(minus)
+	{
+		jprintf_putc(args, '-');
+		n++;
+	}
+	else
+	{
+		if(sign)
+		{
+			jprintf_putc(args, '+');
+			n++;
+		}
+		else if(space_sign)
+		{
+			jprintf_putc(args, ' ');
+			n++;
+		}
+	}
+
+	//Zahlen ausgeben
+	while(i-- + prec + 1)
+	{
+		jprintf_putc(args, ((uint64_t)x % 10) + '0');
+		n++;
+		x -= (uint64_t)x;
+		x *= 10.0;
+		if(i == (uint64_t)-1)
+		{
+			if(point || prec)
+			{
+				jprintf_putc(args, '.');
+				n++;
+			}
+		}
+	}
+	return n;
+}
+
 int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
 	uint64_t pos = 0;
@@ -866,8 +982,18 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 					}
 					break;
 					case 'f': case 'F':	//Float
-						//sputs(str, ftoa(va_arg(arg, double), buffer));
-						//pos += strlen(buffer);
+						if(!precision_spec)
+							precision = 6;
+						if(length == 0 || length == 1)
+						{
+							double value = va_arg(arg, double);
+							pos += jprintd(args, value, precision, sign, space_sign, alt, width, lpad);
+						}
+						else if(length == 6)
+						{
+							long double value = va_arg(arg, long double);
+							pos += jprintld(args, value, precision, sign, space_sign, alt, width, lpad);
+						}
 					break;
 					case 'x': case 'X':	//Hex
 					{
