@@ -151,6 +151,14 @@ void pm_BlockTask(pid_t PID)
 	if(Process != NULL)
 	{
 		Process->Status = BLOCKED;
+
+		//Alle Threads deaktivieren
+		thread_t *thread;
+		size_t i = 0;
+		while((thread = list_get(Process->threads, i++)))
+		{
+			scheduler_remove(thread);
+		}
 	}
 }
 
@@ -165,6 +173,15 @@ void pm_ActivateTask(pid_t PID)
 	if(Process != NULL)
 	{
 		Process->Status = READY;
+
+		//Alle Threads aktivieren
+		thread_t *thread;
+		size_t i = 0;
+		while((thread = list_get(Process->threads, i++)))
+		{
+			if(thread->Status != BLOCKED)
+				scheduler_add(thread);
+		}
 	}
 }
 
