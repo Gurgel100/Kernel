@@ -20,7 +20,7 @@ static pid_t nextPID;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
 process_t *currentProcess = NULL;			//Aktueller Prozess
-static process_t *idleTask;					//Handler für idle-Task
+static process_t idleProcess;				//Handler für idle-Task
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -38,31 +38,19 @@ static void idle(void)
  */
 void pm_Init()
 {
+	thread_Init();
+
 	ProcessList = list_create();
 
-	idleTask = pm_getTask(pm_InitTask(0, idle, ""));
-	thread_t *thread = list_get(idleTask->threads, 0);
+	idleProcess.threads = list_create();
+	thread_t *thread = thread_create(&idleProcess, idle);
 	thread->State->cs = 0x8;
-	thread->State->ds = thread->State->es = thread->State->ss = 0x10;
-	idleTask->PID = 0;
-	free(idleTask->cmd);
-	nextPID = 1;
-	//Als Stack nehmen wir den Kernelstack, weshalb wir hier den Stack wieder freigeben (1 Page)
-	thread->State->rsp = (uint64_t)thread->kernelStack;
-	vmm_ContextUnMap(idleTask->Context, MM_USER_STACK);
+	thread->State->ss = 0x10;
 
-	//Jetzt den Task noch aus der Prozessliste löschen
-	size_t i = 0;
-	process_t *tmp;
-	while((tmp = list_get(ProcessList, i)))
-	{
-		if(tmp == idleTask)
-		{
-			list_remove(ProcessList, i);
-			break;
-		}
-		i++;
-	}
+	//Wir verwenden den Kernelstack weiter
+	vmm_ContextUnMap(thread->process->Context, MM_USER_STACK);
+	extern uint64_t stack;
+	thread->State->rsp = (uint64_t)&stack;
 }
 
 /*
