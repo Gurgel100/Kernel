@@ -42,6 +42,8 @@ thread_t *thread_create(process_t *process, void *entry)
 
 	thread->tid = get_tid();
 
+	thread->process = process;
+
 	thread->Status = BLOCKED;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
