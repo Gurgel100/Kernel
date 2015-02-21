@@ -15,12 +15,13 @@
 #include "tss.h"
 #include "cpu.h"
 #include "thread.h"
+#include "scheduler.h"
 
 static pid_t nextPID;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
-process_t *currentProcess = NULL;			//Aktueller Prozess
-static process_t idleProcess;				//Handler für idle-Task
+extern thread_t *currentThread;
+extern process_t idleProcess;				//Handler für idle-Task
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -39,6 +40,7 @@ static void idle(void)
 void pm_Init()
 {
 	thread_Init();
+	scheduler_Init();
 
 	ProcessList = list_create();
 
@@ -124,19 +126,18 @@ void pm_DestroyTask(pid_t PID)
  */
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
 {
-	process_t *process = currentProcess;
-	//Aktueller Task blockieren
-	process->Status = BLOCKED;
-	//Jetzt wechseln wir in den idle-Task
-	currentProcess = idleTask;
-	activateContext(currentProcess->Context);
-	TSS_setStack(((thread_t*)list_get(currentProcess->threads, 0))->kernelStack);
-	cpu = currentProcess->State;
+	thread_t *thread = currentThread;
+	//Erst müssen wir den Thread wechseln
+	thread_t *newThread = scheduler_schedule();
 
-	//Jetzt können wir den Task löschen
-	pm_DestroyTask(process->PID);
+	//Jetzt müssen wir den Thread deaktivieren
+	scheduler_remove(thread);
+	thread->Status = BLOCKED;
 
-	return cpu;
+	//Jetzt löschen wir den Prozess
+	pm_DestroyTask(thread->process->PID);
+
+	return newThread->State;
 }
 
 /*
@@ -194,58 +195,10 @@ process_t *pm_getTask(pid_t PID)
  */
 ihs_t *pm_Schedule(ihs_t *cpu)
 {
-	static size_t actualProcessIndex = 0;
-
-	if(list_size(ProcessList))		//Gibt es eigentlich etwas zu schedulen?
+	thread_t *thread = scheduler_schedule();
+	if(thread != NULL)
 	{
-		if(currentProcess != NULL)	//Wenn wir noch in keinem Task sind dann müssen wir auch nichts speichern
-		{
-			process_t *newProcess;
-
-			if(currentProcess->Status == RUNNING)
-				currentProcess->Status = READY;
-
-			do
-			{
-				newProcess = list_get(ProcessList, actualProcessIndex);
-				actualProcessIndex = (actualProcessIndex + 1 < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
-			}
-			while(newProcess->Status != READY && newProcess != currentProcess);
-
-			//Es ist kein anderer Prozess bereit also gehen wir in den Idle-Task
-			if(newProcess == currentProcess && newProcess->Status != READY)
-				newProcess = idleTask;
-
-			//Jetzt alten Prozessorzustand speichern
-			currentProcess->State = cpu;
-
-			//Hier findet der eigentliche Taskswitch statt
-			currentProcess = newProcess;
-			currentProcess->Status = RUNNING;
-			activateContext(currentProcess->Context);
-			TSS_setStack(currentProcess->kernelStack);
-			cpu = currentProcess->State;
-		}
-		else
-		{
-			//Einen Task suchen, der geht
-			process_t *newProcess;
-			do
-			{
-				newProcess = list_get(ProcessList, actualProcessIndex);
-				actualProcessIndex = (actualProcessIndex + 1 < list_size(ProcessList)) ? actualProcessIndex + 1 : 0;
-			}
-			while(newProcess->Status != READY && actualProcessIndex != 0);
-			//Wenn keine erster Prozess gefunden wurde, wechseln wir auch nicht den Task
-			if(newProcess == NULL || newProcess->Status != READY)
-				return cpu;
-
-			currentProcess = newProcess;
-
-			activateContext(currentProcess->Context);
-			TSS_setStack(currentProcess->kernelStack);
-			cpu = currentProcess->State;
-		}
+		cpu = thread->State;
 	}
 	return cpu;
 }
