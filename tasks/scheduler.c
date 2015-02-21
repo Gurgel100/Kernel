@@ -51,7 +51,8 @@ void scheduler_activate()
 void scheduler_add(thread_t *thread)
 {
 	lock(&schedule_lock);
-	list_insert(scheduleList, list_size(scheduleList) - 1, thread);
+	size_t i = list_size(scheduleList);
+	list_insert(scheduleList, i ? i - 1 : 0, thread);
 	unlock(&schedule_lock);
 }
 
