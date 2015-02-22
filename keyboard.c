@@ -169,6 +169,8 @@ void keyboard_Handler(ihs_t *ihs)
 	//Zeichen in Puffer schreiben, wenn es ein ASCII-Zeichen ist
 	char Zeichen = keyboard_KeyToASCII(Key);
 	if(Zeichen != 0)
+		console_keyboardHandler(activeConsole, Zeichen);
+	/*if(Zeichen != 0)
 	{
 		Puffer_t *NewPuffer = malloc(sizeof(Puffer_t));
 		NewPuffer->Char = Zeichen;
@@ -178,7 +180,7 @@ void keyboard_Handler(ihs_t *ihs)
 		ActualPuffer = NewPuffer;
 		if(Puffer == NULL)
 			Puffer = ActualPuffer;
-	}
+	}*/
 	}
 }
 
@@ -234,14 +236,15 @@ void keyboard_SetLEDs()
 
 char getch()
 {
-	while(Puffer == NULL) asm volatile("hlt;");	//Wir halten die CPU an, bis ein IRQ von der Tastatur kommt
+	/*while(Puffer == NULL) asm volatile("hlt;");	//Wir halten die CPU an, bis ein IRQ von der Tastatur kommt
 	char Zeichen = Puffer->Char;
 	Puffer_t *OldPuffer = Puffer;
 	Puffer = Puffer->Next;
 	free(OldPuffer);
 	if(ActualPuffer == OldPuffer)
 		ActualPuffer = NULL;
-	return Zeichen;
+	return Zeichen;*/
+	return console_getch(pm_getConsole());
 }
 
 #endif

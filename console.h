@@ -11,6 +11,7 @@
 #include "stddef.h"
 #include "stdint.h"
 #include "stdbool.h"
+#include "list.h"
 
 typedef struct{
 	uint8_t x, y;
@@ -25,9 +26,12 @@ typedef struct{
 
 	char ansi_buf[16];
 	uint8_t ansi_buf_ofs;
+
+	list_t input;
 }console_t;
 
 extern console_t initConsole;
+extern console_t *activeConsole;
 
 void console_Init();
 console_t *console_create(uint8_t page);

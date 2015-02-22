@@ -40,6 +40,7 @@ console_t initConsole = {
 };
 
 static list_t consoles;
+console_t *activeConsole;
 
 static void console_scrollDown();
 
@@ -47,6 +48,8 @@ void console_Init()
 {
 	consoles = list_create();
 	list_push(consoles, &initConsole);
+	activeConsole = &initConsole;
+	initConsole.input = list_create();
 }
 
 console_t *console_create(uint8_t page)
@@ -60,6 +63,8 @@ console_t *console_create(uint8_t page)
 	//80 * 25 Zeichen
 	console->buffer = (void*)GRAFIKSPEICHER + 0x1000 * page;
 	console->color = BG_BLACK | CL_LIGHT_GREY;
+
+	console->input = list_create();
 
 	list_push(consoles, console);
 
@@ -262,6 +267,17 @@ void console_switch(uint8_t page)
 	outb(0x3D5, DISPLAY_PAGE_OFFSET(page));
 	outb(0x3D4, 12);
 	outb(0x3D5, DISPLAY_PAGE_OFFSET(page) >> 8);
+
+	console_t *console;
+	size_t i = 0;
+	while((console = list_get(consoles, i++)))
+	{
+		if(console->page == page)
+		{
+			activeConsole = console;
+			break;
+		}
+	}
 }
 
 static void console_scrollDown(console_t *console)
@@ -290,6 +306,19 @@ void console_setCursor(console_t *console, cursor_t cursor)
 	{
 		*console->cursor = cursor;
 	}
+}
+
+char console_getch(console_t *console)
+{
+	//Auf Eingabe warten
+	while(list_empty(console->input)) asm volatile("hlt");
+
+	return (char)list_remove(console->input, list_size(console->input) - 1);
+}
+
+void console_keyboardHandler(console_t *console, char c)
+{
+	list_push(console->input, (void*)c);
 }
 
 size_t console_handler_stdout(char *name, uint64_t start, size_t length, const void *buffer)
