@@ -9,11 +9,12 @@
 #define SCHEDULER_H_
 
 #include "thread.h"
+#include "cpu.h"
 
 void scheduler_Init();
 void scheduler_add(thread_t *thread);
 void scheduler_remove(thread_t *thread);
 
-thread_t *scheduler_schedule();
+thread_t *scheduler_schedule(ihs_t *state);
 
 #endif /* SCHEDULER_H_ */

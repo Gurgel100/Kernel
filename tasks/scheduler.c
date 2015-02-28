@@ -8,7 +8,6 @@
 #include "scheduler.h"
 #include "list.h"
 #include "lock.h"
-#include "cpu.h"
 #include "pm.h"
 #include "stdbool.h"
 
@@ -81,7 +80,7 @@ void scheduler_remove(thread_t *thread)
  *
  * Rückgabe:	Neuer Thread, der ausgeführt werden soll
  */
-thread_t *scheduler_schedule()
+thread_t *scheduler_schedule(ihs_t *state)
 {
 	static size_t actualThreadIndex = 0;
 	thread_t *newThread;
@@ -91,19 +90,20 @@ thread_t *scheduler_schedule()
 
 	lock(&schedule_lock);
 
+	if(currentThread != NULL)
+	{
+		currentThread->Status = READY;
+		currentThread->State = state;
+	}
+
 	if(list_size(scheduleList))		//Gibt es eigentlich etwas zu schedulen?
 	{
-		if(currentThread != NULL)
-			currentThread->Status = READY;
 
 		newThread = list_get(scheduleList, actualThreadIndex);
 		actualThreadIndex = (actualThreadIndex + 1 < list_size(scheduleList)) ? actualThreadIndex + 1 : 0;
 	}
 	else
 	{
-		if(currentThread != NULL)
-			currentThread->Status = READY;
-
 		newThread = list_get(idleProcess.threads, 0);
 	}
 

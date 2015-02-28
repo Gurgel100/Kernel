@@ -152,7 +152,7 @@ ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
 {
 	thread_t *thread = currentThread;
 	//Erst müssen wir den Thread wechseln
-	thread_t *newThread = scheduler_schedule();
+	thread_t *newThread = scheduler_schedule(cpu);
 
 	//Jetzt müssen wir den Thread deaktivieren
 	scheduler_remove(thread);
@@ -267,7 +267,7 @@ console_t *pm_getConsole()
  */
 ihs_t *pm_Schedule(ihs_t *cpu)
 {
-	thread_t *thread = scheduler_schedule();
+	thread_t *thread = scheduler_schedule(cpu);
 	if(thread != NULL)
 	{
 		cpu = thread->State;
