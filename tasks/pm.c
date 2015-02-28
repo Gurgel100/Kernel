@@ -22,6 +22,7 @@ static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
 extern thread_t *currentThread;
 extern process_t idleProcess;				//Handler für idle-Task
+extern list_t threadList;
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -53,6 +54,18 @@ void pm_Init()
 	vmm_ContextUnMap(thread->process->Context, MM_USER_STACK);
 	extern uint64_t stack;
 	thread->State->rsp = (uint64_t)&stack;
+
+	size_t i = 0;
+	thread_t *t;
+	while((t = list_get(threadList, i)))
+	{
+		if(t == thread)
+		{
+			list_remove(threadList, i);
+			break;
+		}
+		i++;
+	}
 }
 
 /*
