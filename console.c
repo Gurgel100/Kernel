@@ -401,12 +401,10 @@ static size_t console_writeHandler(console_t *console, uint64_t start, size_t le
 {
 	size_t size = 0;
 	char *str = (char*)buffer;
-	if(console != NULL)
+	while(length-- && *str != '\0')
 	{
-		while(length-- && *str != '\0')
-		{
-			console_ansi_write(console, *str++);
-		}
+		console_ansi_write(console, *str++);
+		size++;
 	}
 	return size;
 }
