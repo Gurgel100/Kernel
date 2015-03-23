@@ -14,6 +14,7 @@
 #include "lists.h"
 #include "vfs.h"
 #include "stdio.h"
+#include "stdlib.h"
 
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
 
