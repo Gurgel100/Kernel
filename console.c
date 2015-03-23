@@ -12,6 +12,7 @@
 #include "string.h"
 #include "util.h"
 #include "vfs.h"
+#include "stdio.h"
 
 #define GRAFIKSPEICHER	0xB8000
 #define MAX_PAGES		8
@@ -21,6 +22,8 @@
 #define SIZE_PER_ROW	(COLS * SIZE_PER_CHAR)
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
+
+#define CONSOLE_NUM		20
 
 #define ASCII_ESC		'\e'
 
@@ -44,10 +47,9 @@ static list_t consoles;
 console_t *activeConsole;
 
 static void console_scrollDown();
-static size_t console_readHandler(console_t *data, uint64_t start, size_t length, const void *buffer);
-static size_t console_writeHandler(console_t *data, uint64_t start, size_t length, const void *buffer);
-static void *console_stdin_getValue(void *data, vfs_device_function_t function);
-static void *console_stdout_getValue(void *data, vfs_device_function_t function);
+static size_t console_readHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
+static size_t console_writeHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
+static void *console_getValue(console_t *console, vfs_device_function_t function);
 
 void console_Init()
 {
@@ -55,33 +57,90 @@ void console_Init()
 	list_push(consoles, &initConsole);
 	activeConsole = &initConsole;
 	initConsole.input = list_create();
-	vfs_device_t *stdin = malloc(sizeof(vfs_device_t));
-	stdin->read = console_readHandler;
-	stdin->write = NULL;
-	stdin->getValue = console_stdin_getValue;
-	stdin->opaque = &initConsole;
-	vfs_RegisterDevice(stdin);
-	vfs_device_t *stdout = malloc(sizeof(vfs_device_t));
-	stdout->read = NULL;
-	stdout->write = console_writeHandler;
-	stdout->getValue = console_stdout_getValue;
-	stdout->opaque = &initConsole;
-	vfs_RegisterDevice(stdout);
+
+	//stdin
+	console_t *stdin = console_create("stdin", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
+	vfs_device_t *dev = malloc(sizeof(vfs_device_t));
+	dev->read = console_readHandler;
+	dev->write = console_writeHandler;
+	dev->getValue = console_getValue;
+	dev->opaque = stdin;
+	vfs_RegisterDevice(dev);
+
+	//stdout
+	console_t *stdout = console_create("stdout", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
+	dev = malloc(sizeof(vfs_device_t));
+	dev->read = console_readHandler;
+	dev->write = console_writeHandler;
+	dev->getValue = console_getValue;
+	dev->opaque = stdout;
+	vfs_RegisterDevice(dev);
+
+	//stderr
+	console_t *stderr = console_create("stderr", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
+	dev = malloc(sizeof(vfs_device_t));
+	dev->read = console_readHandler;
+	dev->write = console_writeHandler;
+	dev->getValue = console_getValue;
+	dev->opaque = stderr;
+	vfs_RegisterDevice(dev);
+
+	//Alle Konsolen anlegen
+	uint64_t i;
+	for(i = 1; i <= CONSOLE_NUM; i++)
+	{
+		char *name;
+		asprintf(&name, "tty%02u", i);
+		console_t *console = console_create(name, COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
+		free(name);
+
+		vfs_device_t *tty = malloc(sizeof(vfs_device_t));
+		tty->opaque = console;
+		tty->read = console_readHandler;
+		tty->write = console_writeHandler;
+		tty->getValue = console_getValue;
+		vfs_RegisterDevice(tty);
+	}
 }
 
-console_t *console_create(uint8_t page)
+/*
+ * Erstellt eine neue Konsole.
+ * Paramater:	name = Name der Konsole
+ * 				width = Breite der Konsole
+ * 				height = Höhe der Konsole
+ * 				color = Farbwerte der Konsole
+ * Rückgabe:	Neue Konsole oder NULL bei Fehler
+ */
+console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t color)
 {
 	console_t *console = calloc(sizeof(console_t), 1);
+	if(console == NULL)
+		return NULL;
 
-	page %= MAX_PAGES;
+	console->name = strdup(name);
+	if(console->name == NULL)
+	{
+		free(console);
+		return NULL;
+	}
 
-	console->page = page;
-
-	//80 * 25 Zeichen
-	console->buffer = (void*)GRAFIKSPEICHER + 0x1000 * page;
-	console->color = BG_BLACK | CL_LIGHT_GREY;
+	console->buffer = calloc(height, width * 2);
+	if(console->buffer == NULL)
+	{
+		free(console->name);
+		free(console);
+		return NULL;
+	}
+	console->color = color;
 
 	console->input = list_create();
+	if(console->input == NULL)
+	{
+		free(console->name);
+		free(console->buffer);
+		free(console);
+		return NULL;
+	}
 
 	list_push(consoles, console);
 
@@ -94,9 +153,9 @@ console_t *console_createChild(console_t *parent)
 	uint8_t page = 0;
 	if(parent != NULL)
 		page = parent->page;
-	console = console_create(page);
+	/*console = console_create(page);
 	console->cursor = parent->cursor;
-	console->color = parent->color;
+	console->color = parent->color;*/
 	return console;
 }
 
@@ -366,31 +425,14 @@ static size_t console_readHandler(console_t *console, uint64_t start, size_t len
 	return size;
 }
 
-static void *console_stdin_getValue(void *data, vfs_device_function_t function)
+static void *console_getValue(console_t *console, vfs_device_function_t function)
 {
-	switch(function)
+	switch (function)
 	{
 		case FUNC_TYPE:
 			return VFS_DEVICE_VIRTUAL;
-			break;
 		case FUNC_NAME:
-			return "stdin";
-			break;
-		default:
-			return NULL;
-	}
-}
-
-static void *console_stdout_getValue(void *data, vfs_device_function_t function)
-{
-	switch(function)
-	{
-		case FUNC_TYPE:
-			return VFS_DEVICE_VIRTUAL;
-			break;
-		case FUNC_NAME:
-			return "stdout";
-			break;
+			return console->name;
 		default:
 			return NULL;
 	}

@@ -19,8 +19,10 @@ typedef struct{
 
 typedef struct{
 	uint8_t page;
+	char *name;
 
 	void *buffer;
+	uint16_t height, width;
 	uint8_t color;
 	cursor_t *cursor;
 
@@ -34,7 +36,7 @@ extern console_t initConsole;
 extern console_t *activeConsole;
 
 void console_Init();
-console_t *console_create(uint8_t page);
+console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t color);
 console_t *console_createChild(console_t *parent);
 void console_ansi_write(console_t *console, char c);
 void console_write(console_t *console, char c);
