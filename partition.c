@@ -13,9 +13,47 @@
 #include "fs.h"
 #include "lists.h"
 #include "vfs.h"
+#include "stdio.h"
+
+#define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
 
 struct cdi_fs_filesystem *getFilesystem(partition_t *part);
 struct cdi_fs_driver *getFSDriver(const char *name);
+
+/*
+ * Liest Daten von einer Partition
+ */
+static size_t partition_Read(partition_t *part, uint64_t start, size_t size, const void *buffer)
+{
+	uint64_t corrected_start = MIN(start, part->size);
+	return dmng_Read(part->dev, part->lbaStart + corrected_start, MIN(part->size - corrected_start, size), buffer);
+}
+
+/*
+ * Schreibt Daten auf eine Partition
+ */
+static size_t partition_Write(partition_t *part, uint64_t start, size_t size, const void *buffer)
+{
+	return 0;
+}
+
+/*
+ * Gibt bestimmte Werte zurück, welche vom VFS verwendet werden
+ */
+static void *partition_getValue(partition_t *part, vfs_device_function_t function)
+{
+	switch(function)
+	{
+		case FUNC_TYPE:
+			return VFS_DEVICE_PARTITION;
+		case FUNC_NAME:
+			return part->name;
+		case FUNC_DATA:
+			return part->fs;
+		default:
+			return NULL;
+	}
+}
 
 /*
  * Liest die Partitionstabelle aus.
@@ -44,12 +82,21 @@ int partition_getPartitions(device_t *dev)
 		{
 			partition_t *part = malloc(sizeof(partition_t));
 			part->id = i + 1;
+			asprintf(&part->name, "%s_%hhu", dev->device->name, i);
 			part->lbaStart = ptable->entry[i].firstLBA;
 			part->size = ptable->entry[i].Length;
 			part->type = ptable->entry[i].Type;
-			part->dev = dev->device;
+			part->dev = dev;
 			part->fs = getFilesystem(part);
 			list_push(dev->partitions, part);
+
+			//Partition beim VFS anmelden
+			vfs_device_t* vfs_dev = malloc(sizeof(vfs_device_t));
+			vfs_dev->read = partition_Read;
+			vfs_dev->write = partition_Write;
+			vfs_dev->getValue = partition_getValue;
+			vfs_dev->opaque = part;
+			vfs_RegisterDevice(vfs_dev);
 		}
 	}
 	return 0;
@@ -76,7 +123,7 @@ struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 					.write = true
 			};
 			char *path;
-			asprintf(&path, "dev/%s", part->dev->name);
+			asprintf(&path, "dev/%s", part->dev->device->name);
 			fs->osdep.fp = vfs_Open(path, mode);
 			free(path);
 			//asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);

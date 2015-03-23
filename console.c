@@ -11,6 +11,7 @@
 #include "display.h"
 #include "string.h"
 #include "util.h"
+#include "vfs.h"
 
 #define GRAFIKSPEICHER	0xB8000
 #define MAX_PAGES		8
@@ -43,6 +44,10 @@ static list_t consoles;
 console_t *activeConsole;
 
 static void console_scrollDown();
+static size_t console_readHandler(void *data, uint64_t start, size_t length, const void *buffer);
+static size_t console_writeHandler(void *data, uint64_t start, size_t length, const void *buffer);
+static void *console_stdin_getValue(void *data, vfs_device_function_t function);
+static void *console_stdout_getValue(void *data, vfs_device_function_t function);
 
 void console_Init()
 {
@@ -50,6 +55,18 @@ void console_Init()
 	list_push(consoles, &initConsole);
 	activeConsole = &initConsole;
 	initConsole.input = list_create();
+	vfs_device_t *stdin = malloc(sizeof(vfs_device_t));
+	stdin->read = console_readHandler;
+	stdin->write = NULL;
+	stdin->getValue = console_stdin_getValue;
+	stdin->opaque = NULL;
+	vfs_RegisterDevice(stdin);
+	vfs_device_t *stdout = malloc(sizeof(vfs_device_t));
+	stdout->read = NULL;
+	stdout->write = console_writeHandler;
+	stdout->getValue = console_stdout_getValue;
+	stdout->opaque = NULL;
+	vfs_RegisterDevice(stdout);
 }
 
 console_t *console_create(uint8_t page)
@@ -321,7 +338,7 @@ void console_keyboardHandler(console_t *console, char c)
 	list_push(console->input, (void*)c);
 }
 
-size_t console_handler_stdout(char *name, uint64_t start, size_t length, const void *buffer)
+static size_t console_writeHandler(void *data, uint64_t start, size_t length, const void *buffer)
 {
 	size_t size = 0;
 	console_t *console = pm_getConsole();
@@ -336,7 +353,7 @@ size_t console_handler_stdout(char *name, uint64_t start, size_t length, const v
 	return size;
 }
 
-size_t console_handler_stdin(char *name, uint64_t start, size_t length, const void *buffer)
+static size_t console_readHandler(void *data, uint64_t start, size_t length, const void *buffer)
 {
 	size_t size = 0;
 	char *buf = buffer;
@@ -348,4 +365,34 @@ size_t console_handler_stdin(char *name, uint64_t start, size_t length, const vo
 	}
 
 	return size;
+}
+
+static void *console_stdin_getValue(void *data, vfs_device_function_t function)
+{
+	switch(function)
+	{
+		case FUNC_TYPE:
+			return VFS_DEVICE_VIRTUAL;
+			break;
+		case FUNC_NAME:
+			return "stdin";
+			break;
+		default:
+			return NULL;
+	}
+}
+
+static void *console_stdout_getValue(void *data, vfs_device_function_t function)
+{
+	switch(function)
+	{
+		case FUNC_TYPE:
+			return VFS_DEVICE_VIRTUAL;
+			break;
+		case FUNC_NAME:
+			return "stdout";
+			break;
+		default:
+			return NULL;
+	}
 }

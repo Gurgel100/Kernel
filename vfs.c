@@ -95,33 +95,6 @@ void vfs_Init(void)
 	Node->Name = "mount";
 	Node->Type = TYPE_DIR;
 
-	//Unterordner "dev" füllen
-	Node = getNode("/dev");
-	if(Node != NULL)
-	{
-		Node->Child = malloc(sizeof(vfs_node_t));
-		Node->Child->Parent = Node;
-		Node = Node->Child;
-		Node->Name = "stdout";
-		Node->Type = TYPE_FILE;
-		Node->Handler = Display_FileHandler;
-
-		Node->Next = malloc(sizeof(vfs_node_t));
-		Node->Next->Parent = Node->Parent;
-		Node = Node->Next;
-		Node->Name = "stdin";
-		Node->Type = TYPE_FILE;
-		Node->Handler = NULL;
-
-		Node->Next = malloc(sizeof(vfs_node_t));
-		Node->Next->Parent = Node->Parent;
-		Node = Node->Next;
-		Node->Name = "stderr";
-		Node->Type = TYPE_FILE;
-		Node->Handler = Display_FileHandler;
-		Node->Next = NULL;
-	}
-
 	lastNode = Node;
 }
 
@@ -144,7 +117,7 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 	switch(node->Type)
 	{
 		case TYPE_MOUNT:
-			stream->stream.fs = node->partition->fs;
+			stream->stream.fs = node->fs;
 			stream->stream.res = getRes(&stream->stream, remPath);
 			if(stream->stream.res == NULL)
 			{
@@ -220,7 +193,8 @@ size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void 
 	switch(node->Type)
 	{
 		case TYPE_DEV:
-			sizeRead = dmng_Read(stream->node->dev, start, length, buffer);
+			if(stream->node->dev->read != NULL)
+				sizeRead = stream->node->dev->read(stream->node->dev->opaque, start, length, buffer);
 		break;
 		case TYPE_MOUNT:
 			if(stream->stream.res->flags.read)
@@ -246,7 +220,8 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
 	switch(node->Type)
 	{
 		case TYPE_DEV:
-			sizeWritten = dmng_Read(stream->node->dev, start, length, buffer);
+			if(stream->node->dev->write != NULL)
+				sizeWritten = stream->node->dev->write(stream->node->dev->opaque, start, length, buffer);
 		break;
 		case TYPE_MOUNT:
 			//Überprüfen, ob auf das Dateisystem geschrieben werden darf
@@ -292,7 +267,7 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
 			child->Child = data;
 		break;
 		case TYPE_MOUNT:
-			child->partition = data;
+			child->fs = data;
 		break;
 	}
 
@@ -356,27 +331,23 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if(devNode->Type != TYPE_DEV)
 		return 3;
 
-	device_t *device = devNode->dev;
+	if(devNode->dev->getValue == NULL || strcmp(VFS_DEVICE_PARTITION, (char*)devNode->dev->getValue(devNode->dev->opaque, FUNC_TYPE)) != 0)
+		return 7;
 
-	//Jede Partition durchgehen
-	partition_t *part;
-	size_t i = 0;
-	while((part = list_get(device->partitions, i)))
-	{
-		i++;
-		vfs_node_t *new = calloc(1, sizeof(vfs_node_t));
-		asprintf(&new->Name, "%u", nextPartID++);
-		new->Type = TYPE_MOUNT;
-		new->Parent = mount;
-		new->Next = mount->Child;
-		mount->Child = new;
-		new->partition = part;
-		//Dateisystem initialisieren
-		if(!part->fs->driver->fs_init(part->fs))
-			return 1;
-	}
-	if(!i)
-		return 1;
+	struct cdi_fs_filesystem *fs = devNode->dev->getValue(devNode->dev->opaque, FUNC_DATA);
+	if(fs == NULL)
+		return 5;
+
+	vfs_node_t *new = calloc(1, sizeof(vfs_node_t));
+	asprintf(&new->Name, "%u", nextPartID++);
+	new->Type = TYPE_MOUNT;
+	new->Parent = mount;
+	new->Next = mount->Child;
+	mount->Child = new;
+	new->fs = fs;
+	//Dateisystem initialisieren
+	if(!fs->driver->fs_init(fs))
+		return 4;
 
 	return 0;
 }
@@ -400,7 +371,7 @@ int vfs_Unmount(const char *Mount)
 		parentNode->Child->Next = mount->Next;
 
 	//FS deinitialisieren
-	mount->partition->fs->driver->fs_destroy(mount->partition->fs);
+	mount->fs->driver->fs_destroy(mount->fs);
 
 	free(mount->Name);
 	free(mount);
@@ -585,7 +556,7 @@ vfs_node_t *getNode(const char *Path)
  * Registriert ein Gerät. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
  * Parameter:	dev = Gerätestruktur
  */
-void vfs_RegisterDevice(device_t *dev)
+void vfs_RegisterDevice(vfs_device_t *dev)
 {
 	const char *Path = "/dev";	//Pfad zu den Gerätendateien
 	vfs_node_t *Node, *tmp;
@@ -599,7 +570,7 @@ void vfs_RegisterDevice(device_t *dev)
 	Node->dev = dev;
 	Node->Next = tmp->Child;
 	tmp->Child = Node;
-	Node->Name = dev->device->name;
+	Node->Name = strdup(dev->getValue(dev->opaque, FUNC_NAME));
 	Node->Parent = tmp;
 	printf("Eingehaengt in: /dev/%s\n", Node->Name);
 }

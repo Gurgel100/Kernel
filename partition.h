@@ -45,7 +45,8 @@ typedef struct{
 
 typedef struct{
 	uint64_t id;
-	struct cdi_device *dev;
+	char *name;
+	device_t *dev;
 	struct cdi_fs_filesystem *fs;
 	size_t lbaStart;
 	size_t size;

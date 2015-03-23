@@ -43,7 +43,4 @@ void console_switch(uint8_t page);
 void console_changeColor(console_t *console, uint8_t color);
 void console_setCursor(console_t *console, cursor_t cursor);
 
-size_t console_handler_stdout(char *name, uint64_t start, size_t length, const void *buffer);
-size_t console_handler_stdin(char *name, uint64_t start, size_t length, const void *buffer);
-
 #endif /* CONSOLE_H_ */

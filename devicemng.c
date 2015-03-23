@@ -29,7 +29,13 @@ void dmng_registerDevice(struct cdi_device *dev)
 	device->partitions = list_create();
 	device->device = dev;
 
-	vfs_RegisterDevice(device);
+	vfs_device_t *vfs_dev = malloc(sizeof(vfs_device_t));
+	vfs_dev->opaque = device;
+	vfs_dev->read = dmng_Read;
+	vfs_dev->write = NULL;
+	vfs_dev->getValue = dmng_getValue;
+
+	vfs_RegisterDevice(vfs_dev);
 
 	partition_getPartitions(device);
 
@@ -44,7 +50,7 @@ void dmng_registerDevice(struct cdi_device *dev)
  * 				buffer = Buffer in den die Daten geschrieben werden sollen
  * Rückgabe:	0 bei Fehler und sonst die gelesenen Bytes
  */
-size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
+size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
 {
 	if(size == 0 || buffer == NULL) return 0;
 
@@ -99,6 +105,19 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
 		return 0;
 
 	return size;
+}
+
+void *dmng_getValue(device_t *dev, vfs_device_function_t function)
+{
+	switch(function)
+	{
+		case FUNC_TYPE:
+			return VFS_DEVICE_STORAGE;
+		case FUNC_NAME:
+			return dev->device->name;
+		default:
+			return NULL;
+	}
 }
 
 #endif

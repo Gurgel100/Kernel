@@ -14,6 +14,7 @@
 #include "list.h"
 #include "stdint.h"
 #include "stddef.h"
+#include "vfs.h"
 
 typedef struct{
 	struct cdi_device *device;
@@ -22,7 +23,9 @@ typedef struct{
 
 void dmng_Init(void);
 void dmng_registerDevice(struct cdi_device *dev);
-size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer);
+size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer);
+
+void *dmng_getValue(device_t *dev, vfs_device_function_t function);
 
 #endif /* DEVICEMNG_H_ */
 

@@ -13,11 +13,13 @@
 #include "cdi/fs.h"
 #include "cdi.h"
 #include "stdbool.h"
-#include "devicemng.h"
-#include "partition.h"
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
+
+#define VFS_DEVICE_STORAGE		"STORAGE"
+#define VFS_DEVICE_PARTITION	"PARTITION"
+#define VFS_DEVICE_VIRTUAL		"VIRTUAL"
 
 #ifndef EOF
 #define EOF -1
@@ -29,6 +31,26 @@ typedef enum{
 	TYPE_DIR, TYPE_FILE, TYPE_MOUNT, TYPE_LINK, TYPE_DEV
 }vfs_node_type_t;
 
+/*
+ * FUNC_TYPE:	Gibt den Typ des Gerätes zurück
+ * FUNC_NAME:	Gibt den Namen des Gerätes zurück
+ * FUNC_DATA:	Gibt Gerätespezifische Daten zurück
+ * 		DEVICE_PARTITION:	Gibt Dateisystem zurück
+ */
+typedef enum{
+	FUNC_TYPE, FUNC_NAME, FUNC_DATA
+}vfs_device_function_t;
+
+typedef struct{
+	//Functionen zum Lesen und Schreiben
+	size_t (*read)(void *opaque, uint64_t start, size_t size, const void *buffer);
+	size_t (*write)(void *opaque, uint64_t start, size_t size, const void *buffer);
+
+	//Hiermit können verschiedene Werte ausgelesen werden
+	void *(*getValue)(void *opaque, vfs_device_function_t function);
+	void *opaque;
+}vfs_device_t;
+
 typedef struct vfs_node{
 		char *Name;
 		vfs_node_type_t Type;
@@ -36,8 +58,8 @@ typedef struct vfs_node{
 		struct vfs_node *Child;	//Ungültig wenn kein TYPE_DIR oder TYPE_MOUNT. Bei TYPE_LINK -> Link zum Verknüpften Element
 		struct vfs_node *Next;
 		union{
-			partition_t *partition;
-			device_t *dev;
+			vfs_device_t *dev;			//TYPE_DEVICE
+			struct cdi_fs_filesystem *fs;	//TYPE_MOUNT
 			size_t (*Handler)(char *name, uint64_t start, size_t length, const void *buffer);
 		};
 }vfs_node_t;
@@ -84,12 +106,12 @@ int vfs_UnmountRoot(void);
  * Gerät anmelden
  * Parameter:	dev = CDI-Gerät
  */
-void vfs_RegisterDevice(device_t *dev);
+void vfs_RegisterDevice(vfs_device_t *dev);
 
 /*
  * Gerät abmelden
  */
-void vfs_UnregisterDevice(device_t *dev);
+void vfs_UnregisterDevice(vfs_device_t *dev);
 
 #endif /* VFS_H_ */
 
