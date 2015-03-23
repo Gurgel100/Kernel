@@ -97,7 +97,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 		newProcess->console = console_create(++actualPage);
 	else
 	{
-		context_t *c = &initConsole;
+		console_t *c = &initConsole;
 		if(parent)
 			c = pm_getTask(parent)->console;
 		newProcess->console = console_createChild(c);
