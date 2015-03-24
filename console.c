@@ -15,7 +15,7 @@
 #include "stdio.h"
 
 #define GRAFIKSPEICHER	0xB8000
-#define MAX_PAGES		8
+#define MAX_PAGES		12
 #define ROWS			25
 #define COLS			80
 #define SIZE_PER_CHAR	2
@@ -45,6 +45,20 @@ console_t initConsole = {
 
 static list_t consoles;
 console_t *activeConsole;
+static char *pages[12] = {
+		"tty01",
+		"tty02",
+		"tty03",
+		"tty04",
+		"tty05",
+		"tty06",
+		"tty07",
+		"tty08",
+		"tty09",
+		"tty10",
+		"tty11",
+		"tty12"
+};
 
 static void console_scrollDown();
 static size_t console_readHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
@@ -142,6 +156,16 @@ console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t c
 		return NULL;
 	}
 
+	console->cursor = calloc(1, sizeof(cursor_t));
+	if(console->cursor == NULL)
+	{
+		list_destroy(console->input);
+		free(console->name);
+		free(console->buffer);
+		free(console);
+		return NULL;
+	}
+
 	list_push(consoles, console);
 
 	return console;
@@ -149,14 +173,16 @@ console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t c
 
 console_t *console_createChild(console_t *parent)
 {
-	console_t *console;
-	uint8_t page = 0;
 	if(parent != NULL)
-		page = parent->page;
-	/*console = console_create(page);
-	console->cursor = parent->cursor;
-	console->color = parent->color;*/
-	return console;
+	{
+		console_t *console = console_create(parent->name, parent->width, parent->height, parent->color);
+		free(console->buffer);
+		console->buffer = parent->buffer;
+		free(console->cursor);
+		console->cursor = parent->cursor;
+		return console;
+	}
+	return NULL;
 }
 
 static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
@@ -338,19 +364,16 @@ void console_clear(console_t *console)
 void console_switch(uint8_t page)
 {
 	page = page % MAX_PAGES;
-	//Anstatt rumzukopieren wechseln wir einfach die Adresse
-	outb(0x3D4, 13);
-	outb(0x3D5, DISPLAY_PAGE_OFFSET(page));
-	outb(0x3D4, 12);
-	outb(0x3D5, DISPLAY_PAGE_OFFSET(page) >> 8);
 
 	console_t *console;
 	size_t i = 0;
 	while((console = list_get(consoles, i++)))
 	{
-		if(console->page == page)
+		if(strcmp(console->name, pages[page]) == 0)
 		{
 			activeConsole = console;
+			//Buffer reinkopieren
+			memcpy(GRAFIKSPEICHER, console->buffer, PAGE_SIZE);
 			break;
 		}
 	}
