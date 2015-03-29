@@ -92,16 +92,18 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 
 	newProcess->Context = createContext();
 
-	static uint8_t actualPage = 0;
-	if(newConsole)
-		newProcess->console = console_create(++actualPage);
+	if(newConsole || !parent)
+	{
+		static uint64_t nextConsole = 1;
+		char tmp[5];
+		sprintf(tmp, "tty%2u", nextConsole++);
+		newProcess->console = console_getByName(tmp);
+	}
 	else
 	{
-		console_t *c = &initConsole;
-		if(parent)
-			c = pm_getTask(parent)->console;
-		newProcess->console = console_createChild(c);
+		newProcess->console = pm_getTask(parent)->console;
 	}
+	console_switch(newProcess->console->id);
 
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
@@ -235,7 +237,7 @@ console_t *pm_getConsole()
 {
 	if(currentProcess)
 	{
-		if(currentProcess->console == NULL)
+		/*if(currentProcess->console == NULL)
 		{
 			//Neue Konsole anlegen
 			if(currentProcess->PPID > 0)
@@ -254,7 +256,7 @@ console_t *pm_getConsole()
 			{
 				currentProcess->console = console_createChild(&initConsole);
 			}
-		}
+		}*/
 		return currentProcess->console;
 	}
 	return &initConsole;

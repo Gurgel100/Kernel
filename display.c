@@ -29,6 +29,11 @@ void Display_Init()
 	outb(0x3D8, Register);*/
 }
 
+void display_refresh()
+{
+	memcpy(GRAFIKSPEICHER, activeConsole->buffer, activeConsole->width * activeConsole->height * sizeof(uint16_t));
+}
+
 void setColor(uint8_t Color)
 {
 	console_changeColor(pm_getConsole(), Color);

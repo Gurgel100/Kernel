@@ -44,6 +44,7 @@
 extern uint8_t Spalte, Zeile;
 
 void Display_Init(void);
+void display_refresh();
 void setColor(uint8_t Color);
 void putch(unsigned char c);
 void scrollScreenDown(void);

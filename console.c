@@ -31,20 +31,17 @@ typedef enum{
 	INVALID, NEED_MORE, SUCCESS
 }esc_seq_status_t;
 
-static cursor_t initCursor = {
-	.x = 0,
-	.y = 0
-};
-
 console_t initConsole = {
-	.page = 0,
 	.buffer = (void*)GRAFIKSPEICHER,
 	.color = BG_BLACK | CL_WHITE,
-	.cursor = &initCursor
+	.flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL,
+	.height = ROWS,
+	.width = COLS
 };
 
 static list_t consoles;
-console_t *activeConsole;
+static size_t nextID = 1;
+console_t *activeConsole = &initConsole;
 static char *pages[12] = {
 		"tty01",
 		"tty02",
@@ -73,7 +70,7 @@ void console_Init()
 	initConsole.input = list_create();
 
 	//stdin
-	console_t *stdin = console_create("stdin", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
+	/*console_t *stdin = console_create("stdin", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
 	vfs_device_t *dev = malloc(sizeof(vfs_device_t));
 	dev->read = console_readHandler;
 	dev->write = console_writeHandler;
@@ -97,7 +94,7 @@ void console_Init()
 	dev->write = console_writeHandler;
 	dev->getValue = console_getValue;
 	dev->opaque = stderr;
-	vfs_RegisterDevice(dev);
+	vfs_RegisterDevice(dev);*/
 
 	//Alle Konsolen anlegen
 	uint64_t i;
@@ -105,7 +102,7 @@ void console_Init()
 	{
 		char *name;
 		asprintf(&name, "tty%02u", i);
-		console_t *console = console_create(name, COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
+		console_t *console = console_create(name, BG_BLACK | CL_LIGHT_GREY);
 		free(name);
 
 		vfs_device_t *tty = malloc(sizeof(vfs_device_t));
@@ -125,7 +122,7 @@ void console_Init()
  * 				color = Farbwerte der Konsole
  * Rückgabe:	Neue Konsole oder NULL bei Fehler
  */
-console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t color)
+console_t *console_create(char *name, uint8_t color)
 {
 	console_t *console = calloc(sizeof(console_t), 1);
 	if(console == NULL)
@@ -138,7 +135,7 @@ console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t c
 		return NULL;
 	}
 
-	console->buffer = calloc(height, width * 2);
+	console->buffer = calloc(SIZE_PER_ROW, ROWS);
 	if(console->buffer == NULL)
 	{
 		free(console->name);
@@ -156,33 +153,29 @@ console_t *console_create(char *name, uint16_t width, uint16_t height, uint8_t c
 		return NULL;
 	}
 
-	console->cursor = calloc(1, sizeof(cursor_t));
-	if(console->cursor == NULL)
-	{
-		list_destroy(console->input);
-		free(console->name);
-		free(console->buffer);
-		free(console);
-		return NULL;
-	}
+	console->flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL;
+	console->height = ROWS;
+	console->width = COLS;
+	console->id = nextID++;
+	unlock(&console->lock);
 
 	list_push(consoles, console);
 
 	return console;
 }
 
-console_t *console_createChild(console_t *parent)
+console_t *console_getByName(char *name)
 {
-	if(parent != NULL)
+	console_t *console;
+
+	size_t i = 0;
+	while((console = list_get(consoles, i++)))
 	{
-		console_t *console = console_create(parent->name, parent->width, parent->height, parent->color);
-		free(console->buffer);
-		console->buffer = parent->buffer;
-		free(console->cursor);
-		console->cursor = parent->cursor;
-		return console;
+		if(strcmp(name, console->name) == 0)
+			break;
 	}
-	return NULL;
+
+	return console;
 }
 
 static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
@@ -198,7 +191,7 @@ static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
 			console->color = (console->color & 0xF0) | colors[n - 30];
 		break;
 		case 40 ... 47:
-		console->color = (console->color & 0x0F) | (colors[n - 40] << 4);
+			console->color = (console->color & 0x0F) | (colors[n - 40] << 4);
 		break;
 		default:
 			return INVALID;
@@ -277,6 +270,7 @@ void console_ansi_write(console_t *console, char c)
 {
 	if(console != NULL)
 	{
+		lock(&console->lock);
 		if(c == ASCII_ESC || console->ansi_buf_ofs > 0)
 		{
 			uint8_t i;
@@ -302,6 +296,7 @@ void console_ansi_write(console_t *console, char c)
 		{
 			console_write(console, c);
 		}
+		unlock(&console->lock);
 	}
 }
 
@@ -314,42 +309,45 @@ void console_write(console_t *console, char c)
 		switch(c)
 		{
 			case '\n':
-				console->cursor->y++;
-				if(console->cursor->y > 24)
+				console->cursor.y++;
+				if(console->cursor.y > 24)
 				{
 					console_scrollDown(console);
-					console->cursor->y = 24;
+					console->cursor.y = 24;
 				}
 				//bei '\n' soll auch an den Anfang der Zeile gesprungen werden.
 				/* no break */
 			case '\r':
-				console->cursor->x = 0;
+				console->cursor.x = 0;
 			break;
 			case '\b':
-				if(console->cursor->x == 0)
+				if(console->cursor.x == 0)
 				{
-					console->cursor->x = 79;
-					console->cursor->y -= (console->cursor->y == 0) ? 0 : 1;
+					console->cursor.x = 79;
+					console->cursor.y -= (console->cursor.y == 0) ? 0 : 1;
 				}
 				else
-					console->cursor->x--;
-				gs[console->cursor->y * COLS + console->cursor->x] = ' ';	//Das vorhandene Zeichen "löschen"
+					console->cursor.x--;
+				gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
 			break;
 			default:
 				//Zeichen in den Grafikspeicher kopieren
-				gs[console->cursor->y * COLS + console->cursor->x] = (c | (Farbwert << 8));
-				if(++console->cursor->x > 79)
+				gs[console->cursor.y * COLS + console->cursor.x] = (c | (Farbwert << 8));
+				if(++console->cursor.x > 79)
 				{
-					console->cursor->x = 0;
-					if(++console->cursor->y > 24)
+					console->cursor.x = 0;
+					if(++console->cursor.y > 24)
 					{
 						console_scrollDown(console);
-						console->cursor->y = 24;
+						console->cursor.y = 24;
 					}
 				}
 			break;
 		}
-		setCursor(console->cursor->x, console->cursor->y);
+		setCursor(console->cursor.x, console->cursor.y);
+
+		if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+			display_refresh();
 	}
 }
 
@@ -357,25 +355,32 @@ void console_clear(console_t *console)
 {
 	if(console != NULL)
 	{
+		lock(&console->lock);
 		memset(console->buffer, 0, PAGE_SIZE);
+		unlock(&console->lock);
+	}
+	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh();
+}
+
+void displayConsole(console_t *console)
+{
+	if(console != NULL)
+	{
+		activeConsole = console;
+		if(console->flags & CONSOLE_AUTOREFRESH)
+			display_refresh();
 	}
 }
 
-void console_switch(uint8_t page)
+void console_switch(uint8_t id)
 {
-	page = page % MAX_PAGES;
-
 	console_t *console;
 	size_t i = 0;
 	while((console = list_get(consoles, i++)))
 	{
-		if(strcmp(console->name, pages[page]) == 0)
-		{
-			activeConsole = console;
-			//Buffer reinkopieren
-			memcpy(GRAFIKSPEICHER, console->buffer, PAGE_SIZE);
-			break;
-		}
+		if(console->id == id)
+			displayConsole(console);
 	}
 }
 
@@ -403,7 +408,7 @@ void console_setCursor(console_t *console, cursor_t cursor)
 {
 	if(console != NULL)
 	{
-		*console->cursor = cursor;
+		console->cursor = cursor;
 	}
 }
 
