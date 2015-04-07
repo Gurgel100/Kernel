@@ -58,6 +58,7 @@ struct{
 		bool rdrand;
 		bool nx;
 		bool syscall;
+		bool fxsr;				//FXSAVE/FXRSTORE werden unterstützt
 }cpuInfo;
 
 void cpu_Init(void);

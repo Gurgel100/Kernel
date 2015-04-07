@@ -94,6 +94,7 @@ void cpu_Init()
 	cpuInfo.sse = Temp & 0x2000000;
 	cpuInfo.sse2 = Temp & 0x4000000;
 	cpuInfo.HyperThreading = Temp & 0x10000000;
+	cpuInfo.fxsr = Temp & (1 << 24);
 
 	//Erweiterte Funktionen
 	cpuInfo.maxextCPUID = cpu_CPUID(0x80000000, EAX);

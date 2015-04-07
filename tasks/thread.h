@@ -19,6 +19,7 @@ typedef struct{
 	tid_t tid;
 	process_t * process;
 	ihs_t *State;
+	void *fpuState;
 	pm_status_t Status;
 	void *kernelStackBottom, *kernelStack;
 	bool isMainThread;

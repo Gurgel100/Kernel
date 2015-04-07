@@ -19,6 +19,8 @@
 #include "pit.h"
 #include "vmm.h"
 #include "paging.h"
+#include "thread.h"
+#include "cpu.h"
 
 typedef struct{
 		void (*Handler)(ihs_t *ihs);
@@ -31,6 +33,9 @@ typedef struct{
 }irqHandlers;
 
 static irqHandlers *Handlers[NUM_IRQ];
+
+thread_t *fpuThread = NULL;
+extern thread_t *currentThread;
 
 //Test
 uint64_t Counter;
@@ -270,7 +275,31 @@ void exception_InvalidOpcode(ihs_t *ihs)
 
 //Device not available
 void exception_DeviceNotAvailable(ihs_t *ihs)
-{}
+{
+	//XXX: Because malloc does not align to 16-byte boundary we have to do it manually
+	//Reset TS-Flag
+	asm volatile("clts");
+
+	if(cpuInfo.fxsr)
+	{
+		//Speichere aktuellen FPU Status, wenn ein Prozess gelaufen ist
+		if(fpuThread != NULL)
+			asm volatile("fxsave (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
+
+		fpuThread = currentThread;
+
+		//FPU Status laden
+		if(fpuThread->fpuState == NULL)
+		{
+			//Speicher reservieren, um Status speichern zu können
+			fpuThread->fpuState = malloc(512 + 16);
+		}
+		else
+		{
+			asm volatile("fxrstor (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
+		}
+	}
+}
 
 //Double Fault
 void exception_DoubleFault(ihs_t *ihs)
