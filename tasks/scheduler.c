@@ -88,38 +88,42 @@ thread_t *scheduler_schedule(ihs_t *state)
 	if(!active)
 		return NULL;
 
-	lock(&schedule_lock);
-
 	if(currentThread != NULL)
 	{
 		currentThread->Status = READY;
 		currentThread->State = state;
 	}
 
-	if(list_size(scheduleList))		//Gibt es eigentlich etwas zu schedulen?
+	if(!locked((&schedule_lock)))
 	{
 
-		newThread = list_get(scheduleList, actualThreadIndex);
-		actualThreadIndex = (actualThreadIndex + 1 < list_size(scheduleList)) ? actualThreadIndex + 1 : 0;
-	}
-	else
-	{
-		newThread = list_get(idleProcess.threads, 0);
-	}
+		lock(&schedule_lock);
 
-	if(newThread != currentThread)
-	{
-		if(currentProcess != newThread->process)
-			activateContext(newThread->process->Context);
-		thread_prepare(newThread);
+		if(list_size(scheduleList))		//Gibt es eigentlich etwas zu schedulen?
+		{
 
-		currentProcess = newThread->process;
-		currentThread = newThread;
+			newThread = list_get(scheduleList, actualThreadIndex);
+			actualThreadIndex = (actualThreadIndex + 1 < list_size(scheduleList)) ? actualThreadIndex + 1 : 0;
+		}
+		else
+		{
+			newThread = list_get(idleProcess.threads, 0);
+		}
+
+		if(newThread != currentThread)
+		{
+			if(currentProcess != newThread->process)
+				activateContext(newThread->process->Context);
+			thread_prepare(newThread);
+
+			currentProcess = newThread->process;
+			currentThread = newThread;
+		}
+
+		unlock(&schedule_lock);
 	}
 
 	currentThread->Status = RUNNING;
-
-	unlock(&schedule_lock);
 
 	return currentThread;
 }

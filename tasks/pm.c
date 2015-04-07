@@ -95,15 +95,14 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 	if(newConsole || !parent)
 	{
 		static uint64_t nextConsole = 1;
-		char tmp[5];
-		sprintf(tmp, "tty%2u", nextConsole++);
+		char tmp[6];
+		sprintf(tmp, "tty%02u", nextConsole++);
 		newProcess->console = console_getByName(tmp);
 	}
 	else
 	{
 		newProcess->console = pm_getTask(parent)->console;
 	}
-	console_switch(newProcess->console->id);
 
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
@@ -235,7 +234,7 @@ process_t *pm_getTask(pid_t PID)
  */
 console_t *pm_getConsole()
 {
-	if(currentProcess)
+	if(currentProcess && currentProcess->console)
 	{
 		/*if(currentProcess->console == NULL)
 		{
