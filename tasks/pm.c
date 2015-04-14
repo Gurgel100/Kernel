@@ -152,11 +152,14 @@ void pm_DestroyTask(pid_t PID)
 ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
 {
 	thread_t *thread = currentThread;
-	//Erst müssen wir den Thread wechseln
+
+	//Erst müssen wir den Thread deaktivieren
+	scheduler_remove(thread);
+
+	//Jetzt müssen wir den Thread wechseln
 	thread_t *newThread = scheduler_schedule(cpu);
 
-	//Jetzt müssen wir den Thread deaktivieren
-	scheduler_remove(thread);
+	//Jetzt Thread als blockiert markieren
 	thread->Status = BLOCKED;
 
 	//Jetzt löschen wir den Prozess
