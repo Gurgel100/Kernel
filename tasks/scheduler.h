@@ -21,4 +21,6 @@ void scheduler_remove(thread_t *thread);
 
 thread_t *scheduler_schedule(ihs_t *state);
 
+void yield();
+
 #endif /* SCHEDULER_H_ */

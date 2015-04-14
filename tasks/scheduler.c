@@ -141,3 +141,13 @@ thread_t *scheduler_schedule(ihs_t *state)
 
 	return currentThread;
 }
+
+/*
+ * Wechselt den aktuellen Thread
+ */
+//TODO: Interrupt für wechsel
+void yield()
+{
+	while(currentThread->Status == BLOCKED) asm volatile("hlt");
+	//asm volatile("int $0x20");
+}
