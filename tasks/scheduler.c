@@ -8,7 +8,6 @@
 #include "scheduler.h"
 #include "list.h"
 #include "lock.h"
-#include "pm.h"
 #include "stdbool.h"
 #include "isr.h"
 

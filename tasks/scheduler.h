@@ -8,8 +8,12 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
+#include "pm.h"
 #include "thread.h"
 #include "cpu.h"
+
+extern thread_t *currentThread;
+extern process_t *currentProcess;
 
 void scheduler_Init();
 void scheduler_add(thread_t *thread);
