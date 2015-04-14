@@ -16,6 +16,7 @@
 #include "pit.h"
 #include "system.h"
 #include "cpu.h"
+#include "scheduler.h"
 
 #define STAR	0xC0000081
 #define LSTAR	0xC0000082
@@ -31,6 +32,8 @@ extern void setCursor(uint16_t, uint16_t);
 extern void isr_syscall();
 
 static void nop();
+static uint64_t createThreadHandler(void *entry);
+static void exitThreadHandler();
 
 typedef uint64_t(*syscall)(uint64_t arg, ...);
 
@@ -48,8 +51,8 @@ static syscall syscalls[] = {
 
 		(syscall)&loader_load,			//10
 		(syscall)&pm_ExitTask,			//11
-		(syscall)&nop,
-		(syscall)&nop,
+		(syscall)&createThreadHandler,
+		(syscall)&exitThreadHandler,
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,
@@ -136,6 +139,17 @@ ihs_t *syscall_Handler(ihs_t *ihs)
 static void nop()
 {
 	asm volatile("nop");
+}
+
+static uint64_t createThreadHandler(void *entry)
+{
+	thread_t *thread = thread_create(currentProcess, entry);
+	return thread->tid;
+}
+
+static void exitThreadHandler()
+{
+	thread_destroy(currentThread);
 }
 
 #endif
