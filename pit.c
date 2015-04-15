@@ -11,7 +11,7 @@
 #include "util.h"
 #include "list.h"
 #include "stdlib.h"
-#include "pm.h"
+#include "scheduler.h"
 
 #define CH0		0x40
 #define CH1		0x41
@@ -22,7 +22,7 @@
 #define FRQB	1193182
 
 typedef struct{
-	pid_t PID;
+	thread_t *thread;
 	uint64_t timeout;
 }timer_t;
 
@@ -45,36 +45,38 @@ void pit_InitChannel(uint8_t channel, uint8_t mode, uint16_t data)
 }
 
 //Registriert einen Timer
-void pit_RegisterTimer(pid_t PID, uint64_t msec)
+void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 {
-	timer_t *Timer;
-	size_t i;
-
-	if(Timerlist == NULL)
-		Timerlist = list_create();
-
-	Timer = malloc(sizeof(timer_t));
-
-	Timer->PID = PID;
-	Timer->timeout = Uptime + msec;
-
-	//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
-	//zuerst abläuft
-	timer_t *item;
-	for(i = 0; (item = list_get(Timerlist, i)); i++)
+	if(msec != 0)
 	{
-		if(item->timeout > Timer->timeout)
-			break;
+		timer_t *Timer;
+		size_t i;
+
+		if(Timerlist == NULL)
+			Timerlist = list_create();
+
+		Timer = malloc(sizeof(timer_t));
+
+		Timer->thread = thread;
+		Timer->timeout = Uptime + msec;
+
+		//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
+		//zuerst abläuft
+		timer_t *item;
+		for(i = 0; (item = list_get(Timerlist, i)); i++)
+		{
+			if(item->timeout > Timer->timeout)
+				break;
+		}
+
+		list_insert(Timerlist, i, Timer);
+
+		//Entsprechenden Thread schlafen legen
+		thread_block(thread);
 	}
 
-	list_insert(Timerlist, i, Timer);
-
-	//Entsprechenden Task schlafen legen
-	pm_BlockTask(PID);
-
-	//TODO: Task switchen (yielden)
-	//HACK
-	while(currentProcess->Status == BLOCKED) asm volatile("hlt");
+	//Thread switchen
+	yield();
 }
 
 void pit_Handler(void)
@@ -88,7 +90,7 @@ void pit_Handler(void)
 		{
 			if(Timer->timeout > Uptime)
 				break;
-			pm_ActivateTask(Timer->PID);
+			thread_unblock(Timer->thread);
 			free(list_remove(Timerlist, i));
 			i++;
 		}
