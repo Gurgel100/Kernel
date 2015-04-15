@@ -194,7 +194,16 @@ ihs_t *isr_Handler(ihs_t *ihs)
 		pic_SendEOI(ihs->interrupt - 32);		//PIC sagen, dass IRQ behandelt wurde
 	}
 	else
-		new_ihs = syscall_Handler(new_ihs);
+	{
+		switch(ihs->interrupt)
+		{
+			case 48:
+				new_ihs = syscall_Handler(ihs);
+			break;
+			case 255:
+				new_ihs = pm_Schedule(ihs);
+		}
+	}
 	return new_ihs;
 }
 

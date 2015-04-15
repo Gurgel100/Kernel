@@ -148,6 +148,5 @@ thread_t *scheduler_schedule(ihs_t *state)
 //TODO: Interrupt für wechsel
 void yield()
 {
-	while(currentThread->Status == BLOCKED) asm volatile("hlt");
-	//asm volatile("int $0x20");
+	asm volatile("int $0xFF");
 }
