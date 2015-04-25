@@ -46,7 +46,7 @@ static int ahci_init_hardware(struct ahci_device* ahci)
 {
     int port;
     bool all_idle;
-    uint32_t cmd, ssts, sig;
+    uint32_t cmd, ssts, sig, sctl;
     int retries;
 
     /* HBA reset (see AHCI 1.3, chapter 10.4.3) */
@@ -89,20 +89,58 @@ static int ahci_init_hardware(struct ahci_device* ahci)
     /* Determine number of command slots */
     ahci->cmd_slots = (reg_inl(ahci, REG_CAP) & CAP_NCS_MASK) >> CAP_NCS_SHIFT;
 
-    /* Allocate Command List and FIS for each port */
+    /* All ports: Power On Device, Spin-Up Device, Link Active */
+    for (port = 0; port < MAX_PORTS; port++) {
+        if (!(ahci->ports & BIT(port))) {
+            continue;
+        }
+        cmd = pxreg_inl(ahci, port, REG_PxCMD);
+        cmd &= ~PxCMD_ICC_MASK;
+        cmd |=  PxCMD_POD | PxCMD_SUD | PxCMD_ICC_ACTIVE;
+        pxreg_outl(ahci, port, REG_PxCMD, cmd);
+    }
+
+    /* Detect and initialise devices for each port */
+    retries = 10;
     for (port = 0; port < MAX_PORTS; port++) {
         if (!(ahci->ports & BIT(port))) {
             continue;
         }
 
-        /* If there is a device attached, register it */
-        ssts = pxreg_inl(ahci, port, REG_PxSSTS);
+        /* If we know there is nothing (Cold Presence Detection supported, but
+         * no device detected), skip the device. */
+        cmd = pxreg_inl(ahci, port, REG_PxCMD);
+        if ((cmd & (PxCMD_CPD | PxCMD_CPS)) == PxCMD_CPD) {
+            continue;
+        }
 
+        /* Check whether there is a device */
+        do {
+            ssts = pxreg_inl(ahci, port, REG_PxSSTS);
+            if ((ssts & PxSSTS_DET_MASK) == PxSSTS_DET_PRESENT) {
+                break;
+            } else if ((ssts & PxSSTS_DET_MASK) == 0 && retries < 10) {
+                /* At least device presence should be detected after 100ms,
+                 * even if Phy communication isn't established yet. */
+                break;
+            } else if (retries) {
+                cdi_sleep_ms(100);
+                retries--;
+            }
+        } while (retries);
+
+        /* If there is a device attached, register it */
         if ((ssts & PxSSTS_DET_MASK) != PxSSTS_DET_PRESENT ||
             (ssts & PxSSTS_IPM_MASK) != PxSSTS_IPM_ACTIVE)
         {
             continue;
         }
+
+        /* Forbid transition to any power mangement states */
+        sctl = pxreg_inl(ahci, port, REG_PxSCTL);
+        sctl &= ~PxSCTL_IPM_MASK;
+        sctl |= PxSCTL_IPM_NONE;
+        pxreg_outl(ahci, port, REG_PxSCTL, sctl);
 
         /* Create a device with the right driver */
         sig = pxreg_inl(ahci, port, REG_PxSIG);
@@ -145,6 +183,10 @@ static int ahci_init_hardware(struct ahci_device* ahci)
 void ahci_port_comreset(struct ahci_device* ahci, int port)
 {
     uint32_t sctl = pxreg_inl(ahci, port, REG_PxSCTL);
+    uint32_t cmd = pxreg_inl(ahci, port, REG_PxCMD);
+
+    pxreg_outl(ahci, port, REG_PxCMD, cmd & ~PxCMD_ST);
+    while (pxreg_inl(ahci, port, REG_PxCMD) & PxCMD_CR);
 
     sctl &= ~PxSCTL_DET_MASK;
     sctl |= 0x1;
@@ -154,6 +196,8 @@ void ahci_port_comreset(struct ahci_device* ahci, int port)
 
     sctl &= ~PxSCTL_DET_MASK;
     pxreg_outl(ahci, port, REG_PxSCTL, sctl);
+
+    pxreg_outl(ahci, port, REG_PxCMD, cmd);
 }
 
 static void irq_handler(struct cdi_device* dev)
