@@ -131,7 +131,7 @@ void disasm(void *cmd)
 	}
 
 	//REX erkennen (0x4X, für X = eine Zahl)
-	if((*Byte >> 4) & 0xF == 4)
+	if((*Byte >> 4) == 4)
 	{
 		REX.W = (*Byte >> 3) & 1;
 		REX.R = (*Byte >> 2) & 1;
@@ -156,38 +156,38 @@ void disasm(void *cmd)
 	ModR_M_t *ModRM = 0;
 	OpcodeDB_t Opcode = OpcodeToMnemonic[*Byte++];
 	char *out;
-	if(Opcode.flags & F_VALID == 0)
+	if((Opcode.flags & F_VALID) == 0)
 	{
 		printf("(bad)");
 		return;
 	}
-	if(Opcode.flags & 0b1110 == F_STRUCT)
+	if(Opcode.flags & F_STRUCT)
 	{
-		if(Opcode.flags & (1 << 5))	//Mod.RM is used to identify
+		if(Opcode.flags & F_MODREG)	//Mod.RM is used to identify
 		{
 			OpcodeDB_t *rOpcode = Opcode.data.ext;
-			ModRM = Byte++;
-			OpcodeDB_t sOpcode = rOpcode[ModRM->REG >> 3];
-			if(sOpcode.flags & F_VALID == 0)
+			ModRM = (ModR_M_t*)Byte++;
+			OpcodeDB_t sOpcode = rOpcode[ModRM->REG];
+			if((sOpcode.flags & F_VALID) == 0)
 			{
 				printf("(bad)");
 				return;
 			}
-			if(sOpcode.flags & (1 << 5))
+			if(sOpcode.flags & F_MODREG)
 			{
-				if(sOpcode.flags & 0b1110 == F_MONIC)
-					out = parse_mnemonic(sOpcode, ModRM);
+				if(sOpcode.flags & F_MONIC)
+					out = parse_mnemonic(&sOpcode, ModRM);
 			}
 		}
 	}
-	else if(Opcode.flags & 0b1110 == F_FUNC)
+	else if(Opcode.flags & F_FUNC)
 	{
 	}
-	else if(Opcode.flags & 0b1110 == F_REGOPCODE)
+	else if(Opcode.flags & F_REGOPCODE)
 	{
 	}
 	else
-		out = parse_mnemonic(Opcode, ModRM);
+		out = parse_mnemonic(&Opcode, ModRM);
 
 	printf(out, Prfx);
 
@@ -199,11 +199,11 @@ char *parse_mnemonic(OpcodeDB_t *Opcode, ModR_M_t *ModRM)
 	char *monic = Opcode->data.mnemonic;
 	char *out = 0;
 	size_t i;
-	for(i = 0; *monic != '\0'; i++, monic++)
+	for(i = 1; *monic != '\0'; i++, monic++)
 	{
-		if(*monic++ == '/')
+		if(*monic == '/')
 		{
-			switch(*monic)
+			switch(*(++monic))
 			{
 				case 's':	//Source Operand
 				case '0':
@@ -227,6 +227,7 @@ char *parse_mnemonic(OpcodeDB_t *Opcode, ModR_M_t *ModRM)
 			out[i] = *monic;
 		}
 	}
+	out[i] = '\0';
 
 	return out;
 }
