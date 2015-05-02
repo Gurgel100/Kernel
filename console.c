@@ -23,7 +23,7 @@
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
 
-#define CONSOLE_NUM		20
+#define CONSOLE_NUM		12
 
 #define ASCII_ESC		'\e'
 
@@ -39,9 +39,9 @@ console_t initConsole = {
 	.width = COLS
 };
 
-static list_t consoles;
 static size_t nextID = 1;
 console_t *activeConsole = &initConsole;
+static console_t* consoles[CONSOLE_NUM];
 static char *pages[12] = {
 		"tty01",
 		"tty02",
@@ -64,9 +64,6 @@ static void *console_getValue(console_t *console, vfs_device_function_t function
 
 void console_Init()
 {
-	consoles = list_create();
-	list_push(consoles, &initConsole);
-	activeConsole = &initConsole;
 	initConsole.input = list_create();
 
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
@@ -101,12 +98,13 @@ void console_Init()
 
 	//Alle Konsolen anlegen
 	uint64_t i;
-	for(i = 1; i <= CONSOLE_NUM; i++)
+	for(i = 0; i < CONSOLE_NUM; i++)
 	{
 		char *name;
-		asprintf(&name, "tty%02u", i);
+		asprintf(&name, "tty%02u", i + 1);
 		console_t *console = console_create(name, BG_BLACK | CL_LIGHT_GREY);
 		free(name);
+		consoles[i] = console;
 
 		vfs_device_t *tty = malloc(sizeof(vfs_device_t));
 		tty->opaque = console;
@@ -162,23 +160,18 @@ console_t *console_create(char *name, uint8_t color)
 	console->id = nextID++;
 	unlock(&console->lock);
 
-	list_push(consoles, console);
-
 	return console;
 }
 
 console_t *console_getByName(char *name)
 {
-	console_t *console;
-
-	size_t i = 0;
-	while((console = list_get(consoles, i++)))
+	size_t i;
+	for(i = 0; i < CONSOLE_NUM; i++)
 	{
-		if(strcmp(name, console->name) == 0)
-			break;
+		if(strcmp(name, consoles[i]->name) == 0)
+			return consoles[i];
 	}
-
-	return console;
+	return NULL;
 }
 
 static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
@@ -381,12 +374,16 @@ void displayConsole(console_t *console)
 
 void console_switch(uint8_t id)
 {
-	console_t *console;
-	size_t i = 0;
-	while((console = list_get(consoles, i++)))
+	if(id == 0)
+		displayConsole(&initConsole);
+	else
 	{
-		if(console->id == id)
-			displayConsole(console);
+		size_t i;
+		for(i = 0; i < CONSOLE_NUM; i++)
+		{
+			if(consoles[i]->id == id)
+				displayConsole(consoles[i]);
+		}
 	}
 }
 
