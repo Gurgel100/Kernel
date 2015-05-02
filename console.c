@@ -305,7 +305,8 @@ void console_write(console_t *console, char c)
 	if(console != NULL)
 	{
 		uint8_t Farbwert = console->color;
-		uint16_t *gs = (uint16_t*)console->buffer;
+		uint16_t *gs = (uint16_t*)GRAFIKSPEICHER;
+		uint16_t *buffer = (uint16_t*)console->buffer;
 		switch(c)
 		{
 			case '\n':
@@ -328,11 +329,15 @@ void console_write(console_t *console, char c)
 				}
 				else
 					console->cursor.x--;
-				gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
+				buffer[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
+				if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+					gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Screen updaten
 			break;
 			default:
 				//Zeichen in den Grafikspeicher kopieren
-				gs[console->cursor.y * COLS + console->cursor.x] = (c | (Farbwert << 8));
+				buffer[console->cursor.y * COLS + console->cursor.x] = (c | (Farbwert << 8));
+				if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+					gs[console->cursor.y * COLS + console->cursor.x] = (c | (Farbwert << 8));
 				if(++console->cursor.x > 79)
 				{
 					console->cursor.x = 0;
@@ -344,10 +349,8 @@ void console_write(console_t *console, char c)
 				}
 			break;
 		}
-		setCursor(console->cursor.x, console->cursor.y);
-
-		if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-			display_refresh();
+		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+			setCursor(console->cursor.x, console->cursor.y);
 	}
 }
 
