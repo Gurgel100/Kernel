@@ -69,6 +69,9 @@ void console_Init()
 	activeConsole = &initConsole;
 	initConsole.input = list_create();
 
+	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
+	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
+
 	//stdin
 	/*console_t *stdin = console_create("stdin", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
 	vfs_device_t *dev = malloc(sizeof(vfs_device_t));
