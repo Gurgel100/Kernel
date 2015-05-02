@@ -42,7 +42,7 @@ console_t initConsole = {
 static size_t nextID = 1;
 console_t *activeConsole = &initConsole;
 static console_t* consoles[CONSOLE_NUM];
-static char *pages[12] = {
+static char *console_names[CONSOLE_NUM] = {
 		"tty01",
 		"tty02",
 		"tty03",
@@ -100,10 +100,7 @@ void console_Init()
 	uint64_t i;
 	for(i = 0; i < CONSOLE_NUM; i++)
 	{
-		char *name;
-		asprintf(&name, "tty%02u", i + 1);
-		console_t *console = console_create(name, BG_BLACK | CL_LIGHT_GREY);
-		free(name);
+		console_t *console = console_create(console_names[i], BG_BLACK | CL_LIGHT_GREY);
 		consoles[i] = console;
 
 		vfs_device_t *tty = malloc(sizeof(vfs_device_t));
