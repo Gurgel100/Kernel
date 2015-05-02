@@ -417,15 +417,15 @@ char console_getch(console_t *console)
 	//Auf Eingabe warten
 	while(list_empty(console->input)) asm volatile("hlt");
 
-	return (char)list_remove(console->input, list_size(console->input) - 1);
+	return (char)((uint64_t)list_remove(console->input, list_size(console->input) - 1));
 }
 
 void console_keyboardHandler(console_t *console, char c)
 {
-	list_push(console->input, (void*)c);
+	list_push(console->input, (void*)((uint64_t)c));
 }
 
-static size_t console_writeHandler(console_t *console, uint64_t start, size_t length, const void *buffer)
+static size_t console_writeHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
 {
 	size_t size = 0;
 	char *str = (char*)buffer;
@@ -437,14 +437,14 @@ static size_t console_writeHandler(console_t *console, uint64_t start, size_t le
 	return size;
 }
 
-static size_t console_readHandler(console_t *console, uint64_t start, size_t length, const void *buffer)
+static size_t console_readHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
 {
 	size_t size = 0;
 	char *buf = (char*)buffer;
 
 	while(length-- != 0)
 	{
-		buf[length] = getch();
+		buf[length] = console_getch(console);
 		size++;
 	}
 
