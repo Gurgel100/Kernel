@@ -393,6 +393,9 @@ static void console_scrollDown(console_t *console)
 
 		//Letzte Zeile löschen
 		memset(console->buffer + PAGE_SIZE - SIZE_PER_ROW, 0, SIZE_PER_ROW);
+
+		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+			display_refresh();
 	}
 }
 
