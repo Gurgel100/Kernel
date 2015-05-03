@@ -50,7 +50,7 @@ inline void __attribute__((noreturn)) syscall_exit(int status)
 
 inline void *syscall_fopen(char *path, vfs_mode_t mode)
 {
-	return (void*)_syscall(40, path, &mode);
+	return (void*)_syscall(40, path, mode);
 }
 
 inline void syscall_fclose(void *stream)
