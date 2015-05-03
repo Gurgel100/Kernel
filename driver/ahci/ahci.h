@@ -94,9 +94,16 @@ enum {
 
 enum {
     PxCMD_ST    = (1 <<  0), /* Start */
+    PxCMD_SUD   = (1 <<  1), /* Spin-Up Device */
+    PxCMD_POD   = (1 <<  2), /* Power On Device */
     PxCMD_FRE   = (1 <<  4), /* FIS Receive Enable */
     PxCMD_FR    = (1 << 14), /* FIS Receive Running */
     PxCMD_CR    = (1 << 15), /* Command List Running */
+    PxCMD_CPS   = (1 << 16), /* Cold Presence State */
+    PxCMD_CPD   = (1 << 20), /* Cold Presence Detection */
+
+    PxCMD_ICC_MASK      = (0xf << 28),
+    PxCMD_ICC_ACTIVE    = (0x1 << 28),
 };
 
 enum {
@@ -114,7 +121,10 @@ enum {
 };
 
 enum {
-    PxSCTL_DET_MASK     = (0xf << 0),
+    PxSCTL_DET_MASK     = (0xf << 0),   /* Device Detection Initialization */
+    PxSCTL_IPM_MASK     = (0xf << 8),   /* Interface Power Management
+                                           Transitions Allowed */
+    PxSCTL_IPM_NONE     = (0x3 << 8),
 };
 
 /* SATA 2.6: "11.3 Software reset protocol" */
