@@ -1169,7 +1169,7 @@ void vmm_unusePages(void *virt, size_t pages)
 
 		PT = (void*)PT + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
 
-		if(!vmm_getPageStatus(address))
+		if(!vmm_getPageStatus(address) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE) == 0)
 		{
 			uint64_t entry = PT->PTE[PTi];
 			pmm_Free((void*)(entry & PG_ADDRESS));
