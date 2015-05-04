@@ -128,14 +128,12 @@ bool pmm_Init()
  */
 void *pmm_Alloc()
 {
-	void *Address = (void*)1;
 	size_t i;
-	lock(&pmm_lock);
 	if(pmm_Speicher_Verfuegbar == 0)
 	{
-		unlock(&pmm_lock);
 		return (void*)1;
 	}
+	lock(&pmm_lock);
 	for(i = 4; i < mapSize; i++)
 	{
 		uint8_t j = __builtin_ffsl(Map[i]);
@@ -143,17 +141,18 @@ void *pmm_Alloc()
 		{
 			//j - 1 rechnen, da ffsl eins drauf addiert
 			j--;
-			Address = (void*)((i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE);
+			void* Address = (void*)((i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE);
 
 			//In der Bitmap eintragen, dass Page reserviert
 			asm volatile("btr %0,%1": :"r"(j & 0xFF) ,"m"(Map[i]));
-			pmm_Speicher_Verfuegbar--;
-			break;
+			unlock(&pmm_lock);
+			locked_dec(&pmm_Speicher_Verfuegbar);
+			return Address;
 		}
 	}
 
 	unlock(&pmm_lock);
-	return Address;
+	return (void*)1;
 }
 
 /*
@@ -169,8 +168,8 @@ void pmm_Free(void *Address)
 	uint8_t bit = ((uintptr_t)Address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
 	lock(&pmm_lock);
 	asm volatile("bts %0,%1": : "r"(bit & 0xFF), "m"(Map[i]));
-	pmm_Speicher_Verfuegbar++;
 	unlock(&pmm_lock);
+	locked_inc(&pmm_Speicher_Verfuegbar);
 }
 
 //Für DMA erforderlich
