@@ -19,6 +19,7 @@ process_t idleProcess = {
 		.Context = &kernel_context,
 		.cmd = "idle"
 };
+thread_t* idleThread;
 
 static list_t scheduleList;
 static lock_t schedule_lock = LOCK_LOCKED;
@@ -109,7 +110,7 @@ thread_t *scheduler_schedule(ihs_t *state)
 		}
 		else
 		{
-			newThread = list_get(idleProcess.threads, 0);
+			newThread = idleThread;
 		}
 
 		if(newThread != currentThread)
