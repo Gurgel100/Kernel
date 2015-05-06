@@ -14,6 +14,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "cpu.h"
+#include "scheduler.h"
 
 list_t threadList;
 tid_t nextTID = 0;
@@ -129,4 +130,32 @@ void thread_destroy(thread_t *thread)
 void thread_prepare(thread_t *thread)
 {
 	TSS_setStack(thread->kernelStack);
+}
+
+void thread_block(thread_t *thread)
+{
+	if(thread != NULL)
+	{
+		scheduler_remove(thread);
+		thread->Status = BLOCKED;
+	}
+}
+
+void thread_unblock(thread_t *thread)
+{
+	if(thread != NULL)
+	{
+		thread->Status = READY;
+		scheduler_add(thread);
+	}
+}
+
+void thread_waitUserIO(thread_t* thread)
+{
+	if(thread != NULL)
+	{
+		thread->Status = WAITING_USERIO;
+		scheduler_remove(thread);
+		yield();
+	}
 }

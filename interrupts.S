@@ -60,6 +60,7 @@ isr_stub 47
 
 #Syscalls
 isr_stub 48
+isr_stub 255
 
 isr_common:
 #Pushe alle Register

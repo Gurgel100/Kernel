@@ -10,7 +10,7 @@
 #ifndef IDT_H_
 #define IDT_H_
 
-#define IDT_ENTRIES 49
+#define IDT_ENTRIES 256
 
 #include "stdint.h"
 

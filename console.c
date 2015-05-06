@@ -13,6 +13,7 @@
 #include "util.h"
 #include "vfs.h"
 #include "stdio.h"
+#include "scheduler.h"
 
 #define GRAFIKSPEICHER	0xB8000
 #define MAX_PAGES		12
@@ -418,14 +419,20 @@ void console_setCursor(console_t *console, cursor_t cursor)
 char console_getch(console_t *console)
 {
 	//Auf Eingabe warten
-	while(list_empty(console->input)) asm volatile("hlt");
+	console->waitingThread = currentThread;
+	thread_waitUserIO(console->waitingThread);
 
 	return (char)((uint64_t)list_remove(console->input, list_size(console->input) - 1));
 }
 
 void console_keyboardHandler(console_t *console, char c)
 {
-	list_push(console->input, (void*)((uint64_t)c));
+	if(console->waitingThread)
+	{
+		thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
+		list_push(console->input, (void*)((uint64_t)c));
+	}
 }
 
 static size_t console_writeHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
