@@ -10,21 +10,21 @@
 
 #include "stddef.h"
 
-typedef struct{
-	void *value;
-	void *next;
+typedef struct ring_entry_s{
+	void* value;
+	struct ring_entry_s* next;
+	struct ring_entry_s* prev;
 }ring_entry_t;
 
 typedef struct{
-	ring_entry_t *base;
-	ring_entry_t *end;
+	ring_entry_t* base;
 	size_t size;
 }ring_t;
 
 ring_t *ring_create();
 void ring_destroy(ring_t *ring);
-void ring_add(ring_t *ring, void *value);
-void *ring_get(ring_t *ring, size_t i);
-void *ring_remove(ring_t *ring, size_t i);
+void* ring_add(ring_t *ring, void *value);
+void* ring_remove(ring_t* ring, void* entry);
+void* ring_getNext(ring_t* ring, void* current);
 
 #endif /* RING_H_ */

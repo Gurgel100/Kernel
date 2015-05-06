@@ -43,91 +43,103 @@ void ring_destroy(ring_t *ring)
  *
  * Parameter:	ring = Der Ring, in das das Element eingefügt werden soll
  * 				value = Wert des Elements
+ * Rückgabe:	Wert des eingefügten Elements
  */
-void ring_add(ring_t *ring, void *value)
+void* ring_add(ring_t* ring, void* value)
 {
 	if(ring == NULL)
-		return;
+		return NULL;
 
 	ring_entry_t *entry = malloc(sizeof(entry));
 	if(entry == NULL)
-		return;
+		return NULL;
 
 	entry->value = value;
 
-	entry->next = ring->base;
-	ring->base = entry;
-
-	if(entry->next == NULL)
+	if(ring->base)
 	{
-		//Erster Eintrag
-		entry->next = entry;
-		ring->end = entry;
+		entry->next = ring->base;
+		entry->prev = ring->base->prev;
+		ring->base->prev->next = entry;
+		ring->base->prev = entry;
 	}
 	else
-		ring->end->next = entry;
+	{
+		ring->base = entry;
+		entry->next = entry->prev = entry;
+	}
+	ring->size++;
+
+	return (void*)entry;
 }
 
 /*
- * Gibt das Element an der Stelle i zurück. Wenn i grösser als die Anzahl Einträge im Ring ist,
- * dann wird einfach weitergezählt, so dass man schlussendlich das Element an der Stelle i % size zurück bekommt.
+ * Gibt das nächste Element des Rings zurück.
  *
- * Parameter:	ring = Ring in dem das Element steht
- * 				i = Index
+ * Parameter:	ring = Ring
  * Rückgabe:	Wert des Elements
  */
-void *ring_get(ring_t *ring, size_t i)
+void* ring_getNext(ring_t* ring)
 {
-	ring_entry_t *entry;
+	ring_entry_t* entry;
 
 	if(ring == NULL || ring->size == 0)
 		return NULL;
 
 	entry = ring->base;
-	while(i--)
-		entry = entry->next;
+	ring->base = ring->base->next;
 
 	return entry->value;
 }
 
 /*
- * Entfernt das Element an der Stelle i % size (siehe oben).
+ * Entfernt das übergebene Element aus dem Ring.
  *
  * Parameter:		ring = Ring, in dem das Element ist
- * 					i = Index
- * Rückgabewert:	Wert des Elements
+ * 					element = Element, das gelöscht werden soll
+ * Rückgabe:	Wert des gelöschten Elements
  */
-void *ring_remove(ring_t *ring, size_t i)
+void* ring_remove(ring_t* ring, void* element)
 {
-	ring_entry_t *entry, *prev;
 	void *val;
+	ring_entry_t *entry = element;
 
-	if(ring == NULL || ring->size == 0)
+	if(ring == NULL || ring->size == 0 || entry == NULL)
 		return NULL;
 
-	if(ring->size == 1)
-	{
-		val = ring->base->value;
-		free(ring->base);
-		ring->end = ring->base = NULL;
-
-		return val;
-	}
-
-	prev = ring->end;
-	entry = ring->base;
-	while(i--)
-	{
-		prev = entry;
-		entry = entry->next;
-	}
 	val = entry->value;
+	entry->next->prev = entry->prev;
+	entry->prev->next = entry->next;
+	free(entry);
 
-	prev->next = entry->next;
-	if(ring->base == entry)
-		ring->base = entry->next;
-	if(ring->end == entry)
-		ring->end = prev;
+	ring->size--;
 
 	return val;
+}
+
+
+/*
+ * Durchsucht den Ring nach dem ersten Element mit dem übergebenem Wert.
+ *
+ * Parameter:	ring = Ring, in dem das Element gesucht werden soll
+ * 				value = Wert, nach dem gesucht werden soll
+ * Rückgabe:	Das gesuchte Element oder NULL, wenn nichts gefunden wurde
+ */
+void* ring_find(ring_t* ring, void* value)
+{
+	ring_entry_t* entry;
+
+	if(ring == NULL | ring->size == 0)
+		return NULL;
+
+	entry = ring->base;
+	do
+	{
+		if(entry->value == value)
+			return entry;
+		entry = entry->next;
+	}
+	while(entry != ring->base);
+
+	return NULL;
 }
