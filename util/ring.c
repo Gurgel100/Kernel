@@ -39,6 +39,20 @@ void ring_destroy(ring_t *ring)
 }
 
 /*
+ * Gibt die Grösse des Rings zurück.
+ *
+ * Parameter:	Ring, dessen Grösse zurückgegeben werden soll
+ *
+ * Rückgabe:	Grösse des Rings
+ */
+size_t ring_size(ring_t* ring)
+{
+	if(ring != NULL)
+		return ring->size;
+	return 0;
+}
+
+/*
  * Fügt ein Element zu einem Ring hinzu.
  *
  * Parameter:	ring = Der Ring, in das das Element eingefügt werden soll
@@ -56,7 +70,7 @@ void* ring_add(ring_t* ring, void* value)
 
 	entry->value = value;
 
-	if(ring->base)
+	if(ring->size)
 	{
 		entry->next = ring->base;
 		entry->prev = ring->base->prev;
@@ -107,12 +121,12 @@ void* ring_remove(ring_t* ring, void* element)
 	if(ring == NULL || ring->size == 0 || entry == NULL)
 		return NULL;
 
+	ring->size--;
+
 	val = entry->value;
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
 	free(entry);
-
-	ring->size--;
 
 	return val;
 }

@@ -23,8 +23,10 @@ typedef struct{
 
 ring_t *ring_create();
 void ring_destroy(ring_t *ring);
+size_t ring_size(ring_t* ring);
 void* ring_add(ring_t *ring, void *value);
 void* ring_remove(ring_t* ring, void* entry);
-void* ring_getNext(ring_t* ring, void* current);
+void* ring_getNext(ring_t* ring);
+void* ring_find(ring_t* ring, void* value);
 
 #endif /* RING_H_ */
