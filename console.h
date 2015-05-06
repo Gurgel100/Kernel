@@ -26,6 +26,8 @@ typedef struct{
 	char *name;
 	uint8_t flags;
 
+	void* waitingThread;
+
 	lock_t lock;
 
 	void *buffer;
