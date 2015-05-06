@@ -149,3 +149,13 @@ void thread_unblock(thread_t *thread)
 		scheduler_add(thread);
 	}
 }
+
+void thread_waitUserIO(thread_t* thread)
+{
+	if(thread != NULL)
+	{
+		thread->Status = WAITING_USERIO;
+		scheduler_remove(thread);
+		yield();
+	}
+}

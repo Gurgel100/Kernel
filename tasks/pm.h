@@ -22,7 +22,7 @@ typedef struct{
 }__attribute__((aligned(16)))ihs_extended_t;
 
 typedef enum{
-	READY, BLOCKED, RUNNING
+	READY, BLOCKED, RUNNING, WAITING_USERIO
 }pm_status_t;
 
 typedef struct{
