@@ -31,5 +31,6 @@ void thread_destroy(thread_t *thread);
 void thread_prepare(thread_t *thread);
 void thread_block(thread_t *thread);
 void thread_unblock(thread_t *thread);
+void thread_waitUserIO(thread_t* thread);
 
 #endif /* THREAD_H_ */
