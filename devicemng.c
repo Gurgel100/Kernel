@@ -8,9 +8,12 @@
 #ifdef BUILD_KERNEL
 
 #include "devicemng.h"
+#include "partition.h"
 #include "lists.h"
 #include "storage.h"
 #include "scsi.h"
+#include "stdlib.h"
+#include "string.h"
 
 #define GET_BYTE(value, offset) (value >> offset) & 0xFF
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
@@ -56,8 +59,8 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
 
 	if(dev->device->bus_data->bus_type == CDI_STORAGE)
 	{
-		struct cdi_storage_driver *driver = dev->device->driver;
-		struct cdi_storage_device *device = dev->device;
+		struct cdi_storage_driver *driver = (struct cdi_storage_driver*)dev->device->driver;
+		struct cdi_storage_device *device = (struct cdi_storage_device*)dev->device;
 		uint64_t block_start = start / device->block_size;
 		uint64_t block_count = size / device->block_size + ((size % device->block_size) ? 1 : 0);
 		if(block_start + block_count > device->block_count)
@@ -67,13 +70,13 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
 		if(driver->read_blocks(device, block_start, block_count, block_buffer))
 			return 0;
 
-		memcpy(buffer, block_buffer + block_start % device->block_size, size);
+		memcpy((void*)buffer, block_buffer + block_start % device->block_size, size);
 		free(block_buffer);
 	}
 	else if(dev->device->bus_data->bus_type == CDI_SCSI)
 	{
-		struct cdi_scsi_driver *driver = dev->device->driver;
-		struct cdi_scsi_device *device = dev->device;
+		struct cdi_scsi_driver *driver = (struct cdi_scsi_driver*)dev->device->driver;
+		struct cdi_scsi_device *device = (struct cdi_scsi_device*)dev->device;
 
 		uint32_t lba = start / 2048;
 		uint64_t tmp_size = MIN(size, 2048);
@@ -94,7 +97,7 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
 			if(driver->request(device, &packet))
 				return 0;
 
-			memcpy(buffer + offset, tmp_buffer + start % 2048 + offset, tmp_size);
+			memcpy((void*)buffer + offset, tmp_buffer + start % 2048 + offset, tmp_size);
 			offset += tmp_size;
 			tmp_size = MIN(size - offset, 2048);
 		}
@@ -114,7 +117,7 @@ void *dmng_getValue(device_t *dev, vfs_device_function_t function)
 		case FUNC_TYPE:
 			return VFS_DEVICE_STORAGE;
 		case FUNC_NAME:
-			return dev->device->name;
+			return (void*)dev->device->name;
 		default:
 			return NULL;
 	}

@@ -204,7 +204,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, cmd, newConsole);
+	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, (char*)cmd, newConsole);
 	process_t *task = pm_getTask(taskID);
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));

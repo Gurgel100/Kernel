@@ -15,6 +15,7 @@
 #include "vfs.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "string.h"
 
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
 
@@ -150,7 +151,7 @@ struct cdi_fs_driver *getFSDriver(const char *name)
 	struct cdi_driver *driver;
 
 	size_t i = 0;
-	extern drivers;
+	extern cdi_list_t drivers;
 	while((driver = cdi_list_get(drivers, i)))
 	{
 		if(driver->type == CDI_FILESYSTEM && strcmp(name, driver->name) == 0)

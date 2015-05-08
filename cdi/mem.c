@@ -52,11 +52,11 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 	}
 
 	//Speicher reservieren
-	void *maxAddress;
+	void *maxAddress = (void*)-1;
 	if(flags & CDI_MEM_DMA_16M)
-		maxAddress = 16777216;
+		maxAddress = (void*)16777216;
 	else if(flags & CDI_MEM_DMA_4G)
-		maxAddress = 4294967296;
+		maxAddress = (void*)4294967296;
 	vaddr = vmm_AllocDMA(maxAddress, size / MM_BLOCK_SIZE, &paddr);
 	if(vaddr == NULL)
 		return NULL;
@@ -159,5 +159,5 @@ struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
  */
 void cdi_mem_free(struct cdi_mem_area* p)
 {
-	vmm_SysFree(p->vaddr, p->size / 4096);
+	vmm_SysFree((uintptr_t)p->vaddr, p->size / 4096);
 }
