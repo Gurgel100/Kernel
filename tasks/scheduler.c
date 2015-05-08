@@ -6,7 +6,7 @@
  */
 
 #include "scheduler.h"
-#include "list.h"
+#include "ring.h"
 #include "lock.h"
 #include "stdbool.h"
 #include "isr.h"
@@ -21,7 +21,7 @@ process_t idleProcess = {
 };
 thread_t* idleThread;
 
-static list_t scheduleList;
+static ring_t* scheduleList;
 static lock_t schedule_lock = LOCK_LOCKED;
 static bool active = false;
 thread_t *currentThread;
@@ -32,7 +32,7 @@ process_t *currentProcess;
  */
 void scheduler_Init()
 {
-	scheduleList = list_create();
+	scheduleList = ring_create();
 	//Lock freigeben
 	unlock(&schedule_lock);
 }
@@ -53,8 +53,7 @@ void scheduler_activate()
 void scheduler_add(thread_t *thread)
 {
 	lock(&schedule_lock);
-	size_t i = list_size(scheduleList);
-	list_insert(scheduleList, i ? i - 1 : 0, thread);
+	ring_add(scheduleList, thread);
 	unlock(&schedule_lock);
 }
 
@@ -65,16 +64,8 @@ void scheduler_add(thread_t *thread)
  */
 void scheduler_remove(thread_t *thread)
 {
-	size_t i = 0;
-	thread_t *thr;
-
 	lock(&schedule_lock);
-	while((thr = list_get(scheduleList, i)))
-	{
-		if(thr == thread)
-			list_remove(scheduleList, i);
-		i++;
-	}
+	ring_remove(scheduleList, ring_find(scheduleList, thread));
 	unlock(&schedule_lock);
 }
 
@@ -85,7 +76,6 @@ void scheduler_remove(thread_t *thread)
  */
 thread_t *scheduler_schedule(ihs_t *state)
 {
-	static size_t actualThreadIndex = 0;
 	thread_t *newThread;
 
 	if(!active)
@@ -101,17 +91,10 @@ thread_t *scheduler_schedule(ihs_t *state)
 	{
 
 		lock(&schedule_lock);
-
-		if(list_size(scheduleList))		//Gibt es eigentlich etwas zu schedulen?
-		{
-
-			newThread = list_get(scheduleList, actualThreadIndex);
-			actualThreadIndex = (actualThreadIndex + 1 < list_size(scheduleList)) ? actualThreadIndex + 1 : 0;
-		}
-		else
-		{
+		newThread = ring_getNext(scheduleList);
+		if(newThread == NULL)
 			newThread = idleThread;
-		}
+		unlock(&schedule_lock);
 
 		if(newThread != currentThread)
 		{
@@ -122,8 +105,6 @@ thread_t *scheduler_schedule(ihs_t *state)
 			currentProcess = newThread->process;
 			currentThread = newThread;
 		}
-
-		unlock(&schedule_lock);
 	}
 
 	if(fpuThread == currentThread)
