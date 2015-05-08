@@ -143,7 +143,7 @@ void* ring_find(ring_t* ring, void* value)
 {
 	ring_entry_t* entry;
 
-	if(ring == NULL | ring->size == 0)
+	if(ring == NULL || ring->size == 0)
 		return NULL;
 
 	entry = ring->base;
