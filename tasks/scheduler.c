@@ -83,7 +83,8 @@ thread_t *scheduler_schedule(ihs_t *state)
 
 	if(currentThread != NULL)
 	{
-		currentThread->Status = READY;
+		if(currentThread->Status == RUNNING)
+			currentThread->Status = READY;
 		currentThread->State = state;
 	}
 
@@ -104,19 +105,19 @@ thread_t *scheduler_schedule(ihs_t *state)
 
 			currentProcess = newThread->process;
 			currentThread = newThread;
-		}
-	}
 
-	if(fpuThread == currentThread)
-	{
-		asm volatile("clts");
-	}
-	else
-	{
-		uint64_t cr0;
-		asm volatile("mov %%cr0,%0;": "=r"(cr0));
-		cr0 |= (1 << 3);							//TS-Bit setzen
-		asm volatile("mov %0,%%cr0": : "r"(cr0));
+			if(fpuThread == currentThread)
+			{
+				asm volatile("clts");
+			}
+			else
+			{
+				uint64_t cr0;
+				asm volatile("mov %%cr0,%0;": "=r"(cr0));
+				cr0 |= (1 << 3);							//TS-Bit setzen
+				asm volatile("mov %0,%%cr0": : "r"(cr0));
+			}
+		}
 	}
 
 	currentThread->Status = RUNNING;
