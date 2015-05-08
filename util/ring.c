@@ -64,7 +64,7 @@ void* ring_add(ring_t* ring, void* value)
 	if(ring == NULL)
 		return NULL;
 
-	ring_entry_t *entry = malloc(sizeof(entry));
+	ring_entry_t *entry = malloc(sizeof(ring_entry_t));
 	if(entry == NULL)
 		return NULL;
 
