@@ -15,6 +15,7 @@
 #include "ctype.h"
 #ifdef BUILD_KERNEL
 #include "vfs.h"
+#include "console.h"
 #else
 #include "syscall.h"
 #endif
@@ -563,7 +564,11 @@ int printf(const char *format, ...)
 {
 	va_list arg;
 	va_start(arg, format);
+#ifdef BUILD_KERNEL
+	int pos = vkprintf(format, arg);
+#else
 	int pos = vprintf(format, arg);
+#endif
 	va_end(arg);
 	return pos;
 }
@@ -1201,6 +1206,22 @@ int vprintf(const char *format, va_list arg)
 	jprintf_args handler = {
 			.putc = &vprintf_putc,
 			.putsn = &vprintf_putsn
+	};
+
+	return jvprintf(&handler, format, arg);
+}
+
+//Callback-Funktionen
+int vkprintf_putc(void *arg, char c)
+{
+	console_ansi_write(&initConsole, c);
+	return 1;
+}
+
+int vkprintf(const char *format, va_list arg)
+{
+	jprintf_args handler = {
+			.putc = &vkprintf_putc
 	};
 
 	return jvprintf(&handler, format, arg);
