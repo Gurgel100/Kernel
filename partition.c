@@ -94,9 +94,9 @@ int partition_getPartitions(device_t *dev)
 
 			//Partition beim VFS anmelden
 			vfs_device_t* vfs_dev = malloc(sizeof(vfs_device_t));
-			vfs_dev->read = partition_Read;
-			vfs_dev->write = partition_Write;
-			vfs_dev->getValue = partition_getValue;
+			vfs_dev->read = (vfs_device_read_handler_t*)partition_Read;
+			vfs_dev->write = (vfs_device_write_handler_t*)partition_Write;
+			vfs_dev->getValue = (vfs_device_getValue_handler_t*)partition_getValue;
 			vfs_dev->opaque = part;
 			vfs_RegisterDevice(vfs_dev);
 		}

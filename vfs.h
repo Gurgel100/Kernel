@@ -41,13 +41,18 @@ typedef enum{
 	FUNC_TYPE, FUNC_NAME, FUNC_DATA
 }vfs_device_function_t;
 
+//Handler für Geräte
+typedef size_t (vfs_device_read_handler_t)(void *opaque, uint64_t start, size_t size, const void *buffer);
+typedef size_t (vfs_device_write_handler_t)(void *opaque, uint64_t start, size_t size, const void *buffer);
+typedef void *(vfs_device_getValue_handler_t)(void *opaque, vfs_device_function_t function);
+
 typedef struct{
 	//Functionen zum Lesen und Schreiben
-	size_t (*read)(void *opaque, uint64_t start, size_t size, const void *buffer);
-	size_t (*write)(void *opaque, uint64_t start, size_t size, const void *buffer);
+	vfs_device_read_handler_t *read;
+	vfs_device_write_handler_t *write;
 
 	//Hiermit können verschiedene Werte ausgelesen werden
-	void *(*getValue)(void *opaque, vfs_device_function_t function);
+	vfs_device_getValue_handler_t *getValue;
 	void *opaque;
 }vfs_device_t;
 

@@ -34,9 +34,9 @@ void dmng_registerDevice(struct cdi_device *dev)
 
 	vfs_device_t *vfs_dev = malloc(sizeof(vfs_device_t));
 	vfs_dev->opaque = device;
-	vfs_dev->read = dmng_Read;
-	vfs_dev->write = NULL;
-	vfs_dev->getValue = dmng_getValue;
+	vfs_dev->read = (vfs_device_read_handler_t*)dmng_Read;
+	vfs_dev->write = (vfs_device_write_handler_t*)NULL;
+	vfs_dev->getValue = (vfs_device_getValue_handler_t*)dmng_getValue;
 
 	vfs_RegisterDevice(vfs_dev);
 
