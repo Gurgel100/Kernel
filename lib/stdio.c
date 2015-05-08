@@ -1167,10 +1167,27 @@ int vasprintf(char **str, const char *format, va_list arg)
 
 	return retval;
 }
+//Callback-Funktionen
+int vfprintf_putc(void *arg, char c)
+{
+	return fwrite(&c, 1, sizeof(char), arg);
+}
+
+int vfprintf_putsn(void *arg, const char *str, int n)
+{
+	size_t len = strlen(str);
+	return fwrite(str, MIN(len, (uint64_t)n), sizeof(char), arg);
+}
 
 int vfprintf(FILE *stream, const char *format, va_list arg)
 {
-	return EOF;
+	jprintf_args handler = {
+			.arg = stream,
+			.putc = vfprintf_putc,
+			.putsn = vfprintf_putsn
+	};
+
+	return jvprintf(&handler, format, arg);
 }
 
 //Callback-Funktionen
