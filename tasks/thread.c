@@ -33,7 +33,7 @@ tid_t get_tid()
 	return tid;
 }
 
-thread_t *thread_create(process_t *process, void *entry)
+thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data)
 {
 	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
 	if(thread == NULL)
@@ -55,11 +55,12 @@ thread_t *thread_create(process_t *process, void *entry)
 			.gs = 0x10,
 			.fs = 0x10,
 
+			.rbx = data_length,
 			.rcx = cpuInfo.syscall,
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
-			.rsp = MM_USER_STACK + 1,
+			.rsp = MM_USER_STACK + 1 - data_length,
 
 			//IRQs einschalten (IF = 1)
 			.rflags = 0x202,
@@ -76,7 +77,11 @@ thread_t *thread_create(process_t *process, void *entry)
 	thread->fpuState = NULL;
 
 	//Stack mappen (1 Page)
-	vmm_ContextMap(process->Context, MM_USER_STACK, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
+	void *stack = (void*)mm_SysAlloc(1);
+	memcpy(stack + 0x1000 - data_length, data, data_length);
+	void *phys = (void*)vmm_getPhysAddress((uintptr_t)stack);
+	vmm_ContextMap(process->Context, MM_USER_STACK, (uintptr_t)phys, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
+	vmm_UnMap(stack);
 
 	list_push(process->threads, thread);
 

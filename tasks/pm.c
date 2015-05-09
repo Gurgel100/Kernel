@@ -47,7 +47,7 @@ void pm_Init()
 	ProcessList = list_create();
 
 	idleProcess.threads = list_create();
-	idleThread = thread_create(&idleProcess, idle);
+	idleThread = thread_create(&idleProcess, idle, 0, NULL);
 	idleThread->State->cs = 0x8;
 	idleThread->State->ss = 0x10;
 
@@ -109,7 +109,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 	newProcess->threads = list_create();
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry);
+	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd);
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);

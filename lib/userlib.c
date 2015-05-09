@@ -13,6 +13,47 @@
 void initLib()
 {
 }
+#ifndef BUILD_KERNEL
+extern int main(int argc, char *argv[]);
+
+int getArgCount(char *cmd)
+{
+	int count = 0;
+
+	int i;
+	for(i = 0; ; i++)
+	{
+		if(cmd[i] == '\0')
+		{
+			count++;
+			break;
+		}
+		else if(cmd[i] == ' ')
+			count++;
+	}
+
+	return count;
+}
+
+void c_main(size_t length, void *data)
+{
+	initLib();
+
+	int argc = getArgCount(data);
+	char *argv[argc + 1];
+
+	argv[0] = strtok(data, " ");
+
+	int i;
+	for(i = 1; i < argc; i++)
+	{
+		argv[i] = strtok(NULL, " ");
+	}
+	argv[argc] = NULL;
+
+	exit(main(argc, argv));
+}
+#endif
 
 void reverse(char *s)
 {
