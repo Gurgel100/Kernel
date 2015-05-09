@@ -1228,6 +1228,7 @@ int vprintf(const char *format, va_list arg)
 	return jvprintf(&handler, format, arg);
 }
 
+#ifdef BUILD_KERNEL
 //Callback-Funktionen
 int vkprintf_putc(void *arg, char c)
 {
@@ -1243,6 +1244,7 @@ int vkprintf(const char *format, va_list arg)
 
 	return jvprintf(&handler, format, arg);
 }
+#endif
 
 //Callback-Funktionen
 typedef struct{
