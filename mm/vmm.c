@@ -1154,6 +1154,11 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress)
 	return PT->PTE[PTi] & PG_ADDRESS;
 }
 
+void clearPage(uintptr_t address)
+{
+	asm volatile("rep stosq" : :"c"(VMM_SIZE_PER_PAGE / sizeof(uint64_t)), "D"(address & ~0xFFF), "a"(0) :"memory");
+}
+
 void vmm_unusePages(void *virt, size_t pages)
 {
 	uintptr_t address = (uintptr_t)virt;
@@ -1199,6 +1204,7 @@ void vmm_usePages(void *virt, size_t pages)
 		uintptr_t pAddr = (uintptr_t)pmm_Alloc();
 		setPTEntry(PTi, PT, 1, !!(entry & PG_RW), !!(entry & PG_US), !!(entry & PG_PWT), !!(entry & PG_PCD), !!(entry & PG_A),
 				!!(entry & PG_D), !!(entry & PG_G), PG_AVL(entry) & ~VMM_UNUSED_PAGE, !!(entry & PG_PAT), !!(entry & PG_NX), pAddr);
+		clearPage(address);
 	}
 }
 
