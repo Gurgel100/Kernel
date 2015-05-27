@@ -256,6 +256,10 @@ long int strtol(const char *str, char **endptr, int base)
         	base = 8;
         }
     }
+    else if(base == 0)
+    {
+    	base = 10;
+    }
 
     while(*str)
     {
