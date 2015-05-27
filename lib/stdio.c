@@ -147,6 +147,9 @@ int fclose(FILE *stream)
 	if(stream->mode.write)
 		fflush(stream);
 
+	if(stream->ungetch_count)
+		free(stream->ungetch_buffer);
+
 	if(setvbuf(stream, NULL, _IONBF, 0))
 		return EOF;
 
@@ -1621,9 +1624,8 @@ int vfscanf_getc(void *ptr)
 
 void vfscanf_ungetc(void *ptr, int c)
 {
-	//TODO
 	FILE *stream = ptr;
-	//ungetc(c, stream);
+	ungetc(c, stream);
 }
 
 int vfscanf_tell(void *ptr)
@@ -1692,6 +1694,19 @@ int vsscanf(const char *str, const char *format, va_list arg)
 }
 
 //I/O-Funktionen
+int ungetc(int c, FILE *stream)
+{
+	if(stream == NULL)
+		return EOF;
+
+	char *new_ptr = realloc(stream->ungetch_buffer, stream->ungetch_count + 1);
+	if(new_ptr == NULL)
+		return EOF;
+	stream->ungetch_buffer = new_ptr;
+	stream->ungetch_buffer[stream->ungetch_count++] = (char)c;
+	return c;
+}
+
 int getc(FILE *stream)
 {
 	if(stream == stdin)

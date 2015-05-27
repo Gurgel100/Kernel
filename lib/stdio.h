@@ -48,6 +48,8 @@ typedef struct{
 	void *stream;
 
 	char *buffer;
+	char *ungetch_buffer;
+	size_t ungetch_count;
 	size_t bufSize, bufStart, bufPos;
 	size_t posRead, posWrite;
 	bool bufDirty;
@@ -100,6 +102,7 @@ extern int fscanf(FILE *stream, const char *format, ...);
 extern int scanf(const char *format, ...);
 extern int sscanf(const char *str, const char *format, ...);
 
+extern int ungetc(int c, FILE *stream);
 extern int getc(FILE *stream);
 extern int getchar(void);
 extern char *gets(char *str);
