@@ -41,6 +41,13 @@ typedef struct{
 	void *arg;
 }jprintf_args;
 
+typedef struct{
+	int (*getc)(void *);
+	void (*ungetc)(void *, int);
+	int (*tell)(void *);
+	void *arg;
+}jscanf_args;
+
 int sputchar(char **dest, int zeichen);
 int sputs(char **dest, const char *str);
 
@@ -1279,20 +1286,409 @@ int vsprintf(char *str, const char *format, va_list arg)
 	return retval;
 }
 
+void jscanf_ungetc(jscanf_args *arg, int c)
+{
+	arg->ungetc(arg->arg, c);
+}
+
+int jscanf_getc(jscanf_args *arg)
+{
+	return arg->getc(arg->arg);
+}
+
+int jscanf_tell(jscanf_args *arg)
+{
+	return arg->tell(arg->arg);
+}
+
+size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t base, int *eof)
+{
+	size_t first_digit = 0;
+	size_t i;
+	for(i = 0; i < size; i++)
+	{
+		int c;
+		bool valid = false;
+		buffer[i] = c = jscanf_getc(args);
+		if(c == EOF)
+		{
+			*eof = 1;
+			break;
+		}
+		switch(buffer[i])
+		{
+			case '+': case '-':
+				if(i == 0)
+				{
+					valid = true;
+					first_digit++;
+				}
+			break;
+			case '0':
+				valid = true;
+			break;
+			case '1' ... '7':
+				if(base == 0)
+					base = (buffer[first_digit] == '0') ? 8 : 10;
+				valid = true;
+			break;
+			case '8' ... '9':
+				if(base == 0)
+					base = (buffer[first_digit] == '0') ? 8 : 10;
+				valid = (base != 8);
+			break;
+			case 'a' ... 'f': case 'A' ... 'F':
+				valid = (base == 16);
+			break;
+			case 'x':
+				if(base == 0)
+					base = 16;
+				if(base == 16 && i == first_digit + 1 && buffer[first_digit] == '0')
+					valid = true;
+			break;
+		}
+
+		if(!valid)
+		{
+			jscanf_ungetc(args, c);
+			break;
+		}
+	}
+	buffer[i] = '\0';
+
+	return i;
+}
+
+void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
+{
+	switch(size)
+	{
+		case -2:
+			*((uint8_t*)ptr) = (uint8_t)value;
+		break;
+		case -1:
+			*((uint16_t*)ptr) = (uint16_t)value;
+		break;
+		case 0:
+			*((uint32_t*)ptr) = (uint32_t)value;
+		break;
+		case 1 ... 5:
+			*((uint64_t*)ptr) = value;
+		break;
+	}
+}
+
+int jvscanf(jscanf_args *args, const char *format, va_list arg)
+{
+	int8_t length;
+	size_t width;
+	bool assign;
+	int c, base, eof;
+	char buffer[25];
+	char *end;
+	uint64_t value;
+	int ret = 0;
+	for(; *format; format++)
+	{
+		switch(*format)
+		{
+			case ' ':
+			case '\n':
+			case '\t':
+			case '\f':
+			case '\v':
+				do
+				{
+					c = jscanf_getc(args);
+				} while(isspace(c));
+
+				if(c != EOF)
+				{
+					jscanf_ungetc(args, c);
+				}
+			break;
+			case '%':	//Formatieren?
+				format++;
+
+				//Ein * bedeuted, dass der Wert eingelesen aber nicht zugewiesen wird
+				if(*format == '*')
+				{
+					assign = false;
+					format++;
+				}
+				else
+					assign = true;
+
+				if(isdigit(*format))
+				{
+					width = strtol(format, (char**)&format, 10);
+					if(width == 0)
+						return ret;
+				}
+				else
+					width = 0;
+
+				//Length
+				length = 0;
+				switch(*format)
+				{
+					case 'h':
+						format++;
+						if(*format == 'h')
+						{
+							format++;
+							length = -2;
+						}
+						else
+							length = -1;
+					break;
+					case 'l':
+						format++;
+						if(*format == 'l')
+						{
+							format++;
+							length = 2;
+						}
+						else
+							length = 1;
+					break;
+					case 'j':
+						format++;
+						length = 3;
+					break;
+					case 'z':
+						format++;
+						length = 4;
+					break;
+					case 't':
+						format++;
+						length = 5;
+					break;
+					case 'L':
+						format++;
+						length = 6;
+					break;
+				}
+
+				//Whitespaces überspringen (ausser %[, %c, %n)
+				if(*format != '[' && *format != 'c' && *format != 'n')
+				{
+					while(isspace(c = jscanf_getc(args)));
+					if(c != EOF)
+						jscanf_ungetc(args, c);
+				}
+
+				switch(*format)
+				{
+					case 'i': case 'u':	//Unsigned int
+						base = 0;
+						goto convert_number;
+					case 'd':
+						base = 10;
+						goto convert_number;
+					case 'o':
+						base = 8;
+						goto convert_number;
+					case 'x': case 'X':
+						base = 16;
+						convert_number:
+						if(width == 0 || width > sizeof(buffer))
+							width = sizeof(buffer) - 1;
+						width = jscanf_readNumber(args, buffer, width, base, &eof);
+						value = strtol(buffer, &end, base);
+						if(eof && width == 0 && ret == 0)
+							return EOF;
+						if(assign)
+						{
+							jscanf_assignNumber(va_arg(arg, void*), value, length);
+							ret++;
+						}
+					break;
+					case 'n':	//Bisher gelesene Zeichen
+						if(assign)
+							jscanf_assignNumber(va_arg(arg, void*), jscanf_tell(args), length);
+					break;
+					case 's':	//String
+					{
+						char *ptr;
+						bool matched = false;
+						if(width == 0)
+							width = -1;
+						if(assign)
+							ptr = va_arg(arg, char*);
+
+						while(width--)
+						{
+							c = jscanf_getc(args);
+							if(isspace(c))
+							{
+								jscanf_ungetc(args, c);
+								break;
+							}
+							else if(c == EOF)
+								break;
+
+							matched = true;
+
+							if(assign)
+								*ptr++ = c;
+						}
+
+						if(!matched)
+						{
+							if(ret == 0)
+								return EOF;
+							return ret;
+						}
+						if(assign)
+						{
+							*ptr = '\0';
+							ret++;
+						}
+					}
+					break;
+					case 'c':	//Char
+					{
+						char *ptr;
+						if(assign)
+							ptr = va_arg(arg, char*);
+						if(width == 0)
+							width = 1;
+						while(width--)
+						{
+							c = jscanf_getc(args);
+							if(c == EOF)
+							{
+								if(ret == 0)
+									return EOF;
+								return ret;
+							}
+							if(assign)
+								ptr[width] = c;
+							ret += assign;
+						}
+					}
+					break;
+					default:	//Ansonsten ungültig
+						format--;
+						//pos--;
+					break;
+				}
+			break;
+			default:	//Ansonsten schreibe das aktuelle Zeichen
+				c = jscanf_getc(args);
+				if(c != *format)
+					return ret;
+			break;
+		}
+	}
+	return ret;
+}
+
 //scanf-Funktionen
 int fscanf(FILE *stream, const char *format, ...)
 {
-	return EOF;
+	va_list arg;
+	va_start(arg, format);
+	int pos = vfscanf(stream, format, arg);
+	va_end(arg);
+	return pos;
 }
 
 int scanf(const char *format, ...)
 {
-	return EOF;
+	va_list arg;
+	va_start(arg, format);
+	int pos = vscanf(format, arg);
+	va_end(arg);
+	return pos;
 }
 
 int sscanf(const char *str, const char *format, ...)
 {
+	va_list arg;
+	va_start(arg, format);
+	int pos = vsscanf(str, format, arg);
+	va_end(arg);
+	return pos;
+}
+
+int vfscanf_getc(void *ptr)
+{
+	FILE *stream = ptr;
+	return fgetc(stream);
+}
+
+void vfscanf_ungetc(void *ptr, int c)
+{
+	//TODO
+	FILE *stream = ptr;
+	//ungetc(c, stream);
+}
+
+int vfscanf_tell(void *ptr)
+{
+	FILE *stream = ptr;
+	return ftell(stream);
+}
+
+int vfscanf(FILE *stream, const char *format, va_list arg)
+{
+	jscanf_args args = {
+			.arg = stream,
+			.getc = vfscanf_getc,
+			.ungetc = vfscanf_ungetc,
+			.tell = vfscanf_tell
+	};
+
+	return jvscanf(&args, format, arg);
+}
+
+int vscanf(const char *format, va_list arg)
+{
+	return vfscanf(stdin, format, arg);
+}
+
+typedef struct{
+	char *str;
+	size_t pos;
+}vsscanf_args;
+
+int vsscanf_getc(void *ptr)
+{
+	vsscanf_args *arg = ptr;
+	if(arg->str[arg->pos])
+		return arg->str[arg->pos++];
 	return EOF;
+}
+
+void vsscanf_ungetc(void *ptr, int c)
+{
+	vsscanf_args *arg = ptr;
+	if(arg->pos > 0)
+		arg->pos--;
+}
+
+int vsscanf_tell(void *ptr)
+{
+	vsscanf_args *arg = ptr;
+	return arg->pos;
+}
+
+int vsscanf(const char *str, const char *format, va_list arg)
+{
+	vsscanf_args scanf_args = {
+			.pos = 0,
+			.str = (char*)str
+	};
+	jscanf_args args = {
+			.arg = &scanf_args,
+			.getc = vsscanf_getc,
+			.ungetc = vsscanf_ungetc,
+			.tell = vsscanf_tell
+	};
+
+	return jvscanf(&args, format, arg);
 }
 
 //I/O-Funktionen

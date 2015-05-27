@@ -92,6 +92,11 @@ extern int printf(const char *format, ...);
 extern int sprintf(char *str, const char *format, ...);
 extern int asprintf(char **str, const char *format, ...);
 
+extern int vfscanf(FILE *stream, const char *format, va_list arg);
+extern int vscanf(const char *format, va_list arg);
+extern int vsscanf(const char *str, const char *format, va_list arg);
+
+extern int fscanf(FILE *stream, const char *format, ...);
 extern int scanf(const char *format, ...);
 extern int sscanf(const char *str, const char *format, ...);
 
