@@ -51,8 +51,8 @@ static syscall syscalls[] = {
 
 		(syscall)&loader_load,			//10
 		(syscall)&pm_ExitTask,			//11
-		(syscall)&createThreadHandler,
-		(syscall)&exitThreadHandler,
+		(syscall)&createThreadHandler,	//12
+		(syscall)&exitThreadHandler,	//13
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,
@@ -143,7 +143,7 @@ static void nop()
 
 static uint64_t createThreadHandler(void *entry)
 {
-	thread_t *thread = thread_create(currentProcess, entry);
+	thread_t *thread = thread_create(currentProcess, entry, 0, NULL);
 	return thread->tid;
 }
 
