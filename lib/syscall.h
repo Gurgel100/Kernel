@@ -23,6 +23,7 @@ typedef enum{
 }vfs_fileinfo_t;
 
 typedef uint64_t pid_t;
+typedef uint64_t tid_t;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
