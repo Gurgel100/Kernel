@@ -33,6 +33,8 @@ inline void syscall_putch(unsigned char c);
 
 inline pid_t syscall_createProcess(const char *path, const char *cmd, bool newConsole);
 inline void syscall_exit(int status);
+inline tid_t syscall_createThread(void *entry);
+inline void syscall_exitThread(int status);
 
 inline void *syscall_fopen(char *path, vfs_mode_t mode);
 inline void syscall_fclose(void *stream);

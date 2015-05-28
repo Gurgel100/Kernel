@@ -48,6 +48,16 @@ inline void __attribute__((noreturn)) syscall_exit(int status)
 	while(1);
 }
 
+inline tid_t syscall_createThread(void *entry)
+{
+	return (tid_t)_syscall(12, entry);
+}
+
+inline void __attribute__((noreturn)) syscall_exitThread(int status)
+{
+	asm volatile("int $0x30" : : "D"(13), "S"(status));
+}
+
 inline void *syscall_fopen(char *path, vfs_mode_t mode)
 {
 	return (void*)_syscall(40, path, mode);
