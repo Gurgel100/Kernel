@@ -47,14 +47,7 @@ void pm_Init()
 	ProcessList = list_create();
 
 	idleProcess.threads = list_create();
-	idleThread = thread_create(&idleProcess, idle, 0, NULL);
-	idleThread->State->cs = 0x8;
-	idleThread->State->ss = 0x10;
-
-	//Wir verwenden den Kernelstack weiter
-	vmm_ContextUnMap(idleThread->process->Context, MM_USER_STACK);
-	extern uint64_t stack;
-	idleThread->State->rsp = (uint64_t)&stack;
+	idleThread = thread_create(&idleProcess, idle, 0, NULL, true);
 
 	size_t i = 0;
 	thread_t *t;
@@ -105,11 +98,13 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 		newProcess->console = pm_getTask(parent)->console;
 	}
 
+	newProcess->nextThreadStack = (void*)(MM_USER_STACK + 1);
+
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd);
+	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false);
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);
