@@ -154,7 +154,7 @@ void thread_prepare(thread_t *thread)
 
 void thread_block(thread_t *thread)
 {
-	if(thread != NULL)
+	if(thread != NULL && (thread->Status == RUNNING || thread->Status == READY))
 	{
 		scheduler_remove(thread);
 		thread->Status = BLOCKED;
@@ -163,7 +163,7 @@ void thread_block(thread_t *thread)
 
 void thread_unblock(thread_t *thread)
 {
-	if(thread != NULL)
+	if(thread != NULL && (thread->Status != RUNNING && thread->Status != READY))
 	{
 		thread->Status = READY;
 		scheduler_add(thread);
@@ -172,7 +172,7 @@ void thread_unblock(thread_t *thread)
 
 void thread_waitUserIO(thread_t* thread)
 {
-	if(thread != NULL)
+	if(thread != NULL && (thread->Status == RUNNING || thread->Status == READY))
 	{
 		thread->Status = WAITING_USERIO;
 		scheduler_remove(thread);
