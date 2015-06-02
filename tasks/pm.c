@@ -18,13 +18,13 @@
 #include "scheduler.h"
 #include "cleaner.h"
 
-static pid_t nextPID = 0;
+static pid_t nextPID = 1;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
 extern thread_t *currentThread;
 extern process_t idleProcess;				//Handler für idle-Task
 extern thread_t* idleThread;				//Handler für idle-Task
-thread_t* cleanerThread;					//Handler für cleaner-Task
+thread_t* cleanerThread;				//Handler für cleaner-Task
 extern list_t threadList;
 
 ihs_t *pm_Schedule(ihs_t *cpu);
