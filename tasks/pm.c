@@ -108,7 +108,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 	newProcess->threads = list_create();
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false);
+	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false)->Status = READY;
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);

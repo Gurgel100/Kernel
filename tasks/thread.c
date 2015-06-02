@@ -103,7 +103,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Thread in Liste eintragen
 	list_push(threadList, thread);
 
-	thread->Status = READY;
+	thread->Status = BLOCKED;
 
 	return thread;
 }
