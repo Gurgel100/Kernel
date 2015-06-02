@@ -17,7 +17,7 @@
 #include "scheduler.h"
 
 list_t threadList;
-tid_t nextTID = 0;
+tid_t nextTID = 1;
 
 void thread_Init()
 {
@@ -28,7 +28,7 @@ tid_t get_tid()
 {
 	static lock_t tid_lock = LOCK_UNLOCKED;
 	lock(&tid_lock);
-	tid_t tid = nextTID;
+	tid_t tid = nextTID++;
 	unlock(&tid_lock);
 	return tid;
 }

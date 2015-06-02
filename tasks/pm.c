@@ -18,7 +18,7 @@
 #include "scheduler.h"
 #include "cleaner.h"
 
-static pid_t nextPID;
+static pid_t nextPID = 0;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
 extern thread_t *currentThread;
