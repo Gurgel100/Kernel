@@ -9,7 +9,7 @@
 #define MEMORY_H_
 
 //Kernelspace
-#define KERNELSPACE_START	0x0							//Kernelspace Anfang
+#define KERNELSPACE_START	0x1000						//Kernelspace Anfang
 #define KERNELSPACE_END		(0x8000000000 - 1)			//Kernelspace Ende (512GB)
 
 //Userspace
