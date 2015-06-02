@@ -49,6 +49,8 @@ uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context,
 uint8_t vmm_ContextMap(context_t *context, uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t avl);
 uint8_t vmm_ContextUnMap(context_t *context, uintptr_t vAddress);
 
+bool vmm_getPageStatus(uintptr_t Address);
+
 void vmm_unusePages(void *virt, size_t pages);
 void vmm_usePages(void *virt, size_t pages);
 
