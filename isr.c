@@ -381,7 +381,7 @@ void exception_PageFault(ihs_t *ihs)
 	PT = (void*)PT + (((uint64_t)PML4i << 30) | (PDPi << 21) | (PDi << 12));
 
 	//Wenn diese Page eine unused page ist, dann wird diese aktiviert
-	if(PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE)
+	if(!vmm_getPageStatus(CR2) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
 	{
 		vmm_usePages((void*)CR2, 1);
 	}
