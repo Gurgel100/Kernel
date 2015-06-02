@@ -33,6 +33,8 @@ typedef struct{
 		pm_status_t Status;
 		console_t *console;
 		list_t threads;
+
+		void *nextThreadStack;
 }process_t;
 
 extern process_t *currentProcess;			//Aktueller Prozess

@@ -16,13 +16,15 @@
 #include "cpu.h"
 #include "thread.h"
 #include "scheduler.h"
+#include "cleaner.h"
 
-static pid_t nextPID;
+static pid_t nextPID = 1;
 static uint64_t numTasks = 0;
 static list_t ProcessList;					//Liste aller Prozesse (Status)
 extern thread_t *currentThread;
 extern process_t idleProcess;				//Handler für idle-Task
 extern thread_t* idleThread;				//Handler für idle-Task
+thread_t* cleanerThread;				//Handler für cleaner-Task
 extern list_t threadList;
 
 ihs_t *pm_Schedule(ihs_t *cpu);
@@ -43,18 +45,13 @@ void pm_Init()
 {
 	thread_Init();
 	scheduler_Init();
+	cleaner_Init();
 
 	ProcessList = list_create();
 
 	idleProcess.threads = list_create();
-	idleThread = thread_create(&idleProcess, idle, 0, NULL);
-	idleThread->State->cs = 0x8;
-	idleThread->State->ss = 0x10;
-
-	//Wir verwenden den Kernelstack weiter
-	vmm_ContextUnMap(idleThread->process->Context, MM_USER_STACK);
-	extern uint64_t stack;
-	idleThread->State->rsp = (uint64_t)&stack;
+	idleThread = thread_create(&idleProcess, idle, 0, NULL, true);
+	cleanerThread = thread_create(&idleProcess, cleaner, 0, NULL, true);
 
 	size_t i = 0;
 	thread_t *t;
@@ -105,11 +102,13 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 		newProcess->console = pm_getTask(parent)->console;
 	}
 
+	newProcess->nextThreadStack = (void*)(MM_USER_STACK + 1);
+
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd);
+	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false)->Status = READY;
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);

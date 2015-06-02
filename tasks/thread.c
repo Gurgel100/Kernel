@@ -17,7 +17,7 @@
 #include "scheduler.h"
 
 list_t threadList;
-tid_t nextTID = 0;
+tid_t nextTID = 1;
 
 void thread_Init()
 {
@@ -28,12 +28,12 @@ tid_t get_tid()
 {
 	static lock_t tid_lock = LOCK_UNLOCKED;
 	lock(&tid_lock);
-	tid_t tid = nextTID;
+	tid_t tid = nextTID++;
 	unlock(&tid_lock);
 	return tid;
 }
 
-thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data)
+thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
 {
 	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
 	if(thread == NULL)
@@ -48,8 +48,8 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	thread->Status = BLOCKED;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
-			.cs = 0x20 + 3,	//Userspace
-			.ss = 0x18 + 3,
+			.cs = (kernel) ? 0x8 : 0x20 + 3,	//Kernel- oder Userspace
+			.ss = (kernel) ? 0x10 : 0x18 + 3,	//Kernel- oder Userspace
 			.es = 0x10,
 			.ds = 0x10,
 			.gs = 0x10,
@@ -60,7 +60,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
-			.rsp = MM_USER_STACK + 1 - data_length,
+			.rsp = process->nextThreadStack - data_length,
 
 			//IRQs einschalten (IF = 1)
 			.rflags = 0x202,
@@ -69,39 +69,47 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 			.interrupt = 32
 	};
 	//Kernelstack vorbereiten
-	thread->kernelStackBottom = (void*)mm_SysAlloc(1);
-	thread->kernelStack = thread->kernelStackBottom + MM_BLOCK_SIZE;
-	thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
-	memcpy(thread->State, &new_state, sizeof(ihs_t));
+	if(!kernel)
+	{
+		thread->kernelStackBottom = (void*)mm_SysAlloc(1);
+		thread->kernelStack = thread->kernelStackBottom + MM_BLOCK_SIZE;
+		thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
+		memcpy(thread->State, &new_state, sizeof(ihs_t));
+	}
 
 	thread->fpuState = NULL;
 
 	//Stack mappen (1 Page)
 	void *stack = (void*)mm_SysAlloc(1);
-	memcpy(stack + 0x1000 - data_length, data, data_length);
-	void *phys = (void*)vmm_getPhysAddress((uintptr_t)stack);
-	vmm_ContextMap(process->Context, MM_USER_STACK, (uintptr_t)phys, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
-	vmm_UnMap(stack);
+	memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
+	if(!kernel)
+	{
+		void *phys = (void*)vmm_getPhysAddress((uintptr_t)stack);
+		vmm_ContextMap(process->Context, process->nextThreadStack - MM_BLOCK_SIZE, (uintptr_t)phys,
+				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, (phys == NULL) ? VMM_UNUSED_PAGE : 0);
+		vmm_UnMap(kernel);
+	}
+	else
+	{
+		new_state.rsp = stack + MM_BLOCK_SIZE;
+		thread->State = (ihs_t*)(new_state.rsp - sizeof(ihs_t));
+		memcpy(thread->State, &new_state, sizeof(ihs_t));
+	}
+
+	process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 
 	list_push(process->threads, thread);
 
 	//Thread in Liste eintragen
 	list_push(threadList, thread);
 
-	thread->Status = READY;
+	thread->Status = BLOCKED;
 
 	return thread;
 }
 
 void thread_destroy(thread_t *thread)
 {
-	if(thread->Status == READY)
-	{
-		thread->Status = BLOCKED;
-	}
-	else
-		return;
-
 	mm_SysFree((uintptr_t)thread->kernelStackBottom, 1);
 
 	//Thread aus Listen entfernen
@@ -139,7 +147,7 @@ void thread_prepare(thread_t *thread)
 
 void thread_block(thread_t *thread)
 {
-	if(thread != NULL)
+	if(thread != NULL && (thread->Status == RUNNING || thread->Status == READY))
 	{
 		scheduler_remove(thread);
 		thread->Status = BLOCKED;
@@ -148,7 +156,7 @@ void thread_block(thread_t *thread)
 
 void thread_unblock(thread_t *thread)
 {
-	if(thread != NULL)
+	if(thread != NULL && (thread->Status != RUNNING && thread->Status != READY))
 	{
 		thread->Status = READY;
 		scheduler_add(thread);
@@ -157,7 +165,7 @@ void thread_unblock(thread_t *thread)
 
 void thread_waitUserIO(thread_t* thread)
 {
-	if(thread != NULL)
+	if(thread != NULL && (thread->Status == RUNNING || thread->Status == READY))
 	{
 		thread->Status = WAITING_USERIO;
 		scheduler_remove(thread);
