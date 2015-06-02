@@ -17,6 +17,7 @@
 #include "system.h"
 #include "cpu.h"
 #include "scheduler.h"
+#include "cleaner.h"
 
 #define STAR	0xC0000081
 #define LSTAR	0xC0000082
@@ -143,13 +144,15 @@ static void nop()
 
 static uint64_t createThreadHandler(void *entry)
 {
-	thread_t *thread = thread_create(currentProcess, entry, 0, NULL);
+	thread_t *thread = thread_create(currentProcess, entry, 0, NULL, false);
+	thread_unblock(thread);
 	return thread->tid;
 }
 
 static void exitThreadHandler()
 {
-	thread_destroy(currentThread);
+	cleaner_cleanThread(currentThread);
+	yield();
 }
 
 #endif
