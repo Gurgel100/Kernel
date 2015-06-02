@@ -110,13 +110,6 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 void thread_destroy(thread_t *thread)
 {
-	if(thread->Status == READY)
-	{
-		thread->Status = BLOCKED;
-	}
-	else
-		return;
-
 	mm_SysFree((uintptr_t)thread->kernelStackBottom, 1);
 
 	//Thread aus Listen entfernen
