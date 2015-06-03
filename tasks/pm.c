@@ -149,23 +149,10 @@ void pm_DestroyTask(pid_t PID)
  * Parameter:		Registerstatus
  * Rückgabewert:	Neuer Registerstatus (Taskswitch)
  */
-ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code)
+void pm_ExitTask(uint64_t code)
 {
-	thread_t *thread = currentThread;
-
-	//Erst müssen wir den Thread deaktivieren
-	scheduler_remove(thread);
-
-	//Jetzt müssen wir den Thread wechseln
-	thread_t *newThread = scheduler_schedule(cpu);
-
-	//Jetzt Thread als blockiert markieren
-	thread->Status = BLOCKED;
-
-	//Jetzt löschen wir den Prozess
-	pm_DestroyTask(thread->process->PID);
-
-	return newThread->State;
+	cleaner_cleanProcess(currentProcess);
+	yield();
 }
 
 /*

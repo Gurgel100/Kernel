@@ -42,7 +42,7 @@ extern process_t *currentProcess;			//Aktueller Prozess
 void pm_Init(void);
 pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole);
 void pm_DestroyTask(pid_t PID);
-ihs_t *pm_ExitTask(ihs_t *cpu, uint64_t code);
+void pm_ExitTask(uint64_t code);
 void pm_BlockTask(pid_t PID);
 void pm_ActivateTask(pid_t PID);
 process_t *pm_getTask(pid_t PID);
