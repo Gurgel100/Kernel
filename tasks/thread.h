@@ -22,6 +22,7 @@ typedef struct{
 	void *fpuState;
 	pm_status_t Status;
 	void *kernelStackBottom, *kernelStack;
+	void *userStackBottom, *userStackPhys;
 	bool isMainThread;
 }thread_t;
 

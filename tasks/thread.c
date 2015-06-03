@@ -15,6 +15,7 @@
 #include "string.h"
 #include "cpu.h"
 #include "scheduler.h"
+#include "pmm.h"
 
 list_t threadList;
 tid_t nextTID = 1;
@@ -79,24 +80,25 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 	thread->fpuState = NULL;
 
-	//Stack mappen (1 Page)
-	void *stack = (void*)mm_SysAlloc(1);
-	memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
+	//Stack mappen
 	if(!kernel)
 	{
-		void *phys = (void*)vmm_getPhysAddress((uintptr_t)stack);
-		vmm_ContextMap(process->Context, (uintptr_t)process->nextThreadStack - MM_BLOCK_SIZE, (uintptr_t)phys,
-				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, (phys == NULL) ? VMM_UNUSED_PAGE : 0);
-		vmm_UnMap(stack);
+		void *stack = (void*)mm_SysAlloc(1);
+		thread->userStackBottom = process->nextThreadStack - MM_BLOCK_SIZE;
+		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
+		thread->userStackPhys = (void*)vmm_getPhysAddress((uintptr_t)stack);
+		if(thread->userStackPhys == NULL)
+			thread->userStackPhys = pmm_Alloc();
+		vmm_ContextMap(process->Context, (uintptr_t)thread->userStackBottom, (uintptr_t)thread->userStackPhys,
+				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
+		process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 	}
 	else
 	{
-		new_state.rsp = (uintptr_t)stack + MM_BLOCK_SIZE;
+		new_state.rsp = (uintptr_t)mm_SysAlloc(1) + MM_BLOCK_SIZE;
 		thread->State = (ihs_t*)(new_state.rsp - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
-
-	process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 
 	list_push(process->threads, thread);
 
@@ -135,6 +137,10 @@ void thread_destroy(thread_t *thread)
 		}
 		i++;
 	}
+
+	//Userstack freigeben
+	vmm_ContextUnMap(thread->process->Context, (uintptr_t)thread->userStackBottom);
+	pmm_Free(thread->userStackPhys);
 
 	free(thread->fpuState);
 	free(thread);
