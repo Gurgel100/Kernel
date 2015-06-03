@@ -60,7 +60,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 
-			.rsp = process->nextThreadStack - data_length,
+			.rsp = (uintptr_t)process->nextThreadStack - data_length,
 
 			//IRQs einschalten (IF = 1)
 			.rflags = 0x202,
@@ -85,13 +85,13 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	if(!kernel)
 	{
 		void *phys = (void*)vmm_getPhysAddress((uintptr_t)stack);
-		vmm_ContextMap(process->Context, process->nextThreadStack - MM_BLOCK_SIZE, (uintptr_t)phys,
+		vmm_ContextMap(process->Context, (uintptr_t)process->nextThreadStack - MM_BLOCK_SIZE, (uintptr_t)phys,
 				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, (phys == NULL) ? VMM_UNUSED_PAGE : 0);
-		vmm_UnMap(kernel);
+		vmm_UnMap(stack);
 	}
 	else
 	{
-		new_state.rsp = stack + MM_BLOCK_SIZE;
+		new_state.rsp = (uintptr_t)stack + MM_BLOCK_SIZE;
 		thread->State = (ihs_t*)(new_state.rsp - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
