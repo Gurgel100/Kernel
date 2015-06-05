@@ -204,8 +204,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	pid_t taskID = pm_InitTask(0, (void*)Header->e_entry, (char*)cmd, newConsole);
-	process_t *task = pm_getTask(taskID);
+	process_t *task = pm_InitTask(currentProcess, (void*)Header->e_entry, (char*)cmd, newConsole);;
 
 	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
 	fseek(fp, Header->e_phoff, SEEK_SET);
@@ -213,7 +212,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 	{
 		free(Header);
 		free(ProgramHeader);
-		pm_DestroyTask(taskID);
+		pm_DestroyTask(task);
 		return -1;
 	}
 
@@ -241,6 +240,6 @@ pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 	free(Header);
 
 	//Prozess aktivieren
-	pm_ActivateTask(taskID);
-	return taskID;
+	pm_ActivateTask(task);
+	return task->PID;
 }

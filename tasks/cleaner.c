@@ -29,7 +29,7 @@ void cleaner()
 				switch(entry->type)
 				{
 					case CL_PROCESS:
-						pm_DestroyTask(((process_t*)entry->data)->PID);
+						pm_DestroyTask(entry->data);
 					break;
 					case CL_THREAD:
 						thread_destroy(entry->data);
@@ -56,7 +56,7 @@ void cleaner_cleanProcess(process_t *process)
 	entry->data = process;
 
 	//Prozess blockieren
-	pm_BlockTask(process->PID);
+	pm_BlockTask(process);
 
 	lock(&cleanLock);
 	list_push(cleanList, entry);

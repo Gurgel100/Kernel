@@ -72,7 +72,7 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
+process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsole)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
 	numTasks++;
@@ -86,7 +86,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 	}
 
 	newProcess->PID = nextPID++;
-	newProcess->PPID = parent;
+	newProcess->PPID = parent->PID;
 
 	newProcess->Context = createContext();
 
@@ -99,7 +99,7 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 	}
 	else
 	{
-		newProcess->console = pm_getTask(parent)->console;
+		newProcess->console = parent->console;
 	}
 
 	newProcess->nextThreadStack = (void*)(MM_USER_STACK + 1);
@@ -113,21 +113,21 @@ pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole)
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);
 
-	return newProcess->PID;
+	return newProcess;
 }
 
 /*
  * Task "zerstören", d.h. in aufräumen
  * Params:	PID = PID des Tasks
  */
-void pm_DestroyTask(pid_t PID)
+void pm_DestroyTask(process_t *process)
 {
 	uint64_t i = 0;
-	process_t *process;
+	process_t *p;
 
-	while((process = list_get(ProcessList, i)) != NULL)
+	while((p = list_get(ProcessList, i++)) != NULL)
 	{
-		if(process->PID == PID)
+		if(p == process)
 		{	//Wenn der richtige Prozess gefunden wurde, alle Datenstrukturen des Prozesses freigeben
 			list_remove(ProcessList, i);
 			//Alle Threads beenden
@@ -159,18 +159,16 @@ void pm_ExitTask(uint64_t code)
  * Hält einen Task an ohne ihn zu beenden
  * Params:	PID = PID des Tasks
  */
-void pm_BlockTask(pid_t PID)
+void pm_BlockTask(process_t *process)
 {
-	process_t *Process = pm_getTask(PID);
-
-	if(Process != NULL)
+	if(process != NULL)
 	{
-		Process->Status = BLOCKED;
+		process->Status = BLOCKED;
 
 		//Alle Threads deaktivieren
 		thread_t *thread;
 		size_t i = 0;
-		while((thread = list_get(Process->threads, i++)))
+		while((thread = list_get(process->threads, i++)))
 		{
 			scheduler_remove(thread);
 		}
@@ -181,18 +179,16 @@ void pm_BlockTask(pid_t PID)
  * Hält einen Task an ohne ihn zu beenden
  * Params:	PID = PID des Tasks
  */
-void pm_ActivateTask(pid_t PID)
+void pm_ActivateTask(process_t *process)
 {
-	process_t *Process = pm_getTask(PID);
-
-	if(Process != NULL)
+	if(process != NULL)
 	{
-		Process->Status = READY;
+		process->Status = READY;
 
 		//Alle Threads aktivieren
 		thread_t *thread;
 		size_t i = 0;
-		while((thread = list_get(Process->threads, i++)))
+		while((thread = list_get(process->threads, i++)))
 		{
 			if(thread->Status != BLOCKED)
 				scheduler_add(thread);

@@ -40,11 +40,11 @@ typedef struct{
 extern process_t *currentProcess;			//Aktueller Prozess
 
 void pm_Init(void);
-pid_t pm_InitTask(pid_t parent, void *entry, char* cmd, bool newConsole);
-void pm_DestroyTask(pid_t PID);
+process_t *pm_InitTask(process_t *process, void *entry, char* cmd, bool newConsole);
+void pm_DestroyTask(process_t *process);
 void pm_ExitTask(uint64_t code);
-void pm_BlockTask(pid_t PID);
-void pm_ActivateTask(pid_t PID);
+void pm_BlockTask(process_t *process);
+void pm_ActivateTask(process_t *process);
 process_t *pm_getTask(pid_t PID);
 console_t *pm_getConsole();
 
