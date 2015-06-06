@@ -138,7 +138,7 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 
 	if(mode.empty)
 	{
-		if(stream->stream.fs->read_only && !stream->stream.res->flags.write)
+		if(stream->stream.fs->read_only || !stream->stream.res->flags.write)
 		{
 			stream->stream.res->res->unload(&stream->stream);
 			free(stream);
