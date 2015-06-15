@@ -44,7 +44,7 @@ inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
 void setupNewHeapEntry(heap_t *old, heap_t *new);
 
-void abort()
+void __attribute__((noexit)) abort()
 {
 #ifndef BUILD_KERNEL
 	syscall_exit(-1);
@@ -72,7 +72,7 @@ int atexit(void (*func)(void))
 	return 0;
 }
 
-void exit(int status)
+void __attribute__((noexit)) exit(int status)
 {
 #ifndef BUILD_KERNEL
 	//Erst registrierte Funktionen aufrufen
