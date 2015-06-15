@@ -1143,6 +1143,9 @@ uint64_t vmm_getPhysAddress(uint64_t virtualAddress)
 {
 	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 
+	if(vmm_getPageStatus(virtualAddress))
+		return NULL;
+
 	//Einträge in die Page Tabellen
 	uint16_t PML4i = (virtualAddress & PG_PML4_INDEX) >> 39;
 	uint16_t PDPi = (virtualAddress & PG_PDP_INDEX) >> 30;
@@ -1228,8 +1231,7 @@ context_t *createContext()
 
 	context->physAddress = vmm_getPhysAddress((uintptr_t)newPML4);
 	//Den letzten Eintrag verwenden wir als Zeiger auf den Anfang der Tabelle. Das ermöglicht das Editieren derselben.
-	if(PG_AVL(PML4->PML4E[511]) == VMM_POINTER_TO_PML4)
-		setPML4Entry(511, newPML4, 1, 1, 0, 1, 0, 0, VMM_POINTER_TO_PML4, 1, (uintptr_t)context->physAddress);
+	setPML4Entry(511, newPML4, 1, 1, 0, 1, 0, 0, VMM_POINTER_TO_PML4, 1, (uintptr_t)context->physAddress);
 
 	context->virtualAddress = newPML4;
 
