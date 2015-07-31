@@ -267,9 +267,9 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream, stream->posRead, tmpLength, tmp);
+			size = vfs_Read(stream->stream, stream->posRead + readData, tmpLength, tmp);
 #else
-			size = syscall_fread(stream->stream, stream->posRead, tmpLength, tmp);
+			size = syscall_fread(stream->stream, stream->posRead + readData, tmpLength, tmp);
 #endif
 
 			if(size < tmpLength)
