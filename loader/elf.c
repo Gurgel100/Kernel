@@ -206,9 +206,9 @@ pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 	//Jetzt einen neuen Prozess anlegen
 	process_t *task = pm_InitTask(currentProcess, (void*)Header->e_entry, (char*)cmd, newConsole);;
 
-	elf_program_header_entry *ProgramHeader = malloc(sizeof(elf_program_header_entry));
+	elf_program_header_entry *ProgramHeader = malloc(Header->e_phnum * sizeof(elf_program_header_entry));
 	fseek(fp, Header->e_phoff, SEEK_SET);
-	if(fread(ProgramHeader, 1, sizeof(elf_program_header_entry), fp) < sizeof(elf_program_header_entry))
+	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header->e_phnum, fp) < Header->e_phnum)
 	{
 		free(Header);
 		free(ProgramHeader);
