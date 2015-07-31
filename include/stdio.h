@@ -24,9 +24,15 @@ extern "C" {
 #define _IOLBF	1
 #define _IOFBF	2
 
-#define SEEK_SET 0xFFFF
-#define SEEK_CUR 0xFFF0
-#define SEEK_END 0xFF0F
+#ifndef SEEK_SET
+#define SEEK_SET 1
+#endif
+#ifndef SEEK_CUR
+#define SEEK_CUR 2
+#endif
+#ifndef SEEK_END
+#define SEEK_END 3
+#endif
 
 #define BUFSIZ	65536
 
