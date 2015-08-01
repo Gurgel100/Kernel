@@ -86,7 +86,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsol
 	}
 
 	newProcess->PID = nextPID++;
-	newProcess->PPID = parent->PID;
+	newProcess->PPID = (parent != NULL) ? parent->PID : 0;
 
 	newProcess->Context = createContext();
 
