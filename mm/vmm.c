@@ -32,6 +32,16 @@
 //Flags für AVL Bits
 #define VMM_KERNELSPACE		0x1
 #define VMM_POINTER_TO_PML4	0x2
+#define VMM_PAGE_FULL		(1 << 4)
+
+#define VMM_PAGES_PER_PML4		PAGE_ENTRIES * PAGE_ENTRIES * PAGE_ENTRIES * PAGE_ENTRIES
+#define VMM_PAGES_PER_PDP		PAGE_ENTRIES * PAGE_ENTRIES * PAGE_ENTRIES
+#define VMM_PAGES_PER_PD		PAGE_ENTRIES * PAGE_ENTRIES
+#define VMM_PAGES_PER_PT		PAGE_ENTRIES
+
+#define VMM_EXTEND(address)	((int64_t)((address) << 16) >> 16)
+#define VMM_GET_ADDRESS(PML4i, PDPi, PDi, PTi)	(void*)VMM_EXTEND(((uint64_t)PML4i << 39) | ((uint64_t)PDPi << 30) | (PDi << 21) | (PTi << 12))
+#define VMM_ALLOCATED(entry) (entry & PG_P || PG_AVL(entry) & VMM_UNUSED_PAGE)	//Prüft, ob diese Page schon belegt ist
 
 const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39) + 1;
 const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30) + 1;
@@ -734,29 +744,147 @@ uint8_t vmm_ReMap(context_t *src_context, uintptr_t src, context_t *dst_context,
  */
 void *getFreePages(void *start, void *end, size_t pages)
 {
-	//Speichert, wieviele zusammenhängende Pages schon gefunden wurden
-	size_t num = 0;
-	void *i, *startAddress;
-	for(i = (void*)((uintptr_t)start & 0x1000); i <= end; i += VMM_SIZE_PER_PAGE)
+	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
+
+	size_t found_pages = 0;
+
+	//Einträge in die Page Tabellen
+	uint16_t start_PML4i = ((uintptr_t)start & PG_PML4_INDEX) >> 39;
+	uint16_t start_PDPi = ((uintptr_t)start & PG_PDP_INDEX) >> 30;
+	uint16_t start_PDi = ((uintptr_t)start & PG_PD_INDEX) >> 21;
+	uint16_t start_PTi = ((uintptr_t)start & PG_PT_INDEX) >> 12;
+	uint16_t end_PML4i = ((uintptr_t)end & PG_PML4_INDEX) >> 39;
+	uint16_t end_PDPi = ((uintptr_t)end & PG_PDP_INDEX) >> 30;
+	uint16_t end_PDi = ((uintptr_t)end & PG_PD_INDEX) >> 21;
+	uint16_t end_PTi = ((uintptr_t)end & PG_PT_INDEX) >> 12;
+
+	//Anfang des zusammenhängenden Bereichs
+	uint16_t begin_PML4i = start_PML4i;
+	uint16_t begin_PDPi = start_PDPi;
+	uint16_t begin_PDi = start_PDi;
+	uint16_t begin_PTi = start_PTi;
+
+	uint16_t PML4i;
+	for (PML4i = start_PML4i; PML4i <= end_PML4i; PML4i++)
 	{
-		if(vmm_getPageStatus((uintptr_t)i))
+		if((PML4->PML4E[PML4i] & PG_P))
 		{
-			if(num == 0)			//wenn num = 0 ist,
+			//Es sind noch Pages frei
+			if(!(PG_AVL(PML4->PML4E[PML4i]) & VMM_PAGE_FULL))
 			{
-				startAddress = i;	//dann speichere die Addresse (i) in startAddress
-				num = 1;
+				PDP_t *PDP = (void*)VMM_PDP_ADDRESS + (PML4i << 12);
+				uint16_t PDPi;
+				uint16_t last_PDPi = (PML4i == end_PML4i) ? end_PDPi : PAGE_ENTRIES - 1;
+				for(PDPi = (PML4i == start_PML4i) ? start_PDPi : 0; PDPi <= last_PDPi; PDPi++)
+				{
+					if((PDP->PDPE[PDPi] & PG_P))
+					{
+						//Es sind noch Pages frei
+						if(!(PG_AVL(PDP->PDPE[PDPi]) & VMM_PAGE_FULL))
+						{
+							PD_t *PD = (void*)VMM_PD_ADDRESS + (((uint64_t)PML4i << 21) | (PDPi << 12));
+							uint16_t PDi;
+							uint16_t last_PDi = (PML4i == end_PML4i && PDPi == end_PDPi) ? end_PDi : PAGE_ENTRIES - 1;
+							for(PDi = (PML4i == start_PML4i && PDPi == end_PDPi) ? start_PDi : 0; PDi <= last_PDi; PDi++)
+							{
+								if((PD->PDE[PDi] & PG_P))
+								{
+									//Es sind noch Pages frei
+									if(!(PG_AVL(PD->PDE[PDi]) & VMM_PAGE_FULL))
+									{
+										PT_t *PT = (void*)VMM_PT_ADDRESS + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
+										uint16_t PTi;
+										uint16_t last_PTi = (PML4i == end_PML4i && PDPi == end_PDPi && PDi == end_PDi) ? end_PTi : PAGE_ENTRIES - 1;
+										for(PTi = (PML4i == start_PML4i && PDPi == end_PDPi && PDi == end_PDi) ? start_PTi : 0;
+												PTi <= last_PTi; PTi++)
+										{
+											if(VMM_ALLOCATED(PT->PTE[PTi]))
+											{
+												found_pages = 0;
+												continue;
+											}
+											else
+											{
+												if(found_pages == 0)
+												{
+													begin_PTi = PTi;
+													begin_PDi = PDi;
+													begin_PDPi = PDPi;
+													begin_PML4i = PML4i;
+												}
+												found_pages++;
+											}
+
+											if(found_pages >= pages)
+												return VMM_GET_ADDRESS(begin_PML4i, begin_PDPi, begin_PDi, begin_PTi);
+										}
+									}
+									else
+									{
+										found_pages = 0;
+										continue;
+									}
+								}
+								else
+								{
+									if(found_pages == 0)
+									{
+										begin_PTi = 0;
+										begin_PDi = PDi;
+										begin_PDPi = PDPi;
+										begin_PML4i = PML4i;
+									}
+									found_pages += VMM_PAGES_PER_PT;
+								}
+
+								if(found_pages >= pages)
+									return VMM_GET_ADDRESS(begin_PML4i, begin_PDPi, begin_PDi, begin_PTi);
+							}
+						}
+						else
+						{
+							found_pages = 0;
+							continue;
+						}
+					}
+					else
+					{
+						if(found_pages == 0)
+						{
+							begin_PTi = 0;
+							begin_PDi = 0;
+							begin_PDPi = PDPi;
+							begin_PML4i = PML4i;
+						}
+						found_pages += VMM_PAGES_PER_PD;
+					}
+
+					if(found_pages >= pages)
+						return VMM_GET_ADDRESS(begin_PML4i, begin_PDPi, begin_PDi, begin_PTi);
+				}
 			}
-			else if(num < pages)
+			else
 			{
-				if(i == startAddress + num * VMM_SIZE_PER_PAGE)
-					num++;
-				else
-					num = 0;
+				found_pages = 0;
+				continue;
 			}
-			else	//Wenn zusammenhängende Speicherseiten gefunden, dann zurückgeben
-				return startAddress;	//Virtuelle Addresse zurückgeben
 		}
+		else
+		{
+			if(found_pages == 0)
+			{
+				begin_PTi = 0;
+				begin_PDi = 0;
+				begin_PDPi = 0;
+				begin_PML4i = PML4i;
+			}
+			found_pages += VMM_PAGES_PER_PDP;
+		}
+
+		if(found_pages >= pages)
+			return VMM_GET_ADDRESS(begin_PML4i, begin_PDPi, begin_PDi, begin_PTi);
 	}
+
 	return NULL;
 }
 
