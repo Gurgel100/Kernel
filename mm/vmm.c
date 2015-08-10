@@ -129,43 +129,33 @@ bool vmm_Init(uint64_t Speicher)
  */
 uintptr_t vmm_Alloc(uint64_t Length)
 {
-	uintptr_t startAddress = 0;
-	uintptr_t i, j;
-	uint64_t k = 0;					//Zähler für Anzahl Addressen
-	uint8_t Fehler;
-	for(i = USERSPACE_START; i < VMM_MAX_ADDRESS; i += VMM_SIZE_PER_PAGE)
+	size_t i, j;
+	uint8_t error;
+
+	lock(&vmm_lock);
+
+	void *vAddress = getFreePages((void*)USERSPACE_START, (void*)USERSPACE_END, Length);
+	if(vAddress == NULL)
 	{
-		if(vmm_getPageStatus(i))	//Wenn Page frei ist,
+		unlock(&vmm_lock);
+		return 2;
+	}
+
+	//Mappen
+	for(i = 0; i < Length; i++)
+	{
+		error = vmm_Map((uintptr_t)vAddress + i * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
+		if(error != 0)
 		{
-			if(k == 0)				//und k = 0 ist,
-			{
-				startAddress = i;	//dann speichere die Addresse (i) in startAddress
-				k = 1;
-			}
-			else if(k < Length)
-			{
-				if(i == startAddress + k * VMM_SIZE_PER_PAGE)
-					k++;
-				else
-					k = 0;
-			}
-			else
-			{
-				for(j = 0; j < k; j++)
-				{
-					Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
-					if(Fehler == 1) return 1;
-					if(Fehler == 2)		//Virt. Adresse schon belegt? Also weiter suchen
-					{	//TODO: man müsste hier eigentlich noch alles rückgängig machen, bevor man weiter sucht
-						k = 0;
-						continue;
-					}
-				}
-				return startAddress;	//Virtuelle Addresse zurückgeben
-			}
+			//Mapping rückgängig machen
+			for(j = 0; j < i; j++)
+				vmm_UnMap((uintptr_t)vAddress + j * VMM_SIZE_PER_PAGE);
+			unlock(&vmm_lock);
+			return error;
 		}
 	}
-	return 0;						//Keine virt. Addresse gefunden
+	unlock(&vmm_lock);
+	return (uintptr_t)vAddress;
 }
 
 /*
@@ -202,49 +192,34 @@ void vmm_Free(uintptr_t vAddress, uint64_t Pages)
  */
 uintptr_t vmm_SysAlloc(uint64_t Length)
 {
-	uintptr_t startAddress = 0;
-	uintptr_t i, j;
-	uint64_t k = 0;						//Zähler für Anzahl Seiten
-	uint8_t Fehler;
+	size_t i, j;
+	uint8_t error;
 
 	lock(&vmm_lock);
 
-	for(i = KERNELSPACE_START & 0x1000; i <= KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
+	void *vAddress = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, Length);
+	if(vAddress == NULL)
 	{
-		if(vmm_getPageStatus(i))	//Wenn Page frei ist,
+		unlock(&vmm_lock);
+		return 2;
+	}
+
+	//Mappen
+	for(i = 0; i < Length; i++)
+	{
+		error = vmm_Map((uintptr_t)vAddress + i * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX,
+				VMM_KERNELSPACE | VMM_UNUSED_PAGE);
+		if(error != 0)
 		{
-			if(k == 0)				//und k = 0 ist,
-			{
-				startAddress = i;	//dann speichere die Addresse (i) in startAddress
-				k = 1;
-			}
-			else if(k < Length)
-			{
-				if(i == startAddress + k * VMM_SIZE_PER_PAGE)
-					k++;
-				else
-					k = 0;
-			}
-			else	//Wenn zusammenhängende Speicherseiten gefunden, dann reserviere diese
-			{
-				for(j = 0; j < k; j++)
-				{
-					Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX,
-							VMM_KERNELSPACE | VMM_UNUSED_PAGE);
-					if(Fehler == 1) return 1;
-					if(Fehler == 2)		//Virt. Adresse schon belegt? Also weiter suchen
-					{
-						k = 0;
-						continue;
-					}
-				}
-				unlock(&vmm_lock);
-				return startAddress;	//Virtuelle Addresse zurückgeben
-			}
+			//Mapping rückgängig machen
+			for(j = 0; j < i; j++)
+				vmm_UnMap((uintptr_t)vAddress + j * VMM_SIZE_PER_PAGE);
+			unlock(&vmm_lock);
+			return error;
 		}
 	}
 	unlock(&vmm_lock);
-	return 2;						//Keine virt. Addresse gefunden
+	return (uintptr_t)vAddress;
 }
 
 /*
