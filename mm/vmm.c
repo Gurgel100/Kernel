@@ -517,6 +517,47 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 	else
 		return 2;							//virtuelle Addresse schon besetzt
 
+	//Full flags setzen
+	uint16_t i;
+	for(i = 0; i < PAGE_ENTRIES; i++)
+	{
+		if(!VMM_ALLOCATED(PT->PTE[i]))
+			break;
+	}
+	if(i == PAGE_ENTRIES)
+	{
+		if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+			setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE | VMM_PAGE_FULL, 0, PD->PDE[PDi] & PG_ADDRESS);
+		else
+			setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, VMM_PAGE_FULL, 0, PD->PDE[PDi] & PG_ADDRESS);
+	}
+
+	for(i = 0; i < PAGE_ENTRIES; i++)
+	{
+		if(!(PG_AVL(PD->PDE[i]) & VMM_PAGE_FULL))
+			break;
+	}
+	if(i == PAGE_ENTRIES)
+	{
+		if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+			setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE | VMM_PAGE_FULL, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+		else
+			setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, VMM_PAGE_FULL, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+	}
+
+	for(i = 0; i < PAGE_ENTRIES; i++)
+	{
+		if(!(PG_AVL(PDP->PDPE[i]) & VMM_PAGE_FULL))
+			break;
+	}
+	if(i == PAGE_ENTRIES)
+	{
+		if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+			setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE | VMM_PAGE_FULL, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+		else
+			setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, VMM_PAGE_FULL, 0, PML4->PML4E[PDi] & PG_ADDRESS);
+	}
+
 	//Reserved-Bits zurücksetzen
 	PD->PDE[PDi] &= ~0x1C0;
 	PDP->PDPE[PDPi] &= ~0x1C0;
@@ -578,7 +619,24 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
 			if((PT->PTE[i] & PG_P) == 1 || PG_AVL(PT->PTE[i]) == VMM_KERNELSPACE || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
+			{
+				//Full flags löschen
+				if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
+					setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
+				else
+					setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
+
+				if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+					setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+				else
+					setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+
+				if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+					setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+				else
+					setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
 				return 0; //Wird die PT noch benötigt, sind wir fertig
+			}
 		}
 		//Ansonsten geben wir den Speicherplatz für die PT frei
 		pmm_Free((void*)(PD->PDE[PDi] & PG_ADDRESS));
@@ -593,7 +651,20 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		//Wird die PD noch benötigt?
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
-			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[i]) == VMM_KERNELSPACE) return 0; //Wid die PD noch benötigt, sind wir fertig
+			if((PD->PDE[i] & PG_P) == 1 || PG_AVL(PD->PDE[i]) == VMM_KERNELSPACE)
+			{
+				//Full flags löschen
+				if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
+					setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+				else
+					setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+
+				if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+					setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+				else
+					setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+				return 0; //Wid die PD noch benötigt, sind wir fertig
+			}
 		}
 		//Ansonsten geben wir den Speicherplatz für die PD frei
 		pmm_Free((void*)(PDP->PDPE[PDPi] & PG_ADDRESS));
@@ -609,7 +680,15 @@ uint8_t vmm_UnMap(uintptr_t vAddress)
 		for(i = 0; i < PAGE_ENTRIES; i++)
 		{
 			//Wird die PDP noch benötigt, sind wir fertig
-			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[i]) == VMM_KERNELSPACE) return 0;
+			if((PDP->PDPE[i] & PG_P) == 1 || PG_AVL(PDP->PDPE[i]) == VMM_KERNELSPACE)
+			{
+				//Full flag löschen
+				if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
+					setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+				else
+					setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+				return 0;
+			}
 		}
 		//Ansonsten geben wir den Speicherplatz für die PDP frei
 		pmm_Free((void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
