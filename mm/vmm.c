@@ -839,7 +839,7 @@ void *getFreePages(void *start, void *end, size_t pages)
 							PD_t *PD = (void*)VMM_PD_ADDRESS + (((uint64_t)PML4i << 21) | (PDPi << 12));
 							uint16_t PDi;
 							uint16_t last_PDi = (PML4i == end_PML4i && PDPi == end_PDPi) ? end_PDi : PAGE_ENTRIES - 1;
-							for(PDi = (PML4i == start_PML4i && PDPi == end_PDPi) ? start_PDi : 0; PDi <= last_PDi; PDi++)
+							for(PDi = (PML4i == start_PML4i && PDPi == start_PDPi) ? start_PDi : 0; PDi <= last_PDi; PDi++)
 							{
 								if((PD->PDE[PDi] & PG_P))
 								{
@@ -849,7 +849,7 @@ void *getFreePages(void *start, void *end, size_t pages)
 										PT_t *PT = (void*)VMM_PT_ADDRESS + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
 										uint16_t PTi;
 										uint16_t last_PTi = (PML4i == end_PML4i && PDPi == end_PDPi && PDi == end_PDi) ? end_PTi : PAGE_ENTRIES - 1;
-										for(PTi = (PML4i == start_PML4i && PDPi == end_PDPi && PDi == end_PDi) ? start_PTi : 0;
+										for(PTi = (PML4i == start_PML4i && PDPi == start_PDPi && PDi == start_PDi) ? start_PTi : 0;
 												PTi <= last_PTi; PTi++)
 										{
 											if(VMM_ALLOCATED(PT->PTE[PTi]))
