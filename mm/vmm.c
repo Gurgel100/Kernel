@@ -41,7 +41,7 @@
 
 #define VMM_EXTEND(address)	((int64_t)((address) << 16) >> 16)
 #define VMM_GET_ADDRESS(PML4i, PDPi, PDi, PTi)	(void*)VMM_EXTEND(((uint64_t)PML4i << 39) | ((uint64_t)PDPi << 30) | (PDi << 21) | (PTi << 12))
-#define VMM_ALLOCATED(entry) (entry & PG_P || PG_AVL(entry) & VMM_UNUSED_PAGE)	//Prüft, ob diese Page schon belegt ist
+#define VMM_ALLOCATED(entry) ((entry & PG_P) || (PG_AVL(entry) & VMM_UNUSED_PAGE))	//Prüft, ob diese Page schon belegt ist
 
 const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39) + 1;
 const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30) + 1;
