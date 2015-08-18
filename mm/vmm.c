@@ -447,9 +447,9 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 
 		//Eintrag in die PML4
 		if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
-			setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, Address);
+			setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
-			setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, 0, NX, Address);
+			setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		uint32_t i;
 		for(i = 0; i < 512; i++)
 			PDP->PDPE[i] = 0;
@@ -460,9 +460,9 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 		{
 			//Eintrag der PML4 ändern
 			if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
-				setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, PML4->PML4E[PML4i] & PG_ADDRESS);
+				setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
 			else
-				setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, 0, NX, PML4->PML4E[PML4i] & PG_ADDRESS);
+				setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
 		}
 	}
 
@@ -474,9 +474,9 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 
 		//Eintrag in die PDP
 		if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
-			setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, Address);
+			setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
-			setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, 0, NX, Address);
+			setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		uint32_t i;
 		for(i = 0; i < 512; i++)
 			PD->PDE[i] = 0;
@@ -487,9 +487,9 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 		{
 			//Eintrag der PDP ändern
 			if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
-				setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, PDP->PDPE[PDPi] & PG_ADDRESS);
+				setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
 			else
-				setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, 0, NX, PDP->PDPE[PDPi] & PG_ADDRESS);
+				setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
 		}
 	}
 
@@ -501,9 +501,9 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 
 		//Eintrag in die PDP
 		if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
-			setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, Address);
+			setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
-			setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, 0, NX, Address);
+			setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		uint32_t i;
 		for(i = 0; i < 512; i++)
 			PT->PTE[i] = 0;
@@ -514,9 +514,9 @@ uint8_t vmm_Map(uintptr_t vAddress, uintptr_t pAddress, uint8_t flags, uint16_t 
 		{
 			//Eintrag der PD ändern
 			if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
-				setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, PD->PDE[PDi] & PG_ADDRESS);
+				setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
 			else
-				setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, 0, NX, PD->PDE[PDi] & PG_ADDRESS);
+				setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
 		}
 	}
 
