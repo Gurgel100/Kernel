@@ -1190,9 +1190,9 @@ void vmm_unusePages(void *virt, size_t pages)
 
 void vmm_usePages(void *virt, size_t pages)
 {
-	uintptr_t address = (uintptr_t)virt;
+	uintptr_t address = (uintptr_t)virt & ~0xFFF;
 
-	for(; address < (uintptr_t)virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
+	for(; address < ((uintptr_t)virt & ~0xFFF) + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
 	{
 		PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 		//Einträge in die Page Tabellen
@@ -1207,6 +1207,7 @@ void vmm_usePages(void *virt, size_t pages)
 		uintptr_t pAddr = (uintptr_t)pmm_Alloc();
 		setPTEntry(PTi, PT, 1, !!(entry & PG_RW), !!(entry & PG_US), !!(entry & PG_PWT), !!(entry & PG_PCD), !!(entry & PG_A),
 				!!(entry & PG_D), !!(entry & PG_G), PG_AVL(entry) & ~VMM_UNUSED_PAGE, !!(entry & PG_PAT), !!(entry & PG_NX), pAddr);
+		InvalidateTLBEntry(address);
 		clearPage(address);
 	}
 }
