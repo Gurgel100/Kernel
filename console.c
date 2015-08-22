@@ -123,7 +123,7 @@ void console_Init()
  */
 console_t *console_create(char *name, uint8_t color)
 {
-	console_t *console = calloc(sizeof(console_t), 1);
+	console_t *console = malloc(sizeof(console_t));
 	if(console == NULL)
 		return NULL;
 
@@ -157,6 +157,8 @@ console_t *console_create(char *name, uint8_t color)
 	console->width = COLS;
 	console->id = nextID++;
 	unlock(&console->lock);
+
+	console_clear(console);
 
 	return console;
 }
@@ -353,7 +355,11 @@ void console_clear(console_t *console)
 	if(console != NULL)
 	{
 		lock(&console->lock);
-		memset(console->buffer, 0, PAGE_SIZE);
+		size_t i;
+		for(i = 0; i < PAGE_SIZE / 2; i++)
+		{
+			((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
+		}
 		unlock(&console->lock);
 	}
 	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
@@ -393,7 +399,11 @@ static void console_scrollDown(console_t *console)
 		memmove(console->buffer, console->buffer + SIZE_PER_ROW, PAGE_SIZE - SIZE_PER_ROW);
 
 		//Letzte Zeile löschen
-		memset(console->buffer + PAGE_SIZE - SIZE_PER_ROW, 0, SIZE_PER_ROW);
+		size_t i;
+		for(i = 0; i < SIZE_PER_ROW / 2; i++)
+		{
+			((uint16_t*)(console->buffer + PAGE_SIZE - SIZE_PER_ROW))[i] = ' '| (console->color << 8);
+		}
 
 		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
 			display_refresh();

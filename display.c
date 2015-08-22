@@ -21,8 +21,6 @@ void Display_Init()
 {
 	Display_Clear();
 	setColor(BG_BLACK | CL_WHITE);
-	//hideCursor();
-	showCursor();
 	/*uint8_t Register;
 	inb(0x3D8, Register);
 	Register &= 0xDF;
@@ -31,7 +29,8 @@ void Display_Init()
 
 void display_refresh()
 {
-	memcpy(GRAFIKSPEICHER, activeConsole->buffer, activeConsole->width * activeConsole->height * sizeof(uint16_t));
+	memcpy((void*)GRAFIKSPEICHER, activeConsole->buffer, activeConsole->width * activeConsole->height * sizeof(uint16_t));
+	setCursor(activeConsole->cursor.x, activeConsole->cursor.y);
 }
 
 void setColor(uint8_t Color)
