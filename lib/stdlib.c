@@ -389,6 +389,10 @@ void *malloc(size_t size)
 	void *Address;
 	if(size == 0)
 		return NULL;
+
+	//Size sollte ein Vielfaches von 8 sein
+	size += 8 - (size % 8);
+
 	if(Heap_Entries == 0)	//Es wurde bisher kein Speicher angefordert
 	{
 		uint64_t Pages = (size + sizeof(heap_t)) / 4096 + 1;
