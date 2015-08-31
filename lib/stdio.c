@@ -940,22 +940,22 @@ int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						switch(length)
 						{
 							case -2:
-								value = va_arg(arg, unsigned int);
+								value = va_arg(arg, int);
 							break;
 							case -1:
-								value = va_arg(arg, unsigned int);
+								value = va_arg(arg, int);
 							break;
 							case 0: default:
-								value = va_arg(arg, unsigned int);
+								value = va_arg(arg, int);
 							break;
 							case 1:
-								value = va_arg(arg, unsigned long);
+								value = va_arg(arg, long);
 							break;
 							case 2:
-								value = va_arg(arg, unsigned long long);
+								value = va_arg(arg, long long);
 							break;
 							case 3:
-								value = va_arg(arg, uint64_t);
+								value = va_arg(arg, int64_t);
 							break;
 							case 4:
 								value = va_arg(arg, size_t);
