@@ -12,6 +12,7 @@
 #include "thread.h"
 #include "cpu.h"
 
+extern process_t kernel_process;
 extern thread_t *currentThread;
 extern process_t *currentProcess;
 

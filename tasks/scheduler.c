@@ -15,9 +15,9 @@ extern thread_t *fpuThread;
 
 extern context_t kernel_context;
 
-process_t idleProcess = {
+process_t kernel_process = {
 		.Context = &kernel_context,
-		.cmd = "idle"
+		.cmd = "kernel"
 };
 thread_t* idleThread;
 
