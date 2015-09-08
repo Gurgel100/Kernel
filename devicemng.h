@@ -15,10 +15,12 @@
 #include "stdint.h"
 #include "stddef.h"
 #include "vfs.h"
+#include "semaphore.h"
 
 typedef struct{
 	struct cdi_device *device;
 	list_t partitions;
+	semaphore_t semaphore;
 }device_t;
 
 void dmng_Init(void);
