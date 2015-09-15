@@ -37,6 +37,7 @@ typedef struct{
 
 	char ansi_buf[16];
 	uint8_t ansi_buf_ofs;
+	cursor_t saved_cursor;
 
 	list_t input;
 }console_t;
@@ -50,6 +51,7 @@ console_t *console_getByName(char *name);
 void console_ansi_write(console_t *console, char c);
 void console_write(console_t *console, char c);
 void console_clear(console_t *console);
+void console_clearLine(console_t *console, uint16_t line);
 void console_switch(uint8_t page);
 void console_changeColor(console_t *console, uint8_t color);
 void console_setCursor(console_t *console, cursor_t cursor);
