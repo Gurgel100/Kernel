@@ -25,10 +25,10 @@ typedef enum{
 	READY, BLOCKED, RUNNING, WAITING_USERIO
 }pm_status_t;
 
-typedef struct{
+typedef struct process_t{
 		context_t *Context;
 		pid_t PID;
-		pid_t PPID;
+		struct process_t *parent;
 		char *cmd;
 		pm_status_t Status;
 		console_t *console;
