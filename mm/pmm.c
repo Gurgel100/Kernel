@@ -163,13 +163,18 @@ void *pmm_Alloc()
  */
 void pmm_Free(void *Address)
 {
+	uint8_t bit_status;
 	//entsprechendes Bit in der Bitmap zurücksetzen
 	size_t i = (uintptr_t)Address / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
 	uint8_t bit = ((uintptr_t)Address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
 	lock(&pmm_lock);
-	asm volatile("bts %0,%1": : "r"(bit & 0xFF), "m"(Map[i]));
+	asm volatile("bts %1,%2;"
+				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]));
 	unlock(&pmm_lock);
-	locked_inc(&pmm_Speicher_Verfuegbar);
+	if(bit_status == 0)
+		locked_inc(&pmm_Speicher_Verfuegbar);
+	else
+		printf("\e[33;mWarning:\e[0m Freed page which was already freed (0x%X)\n", Address);
 }
 
 //Für DMA erforderlich
