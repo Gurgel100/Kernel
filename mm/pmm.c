@@ -22,6 +22,9 @@
 #define PMM_BITS_PER_ELEMENT	(sizeof(*Map) * 8)
 #define PMM_MAP_ALIGN_SIZE(x)	((x + (sizeof(*Map) - 1)) & ~(sizeof(*Map) - 1))
 
+#define MAX(a, b)				((a > b) ? a : b)
+#define MIN(a, b)				((a < b) ? a : b)
+
 //Anfang und Ende des Kernels
 extern uint8_t kernel_start;
 extern uint8_t kernel_end;
@@ -35,6 +38,7 @@ static uint64_t pmm_Kernelsize;			//Grösse des Kernels in Bytes
 static uint64_t tmpMap[4096] __attribute__((aligned(MM_BLOCK_SIZE)));
 static uint64_t *Map = tmpMap;
 static size_t mapSize = 4096;			//Grösse der Bitmap
+static size_t lastIndex = 4;
 
 static lock_t pmm_lock = LOCK_UNLOCKED;
 
@@ -134,7 +138,7 @@ void *pmm_Alloc()
 		return (void*)1;
 	}
 	lock(&pmm_lock);
-	for(i = 4; i < mapSize; i++)
+	for(i = lastIndex; i < mapSize; i++)
 	{
 		uint8_t j = __builtin_ffsl(Map[i]);
 		if(j > 0)
@@ -145,6 +149,7 @@ void *pmm_Alloc()
 
 			//In der Bitmap eintragen, dass Page reserviert
 			asm volatile("btr %0,%1": :"r"(j & 0xFF) ,"m"(Map[i]));
+			lastIndex = i;
 			unlock(&pmm_lock);
 			locked_dec(&pmm_Speicher_Verfuegbar);
 			return Address;
@@ -170,6 +175,7 @@ void pmm_Free(void *Address)
 	lock(&pmm_lock);
 	asm volatile("bts %1,%2;"
 				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]));
+	lastIndex = MAX(MIN(i, lastIndex), 4);
 	unlock(&pmm_lock);
 	if(bit_status == 0)
 		locked_inc(&pmm_Speicher_Verfuegbar);
