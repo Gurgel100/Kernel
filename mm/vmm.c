@@ -1427,10 +1427,52 @@ context_t *createContext()
 void deleteContext(context_t *context)
 {
 	//Erst alle Pages des Kontextes freigeben
-	uintptr_t i;
-	for(i = USERSPACE_START; i < USERSPACE_END; i += MM_BLOCK_SIZE)
+	PML4_t *PML4 = context->virtualAddress;
+	uint16_t PML4i;
+	for(PML4i = 1; PML4i < PAGE_ENTRIES - 1; PML4i++)
 	{
-		vmm_ContextUnMap(context, i);
+		//Ist der Eintrag gültig
+		if(PML4->PML4E[PML4i] & PG_P)
+		{
+			uint16_t PDPi;
+			//PDP mappen
+			PDP_t *PDP = (PDP_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+			vmm_Map((uintptr_t)PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX, VMM_KERNELSPACE);
+			for(PDPi = 0; PDPi < PAGE_ENTRIES; PDPi++)
+			{
+				//Ist der Eintrag gültig
+				if(PDP->PDPE[PDPi] & PG_P)
+				{
+					uint16_t PDi;
+					//PD mappen
+					PD_t *PD = (PD_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+					vmm_Map((uintptr_t)PD, PDP->PDPE[PDPi], VMM_FLAGS_NX, VMM_KERNELSPACE);
+					for(PDi = 0; PDi < PAGE_ENTRIES; PDi++)
+					{
+						//Ist der Eintrag gültig
+						if(PD->PDE[PDi] & PG_P)
+						{
+							uint16_t PTi;
+							//PT mappen
+							PT_t *PT = (PT_t*)getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
+							vmm_Map((uintptr_t)PT, PD->PDE[PDi], VMM_FLAGS_NX, VMM_KERNELSPACE);
+							for(PTi = 0; PTi < PAGE_ENTRIES; PTi++)
+							{
+								//Ist die Page alloziiert
+								if(PT->PTE[PTi] & PG_P)
+									pmm_Free((void*)(PT->PTE[PTi] & PG_ADDRESS));
+							}
+							//PT löschen
+							vmm_SysFree((uintptr_t)PT, 1);
+						}
+					}
+					//PD löschen
+					vmm_SysFree((uintptr_t)PD, 1);
+				}
+			}
+			//PDP löschen
+			vmm_SysFree((uintptr_t)PDP, 1);
+		}
 	}
 
 	//Restliche Datenstrukturen freigeben
