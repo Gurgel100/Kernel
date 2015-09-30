@@ -8,7 +8,6 @@
 #include "paging.h"
 #include "cpu.h"
 
-inline void InvalidateTLBEntry(void *Address);
 inline void FlushTLB(void);
 
 /*Flags:
@@ -27,7 +26,7 @@ inline void FlushTLB(void);
  */
 
 void setPML4Entry(uint16_t i, PML4_t *PML4, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, uintptr_t Address)
+		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address)
 {
 	PML4->PML4E[i] = (Present & 1);
 	PML4->PML4E[i] |= (RW & 1) << 1;
@@ -42,7 +41,7 @@ void setPML4Entry(uint16_t i, PML4_t *PML4, uint8_t Present, uint8_t RW, uint8_t
 }
 
 void setPDPEntry(uint16_t i, PDP_t *PDP, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, uintptr_t Address)
+		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address)
 {
 	PDP->PDPE[i] = (Present & 1);
 	PDP->PDPE[i] |= (RW & 1) << 1;
@@ -57,7 +56,7 @@ void setPDPEntry(uint16_t i, PDP_t *PDP, uint8_t Present, uint8_t RW, uint8_t US
 }
 
 void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, uintptr_t Address)
+		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address)
 {
 	PD->PDE[i] = (Present & 1);
 	PD->PDE[i] |= (RW & 1) << 1;
@@ -73,7 +72,7 @@ void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, u
 
 void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
 		uint8_t PCD, uint8_t A, uint8_t D, uint8_t G, uint16_t AVL,
-		uint8_t PAT, uint8_t NX, uintptr_t Address)
+		uint8_t PAT, uint8_t NX, paddr_t Address)
 {
 	PT->PTE[i] = (Present & 1);
 	PT->PTE[i] |= (RW & 1) << 1;
