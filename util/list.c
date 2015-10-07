@@ -203,8 +203,7 @@ void* list_remove(list_t list, size_t index)
 	}
 	else
 	{
-		prevNode = Node;
-		for(i = 1; i < index; i++)
+		for(i = 0; i < index; i++)
 		{
 			prevNode = Node;
 			Node = Node->Next;
