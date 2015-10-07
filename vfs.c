@@ -458,21 +458,21 @@ size_t getDirs(char ***Dirs, const char *Path)
 	size_t i;
 	char *tmp;
 	//Erst Pfad sichern
-	char *tmpPath = strdup(Path);
+	char *path_copy = strdup(Path);
+	char *tmpPath = path_copy;
 
 	if(!*Dirs)
 		*Dirs = malloc(sizeof(char*));
 
-	(*Dirs)[0] = strdup(strtok(tmpPath, VFS_ROOT));
+	(*Dirs)[0] = strdup(strtok_s(&tmpPath, VFS_ROOT));
 	for(i = 1; ; i++)
 	{
-		if((tmp = strtok(NULL, VFS_ROOT)) ==
-		 NULL)
+		if((tmp = strtok_s(&tmpPath, VFS_ROOT)) == NULL)
 			break;
 		*Dirs = realloc(*Dirs, sizeof(char*) * (i + 1));
 		(*Dirs)[i] = strdup(tmp);
 	}
-	free(tmpPath);
+	free(path_copy);
 	return i;
 }
 
