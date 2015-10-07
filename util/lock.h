@@ -16,6 +16,23 @@
 
 typedef uint8_t lock_t;
 
+//Führt eine Funktion gelockt aus und gibt deren Resultat zurück
+#define LOCKED_RESULT(lck, task)\
+	({\
+		lock(&lck);\
+		typeof(task) ___result = task;\
+		unlock(&lck);\
+		___result;\
+	})
+
+//Führt eine Funktion gelockt aus
+#define LOCKED_TASK(lck, task)\
+	{\
+		lock(&lck);\
+		task;\
+		unlock(&lck);\
+	}
+
 void lock(lock_t *l);
 void unlock(lock_t *l);
 bool locked(lock_t *l);
