@@ -15,6 +15,9 @@
 #include "list.h"
 #include "display.h"
 #include "stdio.h"
+#include "lock.h"
+#include "avl.h"
+#include "assert.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
@@ -54,6 +57,32 @@ static vfs_node_t root;
 static vfs_node_t *lastNode;
 static uint8_t nextPartID = 0;
 static list_t res_list;
+static avl_tree *streams = NULL;
+static uint64_t nextFileID = 3;	//0=stdin, 1=stdout, 2=stderr
+static lock_t vfs_lock;
+
+static int stream_cmp(const void *a, const void *b, void *c)
+{
+	const vfs_stream_t *stream1 = a;
+	const vfs_stream_t *stream2 = b;
+	vfs_stream_t **stream3 = c;
+	if(stream3 && stream1->id == stream2->id)
+		*stream3 = (vfs_stream_t*)((stream1->node) ? stream1 : stream2);
+	return (stream1->id < stream2->id) ? -1 : ((stream1->id == stream2->id) ? 0 : 1);
+}
+
+static uint64_t getNextStreamID()
+{
+	uint64_t id;
+	vfs_stream_t tmp;
+	do
+	{
+		id = __sync_fetch_and_add(&nextFileID, 1);
+		tmp.id = id;
+	}
+	while(id == -1ul || LOCKED_RESULT(vfs_lock, avl_search_s(streams, &tmp, stream_cmp, NULL)));
+	return id;
+}
 
 void vfs_Init(void)
 {
@@ -96,6 +125,7 @@ void vfs_Init(void)
 	Node->Type = TYPE_DIR;
 
 	lastNode = Node;
+	unlock(&vfs_lock);
 }
 
 /*
@@ -103,10 +133,10 @@ void vfs_Init(void)
  * Parameter:	path = Pfad zur Datei
  * 				mode = Modus, in der die Datei geöffnet werden soll
  */
-vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
+vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 {
 	if(path == NULL || strlen(path) == 0 || (!mode.read && !mode.write))
-		return NULL;
+		return -1;
 
 	char *remPath;
 	vfs_stream_t *stream = calloc(1, sizeof(*stream));
@@ -124,7 +154,7 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 				free(stream);
 				if(remPath)
 					free(remPath);
-				return NULL;
+				return -1;
 			}
 		break;
 		case TYPE_DIR:	//Ordner kann man nicht öffnen
@@ -132,7 +162,12 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 			free(stream);
 			if(remPath)
 				free(remPath);
-			return NULL;
+			return -1;
+		break;
+		case TYPE_DEV:
+			mode.empty = false;
+			mode.append = false;
+			mode.create = false;
 		break;
 	}
 
@@ -142,22 +177,35 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 		{
 			stream->stream.res->res->unload(&stream->stream);
 			free(stream);
-			return NULL;
+			return -1;
 		}
 		stream->stream.res->file->truncate(&stream->stream, 0);
 	}
 	if(remPath)
 		free(remPath);
 
-	return stream;
+	stream->id = getNextStreamID();
+
+	//In Baum einfügen
+	LOCKED_TASK(vfs_lock, avl_add_s(&streams, stream, stream_cmp, NULL));
+
+	assert(LOCKED_RESULT(vfs_lock, avl_search_s(streams, stream, stream_cmp, NULL)));
+
+	return stream->id;
 }
 
 /*
  * Eine Datei schliessen
  * Parameter:	stream = Stream der geschlossen werden soll
  */
-void vfs_Close(vfs_stream_t *stream)
+void vfs_Close(vfs_file_t streamid)
 {
+	vfs_stream_t tmp = {
+			.id = streamid,
+			.node = NULL
+	};
+	vfs_stream_t *stream = NULL;
+	LOCKED_RESULT(vfs_lock, avl_remove_s(&streams, &tmp, stream_cmp, &stream));
 	if(stream == NULL)
 		return;
 
@@ -168,6 +216,7 @@ void vfs_Close(vfs_stream_t *stream)
 		break;
 	}
 	free(stream);
+	assert(!LOCKED_RESULT(vfs_lock, avl_search_s(streams, &tmp, stream_cmp, NULL)));
 }
 
 /*
@@ -177,9 +226,14 @@ void vfs_Close(vfs_stream_t *stream)
  * 				length = Anzahl der Bytes, die gelesen werden sollen
  * 				Buffer = Buffer in den die Bytes geschrieben werden
  */
-size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
+size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
 {
-	if(stream == NULL || buffer == NULL)
+	vfs_stream_t tmp = {
+			.id = streamid,
+			.node = NULL
+	};
+	vfs_stream_t *stream = NULL;
+	if(buffer == NULL || !LOCKED_RESULT(vfs_lock, avl_search_s(streams, &tmp, stream_cmp, &stream)))
 		return 0;
 
 	size_t sizeRead = 0;
@@ -204,9 +258,14 @@ size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void 
 	return sizeRead;
 }
 
-size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
+size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
 {
-	if(stream == NULL || buffer == NULL)
+	vfs_stream_t tmp = {
+			.id = streamid,
+			.node = NULL
+	};
+	vfs_stream_t *stream = NULL;
+	if(buffer == NULL || !LOCKED_RESULT(vfs_lock, avl_search_s(streams, &tmp, stream_cmp, &stream)))
 		return 0;
 
 	size_t sizeWritten = 0;
@@ -281,8 +340,16 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
  * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)
  * Rückgabe:	Grösse des Streams oder 0 bei Fehler
  */
-uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info)
+uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 {
+	vfs_stream_t tmp = {
+			.id = streamid,
+			.node = NULL
+	};
+	vfs_stream_t *stream = NULL;
+	if(!LOCKED_RESULT(vfs_lock, avl_search_s(streams, &tmp, stream_cmp, &stream)))
+		return 0;
+
 	if(stream->node->Type == TYPE_MOUNT && stream->stream.res->file != NULL)
 	{
 		switch(info)

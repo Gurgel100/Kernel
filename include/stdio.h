@@ -11,6 +11,7 @@
 #include "stddef.h"
 #include "stdarg.h"
 #include "stdbool.h"
+#include "stdint.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,7 +52,7 @@ typedef enum{
 
 
 typedef struct{
-	void *stream;
+	uint64_t stream_id;
 
 	char *buffer;
 	char *ungetch_buffer;
