@@ -16,7 +16,7 @@ extern thread_t *cleanerThread;
 static list_t cleanList;
 static lock_t cleanLock = LOCK_UNLOCKED;
 
-void cleaner()
+void __attribute__((noreturn)) cleaner()
 {
 	while(1)
 	{
