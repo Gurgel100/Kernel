@@ -342,10 +342,8 @@ void exception_StackFault(ihs_t *ihs)
 //General protection
 void exception_GeneralProtection(ihs_t *ihs)
 {
-	Display_Clear();
-	setColor(BG_BLACK | CL_RED);
-	printf("Exception 13: General Protection\n");
-	setColor(BG_BLACK | CL_WHITE);
+	console_switch(0);
+	printf("\e[31mException 13: General Protection\e[37m\n");
 	printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
@@ -387,11 +385,13 @@ void exception_PageFault(ihs_t *ihs)
 	}
 	else
 	{
-		Display_Clear();
-		setColor(BG_BLACK | CL_RED);
-		printf("Exception 14: Page Fault\n");
-		setColor(BG_BLACK | CL_WHITE);
-		printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
+		console_switch(0);
+		printf("\e[31mException 14: Page Fault\e[37m  ");
+		if(currentProcess != NULL && currentThread != NULL)
+		{
+			printf("PID: %lu, TID: %lu ", currentProcess->PID, currentThread->tid);
+		}
+		printf("\nErrorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
 
 
 		printf("CR2: 0x%X%X\n", CR2 >> 32, CR2 & 0xFFFFFFFF);
