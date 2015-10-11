@@ -8,6 +8,8 @@
 #ifdef BUILD_KERNEL
 
 #include "syscalls.h"
+#include "stddef.h"
+#include "stdbool.h"
 #include "isr.h"
 #include "cmos.h"
 #include "pm.h"
@@ -35,6 +37,7 @@ extern void isr_syscall();
 static void nop();
 static uint64_t createThreadHandler(void *entry);
 static void exitThreadHandler();
+static void sleepHandler(uint64_t msec);
 
 typedef uint64_t(*syscall)(uint64_t arg, ...);
 
@@ -96,7 +99,7 @@ static syscall syscalls[] = {
 
 		(syscall)&cmos_GetTime,			//50
 		(syscall)&cmos_GetDate,			//51
-		(syscall)&pit_RegisterTimer,	//52
+		(syscall)&sleepHandler,			//52
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,
@@ -153,6 +156,11 @@ static void exitThreadHandler()
 {
 	cleaner_cleanThread(currentThread);
 	yield();
+}
+
+static void sleepHandler(uint64_t msec)
+{
+	pit_RegisterTimer(currentThread, msec);
 }
 
 #endif
