@@ -129,30 +129,4 @@ void showCursor()
 	outb(0x3D5, 0x64);	//Cursor aktiviert
 }
 
-size_t Display_FileHandler(char *name, uint64_t start, size_t length, const void *buffer)
-{
-	size_t size = 0;
-	char *str = (char*)buffer;
-
-	if(strcmp(name, "stdout") == 0)
-	{
-		while(length-- && *str != '\0')
-		{
-			putch(*str++);
-			size++;
-		}
-	}
-	else if(strcmp(name, "stderr") == 0)
-	{
-		setColor(BG_RED | CL_BLACK);
-		while(length-- && *str != '\0')
-		{
-			putch(*str++);
-			size++;
-		}
-	}
-
-	return size;
-}
-
 #endif
