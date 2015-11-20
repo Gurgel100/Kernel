@@ -121,7 +121,7 @@ FILE *fopen(const char *filename, const char *mode)
 	file->mode.write = m.write;
 	file->mode.binary = binary;
 #ifdef BUILD_KERNEL
-	file->stream_id = vfs_Open(filename, m);
+	file->stream_id = vfs_Open(NULL, filename, m);
 #else
 	file->stream_id = syscall_fopen(filename, m);
 #endif
@@ -151,7 +151,7 @@ int fclose(FILE *stream)
 		return EOF;
 
 #ifdef BUILD_KERNEL
-	vfs_Close(stream->stream_id);
+	vfs_Close(NULL, stream->stream_id);
 #else
 	syscall_fclose(stream->stream_id);
 #endif
@@ -202,7 +202,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream_id, stream->posRead, tmpLength, tmp);
+			size = vfs_Read(NULL, stream->stream_id, stream->posRead, tmpLength, tmp);
 #else
 			size = syscall_fread(stream->stream_id, stream->posRead, tmpLength, tmp);
 #endif
@@ -264,7 +264,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
+			size = vfs_Read(NULL, stream->stream_id, stream->posRead + readData, tmpLength, tmp);
 #else
 			size = syscall_fread(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
 #endif
@@ -312,7 +312,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	else
 	{
 #ifdef BUILD_KERNEL
-		readData = vfs_Read(stream->stream_id, stream->posRead, length, ptr);
+		readData = vfs_Read(NULL, stream->stream_id, stream->posRead, length, ptr);
 #else
 		readData = syscall_fread(stream->stream_id, stream->posRead, length, ptr);
 #endif
@@ -338,7 +338,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	if(stream->bufMode == IO_MODE_NO_BUFFER)
 	{
 #ifdef BUILD_KERNEL
-		writeData = vfs_Write(stream->stream_id, stream->posWrite, length, ptr);
+		writeData = vfs_Write(NULL, stream->stream_id, stream->posWrite, length, ptr);
 #else
 		writeData = syscall_fwrite(stream->stream_id, stream->posWrite, length, ptr);
 #endif
@@ -355,7 +355,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 			{
 				size_t size = 0;
 #ifdef BUILD_KERNEL
-				size = vfs_Write(stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
+				size = vfs_Write(NULL, stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
 #else
 				size = syscall_fwrite(stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
 #endif
@@ -384,7 +384,7 @@ int fflush(FILE *stream)
 	if(stream->bufMode != IO_MODE_NO_BUFFER && stream->mode.write && stream->bufStart != EOF && stream->bufDirty)
 	{
 #ifdef BUILD_KERNEL
-		vfs_Write(stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
+		vfs_Write(NULL, stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
 #else
 		syscall_fwrite(stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
 #endif
@@ -475,7 +475,7 @@ int fseek(FILE *stream, long int offset, int whence)
 			{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
 				//Grösse der Datei ermitteln
 #ifdef BUILD_KERNEL
-				size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
+				size_t filesize = vfs_getFileinfo(NULL, stream->stream_id, VFS_INFO_FILESIZE);
 #else
 				size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
 #endif
@@ -1706,16 +1706,10 @@ int ungetc(int c, FILE *stream)
 
 int getc(FILE *stream)
 {
-	if(stream == stdin)
-	{
-#ifdef BUILD_KERNEL
-		return (int)getch();
-#else
-		return (int)syscall_getch();
-#endif
-	}
-	else
+	unsigned char c;
+	if(fread(&c, sizeof(unsigned char), 1, stream) == 0)
 		return EOF;
+	return c;
 }
 
 int getchar(void)
@@ -1750,32 +1744,12 @@ char *gets(char *str)
 
 int putc(int zeichen, FILE *stream)
 {
-	if(stream == stdout)
-	{
-#ifdef BUILD_KERNEL
-		putch(zeichen);
-#else
-		syscall_putch(zeichen);
-#endif
-		return zeichen;
-	}
-	else
-		return EOF;
+	return fwrite(&zeichen, sizeof(unsigned char), 1, stream);
 }
 
 int putchar(int zeichen)
 {
-	if(stdout == NULL)
-	{
-#ifdef BUILD_KERNEL
-		putch(zeichen);
-#else
-		syscall_putch(zeichen);
-#endif
-		return zeichen;
-	}
-	else
-		return putc(zeichen, stdout);
+	return putc(zeichen, stdout);
 }
 
 int puts(const char *str)

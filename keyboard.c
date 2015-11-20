@@ -236,7 +236,7 @@ void keyboard_SetLEDs()
 			| (PressedKeys[KEY_SCROLL] & 0x1));
 }
 
-char getch()
+char __attribute__((deprecated)) getch()
 {
 	/*while(Puffer == NULL) asm volatile("hlt;");	//Wir halten die CPU an, bis ein IRQ von der Tastatur kommt
 	char Zeichen = Puffer->Char;
@@ -246,7 +246,8 @@ char getch()
 	if(ActualPuffer == OldPuffer)
 		ActualPuffer = NULL;
 	return Zeichen;*/
-	return console_getch(pm_getConsole());
+	//return console_getch(pm_getConsole());
+	return 0;
 }
 
 #endif

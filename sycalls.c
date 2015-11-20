@@ -26,8 +26,6 @@
 #define CSTAR	0xC0000083
 #define SFMASK	0xC0000084
 
-extern void putch(char);
-extern char getch(void);
 //extern uintptr_t mm_SysAlloc(uint64_t);
 //extern void mm_SysFree(uintptr_t, uint64_t);
 extern void setColor(uint8_t);
@@ -64,8 +62,8 @@ static syscall syscalls[] = {
 		(syscall)&nop,
 		(syscall)&nop,
 
-		(syscall)&getch,				//20
-		(syscall)&putch,				//21
+		(syscall)&nop,					//20
+		(syscall)&nop,					//21
 		(syscall)&nop,
 		(syscall)&setColor,				//23
 		(syscall)&setCursor,			//24
@@ -86,11 +84,11 @@ static syscall syscalls[] = {
 		(syscall)&nop,
 		(syscall)&nop,
 
-		(syscall)&vfs_Open,				//40
-		(syscall)&vfs_Close,			//41
-		(syscall)&vfs_Read,				//42
-		(syscall)&vfs_Write,			//43
-		(syscall)&vfs_getFileinfo,		//44
+		(syscall)&vfs_syscall_open,		//40
+		(syscall)&vfs_syscall_close,	//41
+		(syscall)&vfs_syscall_read,		//42
+		(syscall)&vfs_syscall_write,	//43
+		(syscall)&vfs_syscall_getFileinfo,		//44
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,

@@ -6,6 +6,7 @@
  */
 
 #include "fs.h"
+#include "vfs.h"
 
 /**
  * Dateisystemtreiber-Struktur initialisieren
@@ -42,6 +43,6 @@ void cdi_fs_driver_destroy(struct cdi_fs_driver* driver)
 size_t cdi_fs_data_read(struct cdi_fs_filesystem* fs, uint64_t start,
     size_t size, void* buffer)
 {
-	vfs_Read(fs->osdep.fp, start, size, buffer);
+	vfs_Read(NULL, fs->osdep.fp, start, size, buffer);
 	return size;
 }

@@ -126,7 +126,7 @@ struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 			};
 			char *path;
 			asprintf(&path, "dev/%s", part->dev->device->name);
-			fs->osdep.fp = vfs_Open(path, mode);
+			fs->osdep.fp = vfs_Open(NULL, path, mode);
 			free(path);
 			//asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
 		break;

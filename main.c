@@ -38,7 +38,6 @@ void Init(void);
 void __attribute__((noreturn)) main(void *mbsAdresse)
 {
 	MBS = mbsAdresse;
-	initLib();	//Library initialisieren
 	Init();		//Initialisiere System
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
@@ -47,7 +46,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
 	{
-		loader_load("/mount/0/bin", "init", true);
+		initpid = loader_load("/mount/0/bin", "init", "/dev/tty01", "/dev/tty01", "/dev/tty01");
 		scheduler_activate();
 	}
 

@@ -13,6 +13,7 @@
 #include "cdi/fs.h"
 #include "cdi.h"
 #include "stdbool.h"
+#include "pm.h"
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
@@ -67,6 +68,7 @@ typedef struct vfs_node{
 			struct cdi_fs_filesystem *fs;	//TYPE_MOUNT
 			size_t (*Handler)(char *name, uint64_t start, size_t length, const void *buffer);
 		};
+		size_t ref_count;			//Anzahl der Stream, die auf diesen Knoten verweisen
 }vfs_node_t;
 
 typedef struct{
@@ -89,20 +91,29 @@ typedef enum{
 
 void vfs_Init(void);
 
-vfs_file_t vfs_Open(const char *path, vfs_mode_t mode);
-void vfs_Close(vfs_file_t streamid);
+vfs_file_t vfs_Open(vfs_stream_t **s, const char *path, vfs_mode_t mode);
+vfs_file_t vfs_Reopen(vfs_stream_t **s, const vfs_stream_t *old, vfs_mode_t mode);
+void vfs_Close(vfs_stream_t *stream, vfs_file_t streamid);
 
 /*
  * Vom Dateisystem lesen/schreiben
  * Parameter:	Path = Pfad zur Datei
  * 				Buffer = Puffer in dem die Daten reingeschrieben werden bzw. gelesen werden
  */
-size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
-size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
+size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
+size_t vfs_Write(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
+
+/*
+ * Initialisiert den Userspace des Prozesses p.
+ * Parameter:	p = Prozess
+ * Rückgabe:	0: kein Fehler
+ * 				1: Fehler
+ */
+int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr);
 
 vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data);
 
-uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
+uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_file_t streamid, vfs_fileinfo_t info);
 
 int vfs_Mount(const char *Mountpath, const char *Dev);
 int vfs_Unmount(const char *Mount);
@@ -119,6 +130,13 @@ void vfs_RegisterDevice(vfs_device_t *dev);
  * Gerät abmelden
  */
 void vfs_UnregisterDevice(vfs_device_t *dev);
+
+//Syscalls
+vfs_file_t vfs_syscall_open(const char *path, vfs_mode_t mode);
+void vfs_syscall_close(vfs_file_t streamid);
+size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
+size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
+uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
 
 #endif /* VFS_H_ */
 

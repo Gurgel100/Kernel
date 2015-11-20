@@ -26,19 +26,9 @@ inline void syscall_unusePage(void *Address, size_t Pages)
 	_syscall(2, Address, Pages);
 }
 
-inline char syscall_getch()
+inline pid_t syscall_createProcess(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
 {
-	return (char)_syscall(20);
-}
-
-inline void syscall_putch(unsigned char c)
-{
-	_syscall(21, c);
-}
-
-inline pid_t syscall_createProcess(const char *path, const char *cmd, bool newConsole)
-{
-	return (pid_t)_syscall(10, path, cmd, newConsole);
+	return (pid_t)_syscall(10, path, cmd, stdin, stdout, stderr);
 }
 
 inline void __attribute__((noreturn)) syscall_exit(int status)

@@ -10,6 +10,6 @@
 
 #include "pm.h"
 
-pid_t loader_load(const char *path, const char *cmd, bool newConsole);
+pid_t loader_load(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr);
 
 #endif /* LOADER_H_ */

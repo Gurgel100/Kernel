@@ -17,6 +17,7 @@
 #include "thread.h"
 #include "scheduler.h"
 #include "cleaner.h"
+#include "vfs.h"
 
 static pid_t nextPID = 1;
 static uint64_t numTasks = 0;
@@ -72,10 +73,9 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsole)
+process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *stdin, const char *stdout, const char *stderr)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
-	numTasks++;
 
 	//Argumente kopieren
 	newProcess->cmd = strdup(cmd);
@@ -90,28 +90,28 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsol
 
 	newProcess->Context = createContext();
 
-	if(newConsole || !parent)
-	{
-		static uint64_t nextConsole = 1;
-		char tmp[6];
-		sprintf(tmp, "tty%02u", nextConsole++);
-		newProcess->console = console_getByName(tmp);
-	}
-	else
-	{
-		newProcess->console = parent->console;
-	}
-
 	newProcess->nextThreadStack = (void*)(MM_USER_STACK + 1);
 
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
+
+	if(!vfs_initUserspace(parent, newProcess, stdin, stdout, stderr))
+	{
+		//Fehler
+		deleteContext(newProcess->Context);
+		free(newProcess->cmd);
+		free(newProcess);
+		return NULL;
+	}
 
 	//Mainthread erstellen
 	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false)->Status = READY;
 
 	//Prozess in Liste eintragen
 	list_push(ProcessList, newProcess);
+
+	__sync_fetch_and_add(&numTasks, 1);
+	newProcess->lock = LOCK_UNLOCKED;
 
 	return newProcess;
 }
@@ -215,36 +215,6 @@ process_t *pm_getTask(pid_t PID)
 	return NULL;
 }
 
-/*
- * Gibt die Konsole des aktuell ausgeführten Tasks zurück
- */
-console_t *pm_getConsole()
-{
-	if(currentProcess && currentProcess->console)
-	{
-		/*if(currentProcess->console == NULL)
-		{
-			//Neue Konsole anlegen
-			if(currentProcess->PPID > 0)
-			{
-				process_t *parent = pm_getTask(currentProcess->PPID);
-				if(parent)
-				{
-					currentProcess->console = console_createChild(parent->console);
-				}
-				else
-				{
-					currentProcess->console = console_createChild(&initConsole);
-				}
-			}
-			else
-			{
-				currentProcess->console = console_createChild(&initConsole);
-			}
-		}*/
-		return currentProcess->console;
-	}
-	return &initConsole;
 }
 
 /*

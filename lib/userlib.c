@@ -9,9 +9,28 @@
 #include "stdlib.h"
 #include "stdbool.h"
 #include "string.h"
+#include "stdio.h"
 
 void initLib()
 {
+	//stdin
+	stdin = calloc(sizeof(FILE), 1);
+	stdin->error = IO_NO_ERROR;
+	stdin->mode.read = true;
+	stdin->stream_id = 0;
+	setvbuf(stdin, NULL, _IONBF, BUFSIZ);
+	//stdout
+	stdout = calloc(sizeof(FILE), 1);
+	stdout->error = IO_NO_ERROR;
+	stdout->mode.write = true;
+	stdout->stream_id = 1;
+	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+	//stderr
+	stderr = calloc(sizeof(FILE), 1);
+	stderr->error = IO_NO_ERROR;
+	stderr->mode.write = true;
+	stderr->stream_id = 2;
+	setvbuf(stderr, NULL, _IONBF, BUFSIZ);
 }
 #ifndef BUILD_KERNEL
 extern int main(int argc, char *argv[]);

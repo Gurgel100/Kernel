@@ -33,18 +33,9 @@ void display_refresh()
 	setCursor(activeConsole->cursor.x, activeConsole->cursor.y);
 }
 
-void setColor(uint8_t Color)
+void __attribute__((deprecated)) setColor(uint8_t Color)
 {
-	console_changeColor(pm_getConsole(), Color);
-}
-
-/*
- * Schreibt das Zeichen c auf den Bildschirm
- * Parameter:	c = ASCII-Zeichen, das geschrieben werden soll
- */
-void putch(unsigned char c)
-{
-	console_ansi_write(pm_getConsole(), c);
+	//console_changeColor(pm_getConsole(), Color);
 }
 
 /*
