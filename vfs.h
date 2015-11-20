@@ -43,7 +43,7 @@ typedef enum{
 }vfs_device_function_t;
 
 //Handler für Geräte
-typedef size_t (vfs_device_read_handler_t)(void *opaque, uint64_t start, size_t size, const void *buffer);
+typedef size_t (vfs_device_read_handler_t)(void *opaque, uint64_t start, size_t size, void *buffer);
 typedef size_t (vfs_device_write_handler_t)(void *opaque, uint64_t start, size_t size, const void *buffer);
 typedef void *(vfs_device_getValue_handler_t)(void *opaque, vfs_device_function_t function);
 

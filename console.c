@@ -61,9 +61,9 @@ static char *console_names[CONSOLE_NUM] = {
 };
 
 static void console_scrollDown();
-static size_t console_readHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
-static size_t console_writeHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
-static void *console_getValue(console_t *console, vfs_device_function_t function);
+static size_t console_readHandler(void *c, uint64_t start, size_t length, void *buffer);
+static size_t console_writeHandler(void *c, uint64_t start, size_t length, const void *buffer);
+static void *console_getValue(void *c, vfs_device_function_t function);
 
 void console_Init()
 {
@@ -510,10 +510,11 @@ void console_keyboardHandler(console_t *console, char c)
 	}
 }
 
-static size_t console_writeHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
+static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
 {
+	console_t *console = c;
 	size_t size = 0;
-	char *str = (char*)buffer;
+	const char *str = buffer;
 	while(length-- && *str != '\0')
 	{
 		console_ansi_write(console, *str++);
@@ -522,10 +523,11 @@ static size_t console_writeHandler(console_t *console, uint64_t __attribute__((u
 	return size;
 }
 
-static size_t console_readHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
+static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, void *buffer)
 {
+	console_t *console = c;
 	size_t size = 0;
-	char *buf = (char*)buffer;
+	char *buf = buffer;
 
 	while(length-- != 0)
 	{
@@ -536,8 +538,9 @@ static size_t console_readHandler(console_t *console, uint64_t __attribute__((un
 	return size;
 }
 
-static void *console_getValue(console_t *console, vfs_device_function_t function)
+static void *console_getValue(void *c, vfs_device_function_t function)
 {
+	console_t *console = c;
 	switch (function)
 	{
 		case FUNC_TYPE:
