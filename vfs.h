@@ -73,9 +73,11 @@ typedef struct{
 	bool read, write, append, empty, create;
 }vfs_mode_t;
 
+typedef uint64_t vfs_file_t;
+
 typedef struct{
 	struct cdi_fs_stream stream;
-	uint64_t id;
+	vfs_file_t id;
 	vfs_mode_t mode;
 
 	vfs_node_t *node;
@@ -87,20 +89,20 @@ typedef enum{
 
 void vfs_Init(void);
 
-vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode);
-void vfs_Close(vfs_stream_t *stream);
+vfs_file_t vfs_Open(const char *path, vfs_mode_t mode);
+void vfs_Close(vfs_file_t streamid);
 
 /*
  * Vom Dateisystem lesen/schreiben
  * Parameter:	Path = Pfad zur Datei
  * 				Buffer = Puffer in dem die Daten reingeschrieben werden bzw. gelesen werden
  */
-size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
-size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
+size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
+size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
 
 vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data);
 
-uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info);
+uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
 
 int vfs_Mount(const char *Mountpath, const char *Dev);
 int vfs_Unmount(const char *Mount);

@@ -34,7 +34,8 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 	struct cdi_mem_sg_item *sg_item;
 	size_t alignment = flags & CDI_MEM_ALIGN_MASK;
 	size_t asize;
-	void *vaddr, *paddr;
+	void *vaddr;
+	paddr_t paddr;
 
 	//Wir vergeben nur ganze Pages
 	size = (size + 0xFFF) & (~0xFFF);
@@ -52,11 +53,11 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 	}
 
 	//Speicher reservieren
-	void *maxAddress = (void*)-1;
+	paddr_t maxAddress = -1;
 	if(flags & CDI_MEM_DMA_16M)
-		maxAddress = (void*)16777216;
+		maxAddress = 16777216;
 	else if(flags & CDI_MEM_DMA_4G)
-		maxAddress = (void*)4294967296;
+		maxAddress = 4294967296;
 	vaddr = vmm_AllocDMA(maxAddress, size / MM_BLOCK_SIZE, &paddr);
 	if(vaddr == NULL)
 		return NULL;
@@ -65,12 +66,12 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 	if(alignment > 12)
 	{
 		uintptr_t amask = (1ULL << alignment) - 1;
-		uintptr_t astart = ((uintptr_t)paddr + amask) & (~amask);
-		uintptr_t off = astart - (uintptr_t)paddr;
+		paddr_t astart = (paddr + amask) & (~amask);
+		uintptr_t off = astart - paddr;
 
 		//TODO: Die Stücke, die abgeschnitten wurden, bleiben immer reserviert
 
-		paddr = (void*)astart;
+		paddr = astart;
 		vaddr = (void*)(((uintptr_t)vaddr) + off);
 	}
 

@@ -9,6 +9,7 @@
 #define PAGING_H_
 
 #include "stdint.h"
+#include "pmm.h"
 
 /*Pagingstrukturen
  *PML4 = Page-Map-Level-4 Table
@@ -79,14 +80,14 @@ typedef struct{
 }PT_t;
 
 void setPML4Entry(uint16_t i, PML4_t *PML4, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, uintptr_t Address);
+		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address);
 void setPDPEntry(uint16_t i, PDP_t *PDP, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, uintptr_t Address);
+		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address);
 void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, uintptr_t Address);
+		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address);
 void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
 		uint8_t PCD, uint8_t A, uint8_t D, uint8_t G, uint16_t AVL,
-		uint8_t PAT, uint8_t NX, uintptr_t Address);
+		uint8_t PAT, uint8_t NX, paddr_t Address);
 inline void clearPML4Entry(uint16_t i, PML4_t *PML4);
 inline void clearPDPEntry(uint16_t i, PDP_t *PDP);
 inline void clearPDEntry(uint16_t i, PD_t *PD);

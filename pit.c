@@ -51,6 +51,7 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 	{
 		timer_t *Timer;
 		size_t i;
+		uint64_t t;
 
 		if(Timerlist == NULL)
 			Timerlist = list_create();
@@ -58,7 +59,7 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 		Timer = malloc(sizeof(timer_t));
 
 		Timer->thread = thread;
-		Timer->timeout = Uptime + msec;
+		Timer->timeout = ((t = Uptime + msec) < Uptime) ? -1ul : t;
 
 		//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
 		//zuerst abläuft

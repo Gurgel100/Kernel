@@ -86,10 +86,10 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 		void *stack = (void*)mm_SysAlloc(1);
 		thread->userStackBottom = process->nextThreadStack - MM_BLOCK_SIZE;
 		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
-		thread->userStackPhys = (void*)vmm_getPhysAddress((uintptr_t)stack);
-		if(thread->userStackPhys == NULL)
+		thread->userStackPhys = vmm_getPhysAddress(stack);
+		if(thread->userStackPhys == 0)
 			thread->userStackPhys = pmm_Alloc();
-		vmm_ContextMap(process->Context, (uintptr_t)thread->userStackBottom, (uintptr_t)thread->userStackPhys,
+		vmm_ContextMap(process->Context, thread->userStackBottom, thread->userStackPhys,
 				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
 		process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 	}
@@ -139,7 +139,7 @@ void thread_destroy(thread_t *thread)
 	}
 
 	//Userstack freigeben
-	vmm_ContextUnMap(thread->process->Context, (uintptr_t)thread->userStackBottom);
+	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom);
 	pmm_Free(thread->userStackPhys);
 
 	free(thread->fpuState);

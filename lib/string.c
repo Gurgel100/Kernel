@@ -127,6 +127,54 @@ char *strtok(char *string, const char *delimiters)
 	}
 }
 
+/*
+ * Macht praktisch das Selbe wie strtok nur ist sie threadsafe. Achtung: erster Parameter wird verändert
+ * Parameter:	str = Adresse auf String. Der eigentliche String und der Zeiger darauf wird verändert!
+ * 				delimiters = String mit Zeichen, die die Tokens trennen
+ * Rückgabe:	Zeiger auf Token
+ */
+char *strtok_s(char **str, const char *delimiters)
+{
+	char *string = *str;
+	char *del, *token;
+	char sc, dc;
+
+	if(str == NULL || string == NULL)
+		return NULL;
+
+	//Erste Delimiters überspringen
+	cont:
+	sc = *string++;
+	for(del = (char*)delimiters; (dc = *del) != '\0'; del++)
+		if(sc == dc)
+			goto cont;
+
+	if(sc == '\0')
+		return NULL;
+
+	token = string - 1;
+
+	//String nach Delimiters durchsuchen
+	while(1)
+	{
+		sc = *string++;
+		del = (char*)delimiters;
+		do
+		{
+			if((dc = *del++) == sc)
+			{
+				if(sc == '\0')
+					string = NULL;
+				else
+					string[-1] = '\0';
+				*str = string;
+				return token;
+			}
+		}
+		while(dc != '\0');
+	}
+}
+
 char *strcat(char *str1, const char *str2)
 {
 	size_t i;

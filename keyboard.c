@@ -165,7 +165,7 @@ void keyboard_Handler(ihs_t *ihs)
 				console_switch(11);
 			else if(PressedKeys[KEY_F12])
 				console_switch(12);
-			else if(PressedKeys[KEY_K])
+			else if(PressedKeys[KEY_ESC])
 				console_switch(0);
 		}
 	//Zeichen in Puffer schreiben, wenn es ein ASCII-Zeichen ist

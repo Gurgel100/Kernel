@@ -22,6 +22,7 @@ extern int strncmp(const char *str1, const char *str2, size_t size);
 extern size_t strlen(const char *cs);
 extern void *strdup(const char *s);
 extern char *strtok(char *string, const char *delimiters);
+extern char *strtok_s(char **str, const char *delimiters);
 extern char *strcat(char *str1, const char *str2);
 extern char *strncat(char *str1, const char *str2, size_t n);
 

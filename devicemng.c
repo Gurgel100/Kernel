@@ -31,6 +31,7 @@ void dmng_registerDevice(struct cdi_device *dev)
 	device_t *device = malloc(sizeof(device_t));
 	device->partitions = list_create();
 	device->device = dev;
+	semaphore_init(&device->semaphore, 1);
 
 	vfs_device_t *vfs_dev = malloc(sizeof(vfs_device_t));
 	vfs_dev->opaque = device;
@@ -67,8 +68,14 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
 			block_count = device->block_count - block_start;
 		void *block_buffer = malloc(device->block_size * block_count);
 
+		//Gerät reservieren
+		semaphore_acquire(&dev->semaphore);
 		if(driver->read_blocks(device, block_start, block_count, block_buffer))
+		{
+			semaphore_release(&dev->semaphore);
 			return 0;
+		}
+		semaphore_release(&dev->semaphore);
 
 		memcpy((void*)buffer, block_buffer + block_start % device->block_size, size);
 		free(block_buffer);
@@ -94,8 +101,14 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
 				.direction = CDI_SCSI_READ
 			};
 
+			//Gerät reservieren
+			semaphore_acquire(&dev->semaphore);
 			if(driver->request(device, &packet))
+			{
+				semaphore_release(&dev->semaphore);
 				return 0;
+			}
+			semaphore_release(&dev->semaphore);
 
 			memcpy((void*)buffer + offset, tmp_buffer + start % 2048 + offset, tmp_size);
 			offset += tmp_size;

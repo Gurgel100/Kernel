@@ -9,13 +9,8 @@
 
 void lock(lock_t *l)
 {
-	asm volatile(
-			"mov $1,%%dl;"
-			".loop:"
-			"xor %%al,%%al;"
-			"lock cmpxchgb %%dl,(%0);"
-			"jne .loop;"
-			: : "r"(l) : "%al", "%dl");
+	while(!__sync_bool_compare_and_swap(l, 0, 1))
+		asm volatile("pause");
 }
 
 void unlock(lock_t *l)

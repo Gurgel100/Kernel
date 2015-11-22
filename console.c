@@ -24,6 +24,8 @@
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
 
+#define MIN(a, b)		((a < b) ? a : b)
+
 #define CONSOLE_NUM		12
 
 #define ASCII_ESC		'\e'
@@ -123,7 +125,7 @@ void console_Init()
  */
 console_t *console_create(char *name, uint8_t color)
 {
-	console_t *console = calloc(sizeof(console_t), 1);
+	console_t *console = malloc(sizeof(console_t));
 	if(console == NULL)
 		return NULL;
 
@@ -157,6 +159,8 @@ console_t *console_create(char *name, uint8_t color)
 	console->width = COLS;
 	console->id = nextID++;
 	unlock(&console->lock);
+
+	console_clear(console);
 
 	return console;
 }
@@ -197,6 +201,7 @@ static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
 static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_buf, uint8_t ansi_buf_len)
 {
 	uint8_t i;
+	uint16_t tmp;
 	uint8_t n1 = 0, n2 = 0;
 	bool delimiter = false;
 	bool have_n1 = false, have_n2 = false;
@@ -253,7 +258,53 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 					if(handle_ansi_formatting(console, n2) != SUCCESS)
 						return INVALID;
 				}
-			return SUCCESS;
+				return SUCCESS;
+			case 'A':
+				if(!have_n1)
+					return INVALID;
+				if(console->cursor.y > n1)
+					console->cursor.y -= n1;
+				return SUCCESS;
+			case 'B':
+				if(!have_n1)
+					return INVALID;
+				console->cursor.y = MIN(console->height, console->cursor.y + n1);
+				return SUCCESS;
+			case 'C':
+				if(!have_n1)
+					return INVALID;
+				console->cursor.x = MIN(console->width, console->cursor.x + n1);
+				return SUCCESS;
+			case 'D':
+				if(!have_n1)
+					return INVALID;
+				if(console->cursor.x > n1)
+					console->cursor.x -= n1;
+				return SUCCESS;
+			case 'H':	//Setze Cursor Position an n1,n2
+			case 'f':
+				if(!have_n1 || !have_n2)
+					console_setCursor(console, (cursor_t){0, 0});
+				else
+					console_setCursor(console, (cursor_t){MIN(console->width, n1), MIN(console->height, n2)});
+				return SUCCESS;
+			case 's':	//Cursor speichern
+				console->saved_cursor = console->cursor;
+				return SUCCESS;
+			case 'u':	//Cursor wiederherstellen
+				console_setCursor(console, console->saved_cursor);
+				return SUCCESS;
+
+			//TODO: Deadlock beheben durch reentrant locks z.B.
+			/*case 'J':	//ESC[2J Konsole löschen
+				if(!have_n1 || n1 != 2)
+					return INVALID;
+				console_clear(console);
+				return SUCCESS;
+			case 'K':	//Zeile löschen
+				console_clearLine(console, console->cursor.y);
+				printf("line cleared\n");
+				return SUCCESS;*/
 		}
 	}
 
@@ -353,7 +404,25 @@ void console_clear(console_t *console)
 	if(console != NULL)
 	{
 		lock(&console->lock);
-		memset(console->buffer, 0, PAGE_SIZE);
+		size_t i;
+		for(i = 0; i < PAGE_SIZE / 2; i++)
+		{
+			((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
+		}
+		unlock(&console->lock);
+	}
+	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh();
+}
+
+void console_clearLine(console_t *console, uint16_t line)
+{
+	if(console != NULL)
+	{
+		lock(&console->lock);
+		size_t i;
+		for(i = 0; i < console->width; i++)
+			((uint16_t*)console->buffer)[line * console->width + i] = ' ' | (console->color << 8);
 		unlock(&console->lock);
 	}
 	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
@@ -393,7 +462,11 @@ static void console_scrollDown(console_t *console)
 		memmove(console->buffer, console->buffer + SIZE_PER_ROW, PAGE_SIZE - SIZE_PER_ROW);
 
 		//Letzte Zeile löschen
-		memset(console->buffer + PAGE_SIZE - SIZE_PER_ROW, 0, SIZE_PER_ROW);
+		size_t i;
+		for(i = 0; i < SIZE_PER_ROW / 2; i++)
+		{
+			((uint16_t*)(console->buffer + PAGE_SIZE - SIZE_PER_ROW))[i] = ' '| (console->color << 8);
+		}
 
 		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
 			display_refresh();
@@ -413,6 +486,8 @@ void console_setCursor(console_t *console, cursor_t cursor)
 	if(console != NULL)
 	{
 		console->cursor = cursor;
+		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+			setCursor(console->cursor.x, console->cursor.y);
 	}
 }
 

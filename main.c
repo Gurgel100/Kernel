@@ -43,7 +43,13 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 	sound_Play(10000, 1000);
-	vfs_MountRoot();
+	if(vfs_MountRoot())
+		SysLogError("KERNEL", "Could not find root directory\n");
+	else
+	{
+		loader_load("/mount/0/bin", "init", true);
+		scheduler_activate();
+	}
 
 	//Der Kernel wird durch ein Interrupt aufgeweckt
 	while(1) asm volatile("hlt;");	//Wir wollen diese Funktion nicht verlassen
@@ -81,6 +87,7 @@ void Init()
 	dmng_Init();
 	cdi_init();			//CDI und -Treiber initialisieren
 	pm_Init();			//Tasks initialisieren
+	console_Init();
 
 	//MBS an einen richtigen Ort sichern
 	MBS->mbs_mmap_addr = memcpy(malloc(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
