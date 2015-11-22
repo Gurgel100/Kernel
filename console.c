@@ -493,9 +493,17 @@ void console_setCursor(console_t *console, cursor_t cursor)
 
 char console_getch(console_t *console)
 {
-	//Auf Eingabe warten
-	console->waitingThread = currentThread;
-	thread_waitUserIO(console->waitingThread);
+	if(console->id == 0)
+	{
+		console->waitingThread = 1;
+		while(list_size(console->input) == 0) asm volatile("hlt");
+	}
+	else
+	{
+		//Auf Eingabe warten
+		console->waitingThread = currentThread;
+		thread_waitUserIO(console->waitingThread);
+	}
 
 	return (char)((uint64_t)list_remove(console->input, list_size(console->input) - 1));
 }
@@ -504,7 +512,8 @@ void console_keyboardHandler(console_t *console, char c)
 {
 	if(console->waitingThread)
 	{
-		thread_unblock(console->waitingThread);
+		if(console->id != 0)
+			thread_unblock(console->waitingThread);
 		console->waitingThread = NULL;
 		list_push(console->input, (void*)((uint64_t)c));
 	}
