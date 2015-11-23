@@ -46,7 +46,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/util}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.misc.other.1902618720" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000" valueType="string"/>
+								<option id="gnu.c.compiler.option.misc.other.1902618720" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mno-red-zone" valueType="string"/>
 								<option id="gnu.c.compiler.option.warnings.extrawarn.1014712980" name="Extra warnings (-Wextra)" superClass="gnu.c.compiler.option.warnings.extrawarn" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.nowarn.1982163389" name="Inhibit all warnings (-w)" superClass="gnu.c.compiler.option.warnings.nowarn" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.optimization.flags.45205910" name="Other optimization flags" superClass="gnu.c.compiler.option.optimization.flags" value="-Og" valueType="string"/>
@@ -138,7 +138,7 @@
 								<option id="gnu.cpp.compiler.exe.release.option.debugging.level.23711927" name="Debug Level" superClass="gnu.cpp.compiler.exe.release.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
 							</tool>
 							<tool command="gcc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GCCErrorParser" id="cdt.managedbuild.tool.gnu.c.compiler.exe.release.1059013752" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.exe.release">
-								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.exe.release.option.optimization.level.79198657" name="Optimization Level" superClass="gnu.c.compiler.exe.release.option.optimization.level" value="gnu.c.optimization.level.size" valueType="enumerated"/>
+								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.exe.release.option.optimization.level.79198657" name="Optimization Level" superClass="gnu.c.compiler.exe.release.option.optimization.level" value="gnu.c.optimization.level.more" valueType="enumerated"/>
 								<option id="gnu.c.compiler.exe.release.option.debugging.level.340586187" name="Debug Level" superClass="gnu.c.compiler.exe.release.option.debugging.level" value="gnu.c.debugging.level.none" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.preprocessor.nostdinc.2046155860" name="Do not search system directories (-nostdinc)" superClass="gnu.c.compiler.option.preprocessor.nostdinc" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.include.paths.1164441589" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
@@ -153,7 +153,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/util}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.misc.other.1248584633" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mcmodel=medium" valueType="string"/>
+								<option id="gnu.c.compiler.option.misc.other.1248584633" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mno-red-zone" valueType="string"/>
 								<option id="gnu.c.compiler.option.warnings.nowarn.203578845" name="Inhibit all warnings (-w)" superClass="gnu.c.compiler.option.warnings.nowarn" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.extrawarn.728900010" name="Extra warnings (-Wextra)" superClass="gnu.c.compiler.option.warnings.extrawarn" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.optimization.flags.1301583785" name="Other optimization flags" superClass="gnu.c.compiler.option.optimization.flags" value="-mtune=generic" valueType="string"/>
