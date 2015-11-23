@@ -201,7 +201,6 @@ static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
 static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_buf, uint8_t ansi_buf_len)
 {
 	uint8_t i;
-	uint16_t tmp;
 	uint8_t n1 = 0, n2 = 0;
 	bool delimiter = false;
 	bool have_n1 = false, have_n2 = false;
@@ -502,7 +501,7 @@ char console_getch(console_t *console)
 {
 	if(console->id == 0)
 	{
-		console->waitingThread = 1;
+		console->waitingThread = (void*)1;
 		while(list_size(console->input) == 0) asm volatile("hlt");
 	}
 	else
