@@ -442,14 +442,21 @@ void displayConsole(console_t *console)
 void console_switch(uint8_t id)
 {
 	if(id == 0)
-		displayConsole(&initConsole);
+	{
+		if(activeConsole != &initConsole)
+			displayConsole(&initConsole);
+	}
 	else
 	{
 		size_t i;
 		for(i = 0; i < CONSOLE_NUM; i++)
 		{
 			if(consoles[i]->id == id)
-				displayConsole(consoles[i]);
+			{
+				if(activeConsole != consoles[i])
+					displayConsole(consoles[i]);
+				return;
+			}
 		}
 	}
 }
