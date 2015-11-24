@@ -125,7 +125,7 @@ struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
 	size_t i;
 	for(i = 0; i < size; i += MM_BLOCK_SIZE)
 	{
-		vmm_Map((uintptr_t)vaddr + i, paddr + i, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL, 0);
+		vmm_Map((uintptr_t)vaddr + i, paddr + i, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NO_CACHE, 0);
 	}
 
 	area = malloc(sizeof(*area));
