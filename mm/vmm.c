@@ -419,6 +419,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 	bool RW = (flags & VMM_FLAGS_WRITE);
 	bool NX = (flags & VMM_FLAGS_NX);
 	bool P = !(avl & VMM_UNUSED_PAGE);
+	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
+	bool PWT = (flags & VMM_FLAGS_PWT);
 
 	//PML4 Tabelle bearbeiten
 	if((PML4->PML4E[PML4i] & PG_P) == 0)		//Eintrag für die PML4 schon vorhanden?
@@ -506,9 +508,9 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 	{										//Neuen Eintrag erstellen
 		//Eintrag in die PT
 		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
-			setPTEntry(PTi, PT, P, RW, US, 1, 0, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
 		else
-			setPTEntry(PTi, PT, P, RW, US, 1, 0, 0, 0, G, avl, 0, NX, pAddress);
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
 	}
 	else
 		return 2;							//virtuelle Addresse schon besetzt
@@ -734,6 +736,8 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 	bool RW = (flags & VMM_FLAGS_WRITE);
 	bool NX = (flags & VMM_FLAGS_NX);
 	bool P = !(avl & VMM_UNUSED_PAGE);
+	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
+	bool PWT = (flags & VMM_FLAGS_PWT);
 
 	PDP = (void*)PDP + (PML4i << 12);
 	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
@@ -746,9 +750,9 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 	else
 	{
 		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
-			setPTEntry(PTi, PT, P, RW, US, 1, 0, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
 		else
-			setPTEntry(PTi, PT, P, RW, US, 1, 0, 0, 0, G, avl, 0, NX, pAddress);
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
 
 		//Reserved bits zurücksetzen
 		PD->PDE[PDi] &= ~0x1C0;
@@ -961,6 +965,8 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	bool RW = (flags & VMM_FLAGS_WRITE);
 	bool NX = (flags & VMM_FLAGS_NX);
 	bool P = !(avl & VMM_UNUSED_PAGE);
+	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
+	bool PWT = (flags & VMM_FLAGS_PWT);
 
 	//PML4 Tabelle bearbeiten
 	if((PML4->PML4E[PML4i] & PG_P) == 0)		//Eintrag für die PML4 schon vorhanden?
@@ -1075,9 +1081,9 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	{										//Neuen Eintrag erstellen
 		//Eintrag in die PT
 		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
-			setPTEntry(PTi, PT, P, RW, US, 1, 0, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
 		else
-			setPTEntry(PTi, PT, P, RW, US, 1, 0, 0, 0, G, avl, 0, NX, pAddress);
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
 	}
 	else
 	{

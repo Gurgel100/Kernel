@@ -20,6 +20,8 @@
 #define VMM_FLAGS_GLOBAL	(1 << 1)	//Bestimmt, ob die Page global ist
 #define VMM_FLAGS_USER		(1 << 2)	//Bestimmt, ob die Page im Usermode ist oder nicht
 #define VMM_FLAGS_NX		(1 << 3)	//Bestimmt, ob in der Page ausführbare Daten sind
+#define VMM_FLAGS_PWT		(1 << 4)	//Bestimmt, ob die Page mit write-through policy gecacht werden soll
+#define VMM_FLAGS_NO_CACHE	(1 << 5)	//Bestimmt, ob die Page nicht gecacht werden soll
 
 #define VMM_UNUSED_PAGE		0x4		//Marks page as unused by process
 
