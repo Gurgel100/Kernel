@@ -534,15 +534,18 @@ char *fgets(char *str, int n, FILE *stream)
 {
 	char c;
 	int i = 0;
-	if(stream == NULL || str == NULL)
+	if(stream == NULL || str == NULL || n <= 0)
 		return NULL;
 
-	while((c = fgetc(stream)) != '\n' && i < (n - 1) && !stream->eof)
+	while((c = fgetc(stream)) != EOF && i < (n - 1))
 	{
 		str[i++] = c;
+		if(c == '\n')
+			break;
 	}
-	if(i != 0)
-		str[i] = '\0';
+	str[i] = '\0';
+	if(c == EOF)
+		return NULL;
 	return str;
 }
 
