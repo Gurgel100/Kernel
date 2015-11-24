@@ -207,12 +207,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			size = syscall_fread(stream->stream_id, stream->posRead, tmpLength, tmp);
 #endif
 
-			if(size < tmpLength)
-			{
-				stream->eof = true;
-				if(size == 0)
-					return EOF;
-			}
+			stream->eof = size < tmpLength;
 			memcpy(ptr + readData, tmp, size);
 			readData += size;
 
@@ -269,12 +264,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			size = syscall_fread(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
 #endif
 
-			if(size < tmpLength)
-			{
-				stream->eof = true;
-				if(size == 0)
-					return EOF;
-			}
+			stream->eof = size < tmpLength;
 			memcpy(ptr + readData, tmp, size);
 			readData += size;
 
