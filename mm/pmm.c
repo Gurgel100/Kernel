@@ -38,9 +38,6 @@ static uint64_t pmm_Kernelsize;			//Grösse des Kernels in Bytes
 static uint64_t tmpMap[4096] __attribute__((aligned(MM_BLOCK_SIZE)));
 static uint64_t *Map = tmpMap;
 static size_t mapSize = 4096;			//Grösse der Bitmap
-static size_t lastIndex = 4;
-
-static lock_t pmm_lock = LOCK_UNLOCKED;
 
 /*
  * Initialisiert die physikalische Speicherverwaltung
@@ -132,31 +129,27 @@ bool pmm_Init()
  */
 paddr_t pmm_Alloc()
 {
-	size_t i;
-	if(pmm_Speicher_Verfuegbar == 0)
+	while(pmm_Speicher_Verfuegbar > 0)
 	{
-		return 1;
-	}
-	lock(&pmm_lock);
-	for(i = lastIndex; i < mapSize; i++)
-	{
-		uint8_t j = __builtin_ffsl(Map[i]);
-		if(j > 0)
+		size_t i;
+		for(i = 4; i < mapSize; i++)
 		{
-			//j - 1 rechnen, da ffsl eins drauf addiert
-			j--;
-			paddr_t Address = ((i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE);
-
-			//In der Bitmap eintragen, dass Page reserviert
-			asm volatile("btr %0,%1": :"r"(j & 0xFF) ,"m"(Map[i]));
-			lastIndex = i;
-			unlock(&pmm_lock);
-			locked_dec(&pmm_Speicher_Verfuegbar);
-			return Address;
+			uint16_t tmp;
+			while((tmp = __builtin_ffsl(Map[i])) > 0)
+			{
+				uint16_t j;
+				bool status;
+				j = tmp - 1;
+				asm volatile("lock btr %2,%0;"
+							"setc %1": "=m"(Map[i]), "=r"(status): "r"(j): "cc");
+				if(status)
+				{
+					locked_dec(&pmm_Speicher_Verfuegbar);
+					return (i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE;
+				}
+			}
 		}
 	}
-
-	unlock(&pmm_lock);
 	return 1;
 }
 
@@ -172,11 +165,8 @@ void pmm_Free(paddr_t Address)
 	//entsprechendes Bit in der Bitmap zurücksetzen
 	size_t i = Address / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
 	uint8_t bit = (Address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
-	lock(&pmm_lock);
-	asm volatile("bts %1,%2;"
-				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]));
-	lastIndex = MAX(MIN(i, lastIndex), 4);
-	unlock(&pmm_lock);
+	asm volatile("lock bts %1,%2;"
+				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]): "cc");
 	if(bit_status == 0)
 		locked_inc(&pmm_Speicher_Verfuegbar);
 	else
@@ -184,46 +174,86 @@ void pmm_Free(paddr_t Address)
 }
 
 //Für DMA erforderlich
-paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t Size)
+paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t size)
 {
-	lock(&pmm_lock);
-	if(pmm_Speicher_Verfuegbar == 0)
+	size_t maxIndex = maxAddress / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
+	uint8_t maxBit = (maxAddress / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
+	size_t i, bitCount, bitAlloc, startIndex, lastIndex;
+	uint8_t startBit;
+	uint8_t lastBit;
+	size_t bitFreed;
+	search:
+	while(pmm_Speicher_Verfuegbar >= size)
 	{
-		unlock(&pmm_lock);
-		return 0;
-	}
-	//Durchsuche die Bitmap um Speicherseiten zu finden, die hintereinander liegen
-	size_t Bits = Size / PMM_BITS_PER_ELEMENT + Size % PMM_BITS_PER_ELEMENT;
-	size_t startBit;
-	paddr_t i;
-	bool found = false;
-	//NULL ist eine ungültige Adresse deshalb fangen wir bei der 2. Page an zu suchen
-	for(i = MM_BLOCK_SIZE; i < maxAddress; i += MM_BLOCK_SIZE)
-	{
-		uint64_t Index = i / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE);
-		startBit = (i / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
-		if(((Map[Index] >> ((i / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT)) & 0x1) == 1)	//Speicherseite frei, dann nachschauen, ob  nachfolgende auch frei sind
+		size_t maxI = MIN(mapSize - 1, maxIndex);
+		bitCount = 0;
+		startIndex = lastIndex = -1;
+		startBit = lastBit = -1;
+		for(i = 4; i <= maxI; i++)
 		{
-			uint64_t j;
-			for(j = 0; j < Bits; j++)
+			uint8_t bit;
+			uint8_t maxBitIndex = (i == maxI) ? maxBit : PMM_BITS_PER_ELEMENT - 1;
+			for(bit = 0; bit <= maxBitIndex; bit++)
 			{
-				if(((Map[Index + Bits / PMM_BITS_PER_ELEMENT] >> (startBit + j)) & 0x1) == 0)	//Speicherseite nicht frei => weitersuchen
+				bool status;
+				asm volatile(
+						"bt %2,%1;"
+						"setc %0"
+						: "=r"(status) : "m"(Map[i]), "r"((uint16_t)bit): "cc");
+				if(status)
 				{
-					found = false;
-					break;
+					if(((lastIndex == i && lastBit == bit - 1) || (lastIndex == i - 1 && lastBit == PMM_BITS_PER_ELEMENT - 1 && bit == 0))
+							&& bitCount > 0)
+					{
+						lastIndex = i;
+						lastBit = bit;
+						if(++bitCount == size)
+							goto found;
+					}
+					else
+					{
+						bitCount = 1;
+						startIndex = lastIndex = i;
+						startBit = lastBit = bit;
+					}
 				}
-				else
-					found = true;
-			}
-			if(found)	//Speicher reservieren
-			{
-				for(j = 0; j < Bits; j++)
-				Map[Index + Bits / PMM_BITS_PER_ELEMENT] &= ~(1 << (startBit + j));
-				unlock(&pmm_lock);
-				return i;
 			}
 		}
 	}
-	unlock(&pmm_lock);
-	return 0;
+	return 1;
+
+	found:
+	bitAlloc = 0;
+	for(i = startIndex; i <= lastIndex; i++)
+	{
+		uint8_t bit;
+		uint8_t lastBitIndex = (i == lastIndex) ? lastBit : PMM_BITS_PER_ELEMENT - 1;
+		uint8_t startBitIndex = (i == startIndex) ? startBit : 0;
+		for(bit = startBitIndex; bit <= lastBitIndex; bit++)
+		{
+			bool status;
+			asm volatile(
+					"lock btr %2,%1;"
+					"setc %0"
+					: "=r"(status), "=m"(Map[i]): "r"((uint16_t)bit): "cc");
+			if(!status)
+				goto failure;
+			else
+				bitAlloc++;
+		}
+	}
+	__sync_fetch_and_add(&pmm_Speicher_Verfuegbar, -size);
+	return (startIndex * PMM_BITS_PER_ELEMENT + startBit) * MM_BLOCK_SIZE;
+
+	failure:
+	bitFreed = bitAlloc;
+	//Alles rückgängig machen
+	for(i = startIndex; bitAlloc > 0; i++)
+	{
+		uint8_t bit;
+		for(bit = (i == startIndex) ? startBit : 0; bit < PMM_BITS_PER_ELEMENT && bitAlloc > 0; bit++, bitAlloc--)
+			asm volatile("lock bts %1,%0": "=m"(Map[i]): "r"((uint16_t)bit): "cc");
+	}
+	__sync_fetch_and_add(&pmm_Speicher_Verfuegbar, bitFreed);
+	goto search;
 }
