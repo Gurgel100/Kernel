@@ -325,6 +325,7 @@ void console_ansi_write(console_t *console, char c)
 				case NEED_MORE:
 					if(console->ansi_buf_ofs <= sizeof(console->ansi_buf))
 						break;
+					/* no break */
 				case INVALID:
 					for(i = 0; i < console->ansi_buf_ofs; i++)
 						console_write(console, console->ansi_buf[i]);
