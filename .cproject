@@ -163,6 +163,7 @@
 								<option id="gnu.c.compiler.option.misc.pic.944765740" name="Position Independent Code (-fPIC)" superClass="gnu.c.compiler.option.misc.pic" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1960884146" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="BUILD_KERNEL"/>
+									<listOptionValue builtIn="false" value="NDEBUG"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.980096085" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
