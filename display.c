@@ -12,6 +12,7 @@
 #include "string.h"
 #include "console.h"
 #include "pm.h"
+#include "stdio.h"
 
 #define GRAFIKSPEICHER 0xB8000
 
@@ -54,27 +55,12 @@ void setCursor(uint8_t x, uint8_t y)
 
 void SysLog(char *Device, char *Text)
 {
-	setColor(BG_BLACK | CL_WHITE);
-	printf("[ ");
-	setColor(BG_BLACK | CL_GREEN);
-	printf(Device);
-	setColor(BG_BLACK | CL_WHITE);
-	printf(" ]");
-	setCursor(30, Zeile);
-	printf("%s\n\r", Text);
+	printf("[ \e[32m%s\e[37m ] %s\n", Device, Text);
 }
 
 void SysLogError(char *Device, char *Text)
 {
-	setColor(BG_BLACK | CL_WHITE);
-	printf("[ ");
-	setColor(BG_BLACK | CL_RED);
-	printf(Device);
-	setColor(BG_BLACK | CL_WHITE);
-	printf(" ]");
-	setCursor(30, Zeile);
-	setColor(BG_BLACK | CL_RED);
-	printf("%s\n", Text);
+	printf("[ \e[31m%s\e[37m ] \e[31m%s\e[37m\n", Device, Text);
 }
 
 /*
@@ -94,10 +80,7 @@ void Display_Clear()
  */
 void Panic(char *Device, char *Text)
 {
-	setColor(BG_RED | CL_WHITE);
-	printf("[ %s ]", Device);
-	setCursor(30, Zeile);
-	printf(Text);
+	printf("\e[41;37m[ %s ] %s", Device, Text);
 	asm("cli;hlt");
 }
 
