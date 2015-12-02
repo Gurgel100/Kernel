@@ -38,22 +38,6 @@ void __attribute__((deprecated)) setColor(uint8_t Color)
 	//console_changeColor(pm_getConsole(), Color);
 }
 
-/*
- * Scrollt den Bildschirm um eine Zeile nach unten.
- */
-void scrollScreenDown()
-{
-	int zeile, spalte;
-	uint16_t *gs = (uint16_t*)GRAFIKSPEICHER;
-	for(zeile = 0; zeile < 24; zeile++)
-		for(spalte = 0; spalte < 80; spalte++)
-			gs[zeile * 80 + spalte] = gs[(zeile + 1) * 80 + spalte];
-	//Letzte Zeile löschen
-	zeile = 24;
-	for(spalte = 0; spalte < 80; spalte++)
-		gs[zeile * 80 + spalte] = 0;
-}
-
 void setCursor(uint8_t x, uint8_t y)
 {
 	//Diese Funktion kann auch extern aufgerufen werden, deshalb müssen hier die
