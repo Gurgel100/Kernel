@@ -95,6 +95,7 @@
  *
  * \defgroup core
  */
+/*\@{*/
 
 #ifndef _CDI_H_
 #define _CDI_H_
@@ -141,6 +142,51 @@ struct cdi_bus_data {
 
 /**
  * \german
+ * Diese von jedem sie unterstützenden Bustyp zu erweiternde Struktur enthält
+ * Informationen darüber, welche Geräte von einem bestimmten Treiber verwaltet
+ * werden können.
+ * Typischerweise enthält sie einige der von der zugehörigen cdi_bus_data-
+ * Struktur bereitgestellten Felder (jene, die genutzt werden, um ein Gerät zu
+ * identifizieren, wie Geräte- und Hersteller-ID), wobei negative Werte "egal"
+ * bedeuten.
+ * \endgerman
+ * \english
+ * This structure, which is extended by any bus type supporting it, contains
+ * information about which devices can be handled by a certain driver.
+ * Typically, it will contain some of the fields provided by the appropriate
+ * cdi_bus_data structure (the ones which are used to identify a device like
+ * device/vendor ID) where negative values signify a "don't care".
+ * \endenglish
+ * \thuringiansaxonian
+ * Diese Schdruggtur wird von jehm Busdühp, der se unnerstützn gönnn dut,
+ * erweidert, und hat dann Informatzschjoun darübber, welsche Geräide vonnä
+ * bestimmdn Draibr unnr de Fiddische genomm wern gönnn.
+ * Tübbischerweise endhältse ä bår vondn Feldrn, die ooch in dr zugehörschn
+ * cdi_bus_data-Schdruggtur sin (welsche de nimmst, damitte weest, was für ä
+ * Geräit das nu eigndlisch is, zum Beispiel Geräide- un Herschdellor-
+ * Idendifikatzschjoun). Negadive Werde dun dann "egal" bedeudn.
+ * \endthuringiansaxonian
+ * \french
+ * Cette structure, qui est enrichie par tous les types qui le peuvent, décrit
+ * quels appareils un particulier pilote peut employer.
+ * Régulièrement, il y a quelques valeurs de la cdi_bus_data structure adéquate
+ * (qui sont utilisées pour identifier un appareil, comme l'ID de l'appareil et
+ * du vendeur), où des valeurs négatives signifient "n'importe quoi".
+ * \endfrench
+ * \japanese
+ * この毎のバスタイプが付け足されてストラクチャーの情報はあるドライバーが
+ * 何のディバイスを使える。
+ * 通例に、当たりcdi_bus_dataストラクチャーのフィールド多少がある。（それは、
+ * ディバイスを分かることのために使うフィールド、例えばディバイスとベンダーID）
+ * それなら、負の数の意味は「どうでもいい」。
+ * \endjapanese
+ */
+struct cdi_bus_device_pattern {
+    cdi_device_type_t bus_type;
+};
+
+/**
+ * \german
  * Beschreibt ein Gerät
  * \endgerman
  * \english
@@ -177,9 +223,6 @@ struct cdi_device {
      * \endenglish
      */
     struct cdi_bus_data*    bus_data;
-
-    // tyndur-spezifisch
-    void*               backdev;
 };
 
 /**
@@ -407,6 +450,75 @@ int cdi_provide_device(struct cdi_bus_data* device);
  */
 int cdi_provide_device_internal_drv(struct cdi_bus_data* device,
                                     struct cdi_driver* driver);
+
+/**
+ * \german
+ * Teilt der CDI-Implementierung mit, dass der Treiber @drv nur Geräte vom
+ * Muster @pattern akzeptiert (die am Bus @pattern->bus_type hängen). Diese
+ * Funktion darf mehrfach aufgerufen werden. Jedes neue Gerät am Bus, das nicht
+ * auf das Muster passt, wird der @drv->init_device()-Funktion nicht übergeben.
+ * Diese Funktion darf andererseits aber NULL zurückgeben, selbst wenn
+ * cdi_handle_bus_device() vom Treiber benutzt wurde, das heißt, diese Funktion
+ * darf mit einem Muster aufgerufen werden, das nicht nur auf Geräte passt, die
+ * vom Treiber behandelt werden können, sondern auch auf andere (die dann
+ * abgewiesen werden können, indem @drv->init_device() NULL zurückgibt).
+ *
+ * Diese Funktion darf nur in @drv->init_driver() aufgerufen werden.
+ * \endgerman
+ * \english
+ * Tells the CDI implementation that the driver @drv is able to handle devices
+ * with the pattern @pattern (appearing on the bus @pattern->bus_type). This
+ * function can be called multiple times. Any device appearing on the bus not
+ * fitting the pattern will not be passed to the @drv->init_device() function.
+ * That function may however return NULL even after the driver has called
+ * cdi_handle_bus_device(), that is, it is valid to call this function with a
+ * @pattern that does not only fit devices handled by @drv but others as well
+ * (which can then be rejected by letting @drv->init_device() return NULL).
+ *
+ * This function must only be called from @drv->init_driver().
+ * \endenglish
+ * \thuringiansaxonian
+ * Dailt dr CDI-Imblämändierung mit, dass dr Draibr @drv nur an Gelumbsch mibm
+ * Musdr @pattern rummehrn kann (die andn Bus @pattern->bus_type sin). Diese
+ * Fungzschjoun gann oo mehrfach uffgerufn wern. Wenn ä neues Geräit am Bus
+ * uffdoochn dut und das ni uffs Musdr bassn dut, dann gommt das bei dr
+ * @drv->init_device()-Fungzschjoun oo ni an. Uff dr annern Saide darf diese
+ * Fungzschjoun wiederum NULL zurückgehm, sogar wenner Draibr vorher
+ * cdi_handle_bus_device() uffgerufn hat, das heißt, diese Fungzschjoun gann
+ * ooch middä Musdr uffgerufn wern, das ni nur uff Geräide bassn dud, die middä
+ * Draibr was zu dun hamm, sonnern ooch uff annere (eene Möjlischgeit die
+ * abzulehn isses dann, in @drv->init_device() NULL zurückzugehm).
+ *
+ * Diese Fungzschjoun gannsde nirschndwo sonst als in @drv->init_driver()
+ * uffrufn.
+ * \endthuringiansaxonian
+ * \french
+ * Informe la CDI implémentation que le pilote @drv ne peut qu'employer des
+ * appareils du type @pattern (qui se présentent au bus @pattern->bus_type). On
+ * peut appeler cette fonction à plus d'une fois. Tous les appareils qui se
+ * présentent au bus qui ne correspondent pas au type ne seront pas transmises
+ * au fonction @drv->init_device(). À l'inverse, cette fonction peut rendre NULL
+ * même que le pilote a appelé cdi_handle_bus_device(), c'est-à-dire que on peut
+ * appeler cette fonction avec un type qui ne corresponde pas seulement aux
+ * appareils qui le pilote peut employer, mais en plus au des autres (qui on
+ * peut renvoyer par faire @drv->init_device() rendre NULL).
+ *
+ * Cette fonction doit être appeler seulement en @drv->init_driver().
+ * \endfrench
+ * \japanese
+ * ドライバー@drvがパターン@patternのようにディバイスだけを使えることを
+ * CDI図書館に知られす。そのディバイスがバス@pattern->bus_typeに出る。この
+ * ファンクションを数倍に呼び出していい。バスに出るパターンと違うディバイスが
+ * @drv->init_device()に渡されない。cdi_handle_bus_device()を呼び出して後でも
+ * @drv->init_device()からNULLを返していい。つまり、このファンクションには
+ * ドライバーが使えないディバイスのパターンを渡していい。その使えない
+ * ディバイスを@drv->init_device()からNULLを返すことで捨てれる。
+ *
+ * @drv->init_driver()と他の所でこのファンクションを呼び出してだめ。
+ * \endjapanese
+ */
+void cdi_handle_bus_device(struct cdi_driver* drv,
+                           struct cdi_bus_device_pattern* pattern);
 
 #endif
 
