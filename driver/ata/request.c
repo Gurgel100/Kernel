@@ -278,7 +278,7 @@ int ata_protocol_pio_in(struct ata_request* request)
                     // Wenn alle Blocks gelesen wurden ist der Transfer
                     // abgeschlossen.
                     return 1;
-                } else if (request->flags.ata &&
+                } else if (request->flags.ata && packet_size &&
                          request->blocks_done*request->block_size>=packet_size)
                 {
                     // Wenn alle Bytes des ATAPI-Paketes gelesen wurden

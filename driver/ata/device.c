@@ -222,7 +222,7 @@ void ata_init_controller(struct ata_controller* controller)
     // Jetzt werden die einzelnen geraete identifiziert. Hier ist es
     // anscheinend geschickter mit dem Slave zu beginnen.
     for (i = 1; i >= 0; i--) {
-        struct ata_device* dev = malloc(sizeof(*dev));
+        struct ata_device* dev = calloc(1, sizeof(*dev));
         dev->controller = controller;
         dev->id = i;
         dev->partition_list = cdi_list_create();
