@@ -207,8 +207,7 @@ paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t size)
 					{
 						lastIndex = i;
 						lastBit = bit;
-						if(++bitCount == size)
-							goto found;
+						bitCount++;
 					}
 					else
 					{
@@ -216,6 +215,8 @@ paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t size)
 						startIndex = lastIndex = i;
 						startBit = lastBit = bit;
 					}
+					if(bitCount == size)
+						goto found;
 				}
 			}
 		}
