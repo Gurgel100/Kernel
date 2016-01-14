@@ -280,7 +280,7 @@ void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
 
 	//Physischen Speicher allozieren
 	*Phys = pmm_AllocDMA(maxAddress, Size);
-		if(*Phys == 0) return NULL;
+		if(*Phys == 1) return NULL;
 
 	lock(&vmm_lock);
 	for(i = (void*)KERNELSPACE_START; i <= (void*)KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
