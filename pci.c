@@ -283,34 +283,6 @@ void initDevice(uint8_t bus, uint8_t slot)
 			for(i = 0; i < 6; i++)
 				pciDevice->BAR[Bar].Type = BAR_UNDEFINED;
 	}
-
-	#ifdef DEBUGMODE
-	setColor(BG_BLACK | CL_LIGHT_GREY);
-	/*if(pciDevice->HeaderType != 0x2)
-	{
-		uint8_t di;
-		for(di = 0; di < 6; di++)
-		{
-			if(pciDevice->BAR[di].Type != BAR_INVALID || pciDevice->BAR[di].Type != BAR_UNUSED || pciDevice->BAR[di].Type != BAR_UNDEFINED)
-			{
-				printf("->BAR");
-				printf(itoa(di));
-				printf(": Adress ");
-				printf(itoa(pciDevice->BAR[di].Address));
-				printf(", Size ");
-				printf(itoa(pciDevice->BAR[di].Size));
-				printf("\n\r");
-			}
-		}
-	}
-	getch();*/
-
-	/*printf("  Bus %u,Slot %u: Classcode %y,Subclass %y,ProgIF %y,Header %y,Function %y,IRQ %y\n",
-		pciDevice->Bus, pciDevice->Slot, pciDevice->ClassCode,
-		pciDevice->Subclass, pciDevice->ProgIF, pciDevice->HeaderType, pciDevice->Functions, pciDevice->irq);
-	printf("  Bus %u,Slot %u: Vendor 0x%x, DeviceID 0x%x\n",
-		pciDevice->Bus, pciDevice->Slot, pciDevice->VendorID, pciDevice->DeviceID);*/
-	#endif
 }
 
 #endif
