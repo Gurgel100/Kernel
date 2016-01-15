@@ -23,7 +23,8 @@
 void cdi_pci_get_all_devices(cdi_list_t list)
 {
 	pciDevice_t *pciDevice;
-	for(pciDevice = pci_firstDevice; pciDevice != NULL; pciDevice = pciDevice->NextDevice)
+	size_t i = 0;
+	while((pciDevice = list_get(pciDevices, i++)))
 	{
 		struct cdi_pci_device *cdi_pciDevice;
 		cdi_list_t resources = cdi_list_create();
@@ -55,7 +56,7 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 						{
 							*cdi_pciRes = (struct cdi_pci_resource){
 								.type = CDI_PCI_MEMORY,
-								.start = pciDevice->BAR[Bar].Address | (pciDevice->BAR[Bar + 1].Address << 32),
+								.start = pciDevice->BAR[Bar].Address | ((uint64_t)pciDevice->BAR[Bar + 1].Address << 32),
 								.length = pciDevice->BAR[Bar + 1].Size,
 								.index = Bar
 							};
@@ -69,6 +70,9 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 							.length = pciDevice->BAR[Bar].Size,
 							.index = Bar
 						};
+					break;
+					default:
+					break;
 				}
 				cdi_list_push(resources, cdi_pciRes);
 			}
@@ -76,10 +80,10 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 
 		cdi_pciDevice = malloc(sizeof(*cdi_pciDevice));
 		*cdi_pciDevice = (struct cdi_pci_device){
-			.bus_data = CDI_PCI,
+			.bus_data = { CDI_PCI },
 			.bus = pciDevice->Bus,
 			.dev = pciDevice->Slot,
-			.function = pciDevice->Functions,
+			.function = pciDevice->Function,
 			.vendor_id = pciDevice->VendorID,
 			.device_id = pciDevice->DeviceID,
 			.class_id = pciDevice->ClassCode,

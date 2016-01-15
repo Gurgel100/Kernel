@@ -12,6 +12,7 @@
 
 #include "stdint.h"
 #include "stddef.h"
+#include "list.h"
 
 typedef enum{
 	BAR_UNDEFINED, BAR_INVALID, BAR_UNUSED, BAR_32, BAR_64LO, BAR_64HI, BAR_IO
@@ -24,17 +25,14 @@ typedef struct{
 }pciBar_t;
 
 typedef struct{
-		uint8_t Bus, Slot;
+		uint8_t Bus, Slot, Function;
 		uint16_t DeviceID, VendorID;
 		uint8_t ClassCode, Subclass, RevisionID, ProgIF, HeaderType;
-		uint8_t Functions;	//Bit-Maske welche Funktionen zur Verfügung stehen
 		uint8_t irq;
 		pciBar_t BAR[6];
-		void *NextDevice;
 }pciDevice_t;
 
-pciDevice_t *pci_firstDevice;
-uint64_t NumDevices;
+extern list_t pciDevices;
 
 void pci_Init();
 uint32_t pci_readConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length);

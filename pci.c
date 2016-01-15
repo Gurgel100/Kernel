@@ -61,73 +61,32 @@
  * 		| Interrupt Status	| Reserved
  */
 
-bool checkDevice(uint8_t bus, uint8_t slot, uint8_t func);
+list_t pciDevices;
 
-void pci_Init()
-{
-	pci_firstDevice = 0;
-	NumDevices = 0;
-
-	printf(" =>PCI:\n");
-	uint16_t bus;
-	uint8_t slot;
-	for(bus = 0; bus < PCIBUSES; bus++)
-		for(slot = 0; slot < PCISLOTS; slot++)
-			initDevice((uint8_t)bus, slot);
-
-	SysLog("PCI", "Initialisierung abgeschlossen");
-	printf("%u Geraete gefunden\n", NumDevices);
-}
-
-bool checkDevice(uint8_t bus, uint8_t slot, uint8_t func)
+static bool checkDevice(uint8_t bus, uint8_t slot, uint8_t func)
 {
 	//Wenn VendorID != 0xFFFF, dann ist ein Gerät vorhanden
 	if(pci_readConfig(bus, slot, func, PCI_VENDOR_ID, 2) != 0xFFFF) return true;
 	return false;
 }
 
-//TODO: BARs funktionieren anscheinend nicht richtig
-void initDevice(uint8_t bus, uint8_t slot)
+static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 {
 	pciDevice_t *pciDevice;
+
 	//Wenn kein Gerät vorhanden, Initialierung abbrechen
-	if(!checkDevice(bus, slot, 0)) return;
+	if(!checkDevice(bus, slot, func))
+		return NULL;
 
 	//Ansonsten neue Struktur anlegen
-	if(pci_firstDevice == 0)
-	{
-		pciDevice = pci_firstDevice = malloc(sizeof(pciDevice_t));
-		pciDevice->NextDevice = 0;
-	}
-	else
-	{
-		pciDevice = pci_firstDevice;
-		//Finde das letzte Gerät
-		while(pciDevice->NextDevice != 0) pciDevice = pciDevice->NextDevice;
+	pciDevice = malloc(sizeof(pciDevice_t));
+	if(pciDevice == NULL)
+		return NULL;
 
-		//Neue Datenstruktur anlegen für das neue Gerät
-		pciDevice->NextDevice = malloc(sizeof(pciDevice_t));
-		pciDevice = pciDevice->NextDevice;
-		pciDevice->NextDevice = 0;
-	}
-	NumDevices++;
-
-	pciDevice->NextDevice = 0;
 	//Daten auslesen
 	pciDevice->Bus = bus;
 	pciDevice->Slot = slot;
-
-	pciDevice->Functions = 0;
-	if(pciDevice->HeaderType & 0x80)	//Mehrere Funktionen werden unterstützt
-	{
-		//Überprüfe jede Funktion ob verfügbar
-		uint8_t func;
-		for(func = 0; func < PCIFUNCS; func++)
-		{
-			if(checkDevice(bus, slot, func))
-				pciDevice->Functions |= 1 << func;
-		}
-	}
+	pciDevice->Function = func;
 	pciDevice->DeviceID = pci_readConfig(bus, slot, 0, PCI_DEVICE_ID, 2);
 	pciDevice->VendorID = pci_readConfig(bus, slot, 0, PCI_VENDOR_ID, 2);
 	pciDevice->ClassCode = pci_readConfig(bus, slot, 0, PCI_CLASS, 1);
@@ -231,6 +190,47 @@ void initDevice(uint8_t bus, uint8_t slot)
 			for(i = 0; i < 6; i++)
 				pciDevice->BAR[Bar].Type = BAR_UNDEFINED;
 	}
+
+	return pciDevice;
+}
+
+static void checkSlot(uint8_t bus, uint8_t slot)
+{
+	pciDevice_t *pciDevice = initDevice(bus, slot, 0);
+	if(pciDevice != NULL)
+	{
+		list_push(pciDevices, pciDevice);
+		if(pciDevice->HeaderType & 0x80)	//Mehrere Funktionen werden unterstützt
+		{
+			//Überprüfe jede Funktion
+			uint8_t func;
+			for(func = 1; func < PCIFUNCS; func++)
+			{
+				pciDevice = initDevice(bus, slot, func);
+				if(pciDevice != NULL)
+					list_push(pciDevices, pciDevice);
+			}
+		}
+	}
+}
+
+//#include "console.h"
+
+void pci_Init()
+{
+	pciDevices = list_create();
+	printf(" =>PCI:\n");
+	uint16_t bus;
+	uint8_t slot;
+	for(bus = 0; bus < PCIBUSES; bus++)
+		for(slot = 0; slot < PCISLOTS; slot++)
+			checkSlot(bus, slot);
+
+	SysLog("PCI", "Initialisierung abgeschlossen");
+	printf("%u Geraete gefunden\n", list_size(pciDevices));
+//	console_getch(&initConsole);
+}
+
 uint32_t pci_readConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length)
 {
 	uint32_t Data = 0;
