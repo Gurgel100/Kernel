@@ -214,8 +214,6 @@ static void checkSlot(uint8_t bus, uint8_t slot)
 	}
 }
 
-//#include "console.h"
-
 void pci_Init()
 {
 	pciDevices = list_create();
@@ -228,7 +226,6 @@ void pci_Init()
 
 	SysLog("PCI", "Initialisierung abgeschlossen");
 	printf("%u Geraete gefunden\n", list_size(pciDevices));
-//	console_getch(&initConsole);
 }
 
 uint32_t pci_readConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length)
