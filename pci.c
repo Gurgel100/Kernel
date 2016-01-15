@@ -87,14 +87,14 @@ static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 	pciDevice->Bus = bus;
 	pciDevice->Slot = slot;
 	pciDevice->Function = func;
-	pciDevice->DeviceID = pci_readConfig(bus, slot, 0, PCI_DEVICE_ID, 2);
-	pciDevice->VendorID = pci_readConfig(bus, slot, 0, PCI_VENDOR_ID, 2);
-	pciDevice->ClassCode = pci_readConfig(bus, slot, 0, PCI_CLASS, 1);
-	pciDevice->Subclass = pci_readConfig(bus, slot, 0, PCI_SUBCLASS, 1);
-	pciDevice->ProgIF = pci_readConfig(bus, slot, 0, PCI_PROG_IF, 1);
-	pciDevice->RevisionID = pci_readConfig(bus, slot, 0, PCI_REVISION, 1);
-	pciDevice->HeaderType = pci_readConfig(bus, slot, 0, PCI_HEADERTYPE, 1);
-	pciDevice->irq = pci_readConfig(bus, slot, 0, PCI_IRQLINE, 1);
+	pciDevice->DeviceID = pci_readConfig(bus, slot, func, PCI_DEVICE_ID, 2);
+	pciDevice->VendorID = pci_readConfig(bus, slot, func, PCI_VENDOR_ID, 2);
+	pciDevice->ClassCode = pci_readConfig(bus, slot, func, PCI_CLASS, 1);
+	pciDevice->Subclass = pci_readConfig(bus, slot, func, PCI_SUBCLASS, 1);
+	pciDevice->ProgIF = pci_readConfig(bus, slot, func, PCI_PROG_IF, 1);
+	pciDevice->RevisionID = pci_readConfig(bus, slot, func, PCI_REVISION, 1);
+	pciDevice->HeaderType = pci_readConfig(bus, slot, func, PCI_HEADERTYPE, 1);
+	pciDevice->irq = pci_readConfig(bus, slot, func, PCI_IRQLINE, 1);
 
 	if((pciDevice->HeaderType & ~0x80) == 0x00 || (pciDevice->HeaderType & ~0x80) == 0x01)
 	{
@@ -105,7 +105,7 @@ static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 			//Offset der aktuellen Bar
 			uint32_t BarOffset = 0x10 + (Bar * 4);
 
-			uint32_t Data = pci_readConfig(bus, slot, 0, BarOffset, 4);
+			uint32_t Data = pci_readConfig(bus, slot, func, BarOffset, 4);
 
 			//prüfen, ob Speicher oder IO
 			if((Data & 0x1) == 0)
@@ -115,11 +115,11 @@ static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 				{
 					case 0x0:	//32-Bit BAR
 						//Mit lauter 1en überschreiben
-						pci_writeConfig(bus, slot, 0, BarOffset, 4, 0xFFFFFFF0);
+						pci_writeConfig(bus, slot, func, BarOffset, 4, 0xFFFFFFF0);
 						//und zurück lesen
-						uint32_t tmp = pci_readConfig(bus, slot, 0, BarOffset, 4);
+						uint32_t tmp = pci_readConfig(bus, slot, func, BarOffset, 4);
 						//Daten zurückschreiben
-						pci_writeConfig(bus, slot, 0, BarOffset, 4, Data);
+						pci_writeConfig(bus, slot, func, BarOffset, 4, Data);
 						if(tmp == 0)	//Es muss immer mind. ein Bit beschreibbar sein
 							pciDevice->BAR[Bar].Type = BAR_UNUSED;
 						else
@@ -136,15 +136,15 @@ static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 						else
 						{
 							//Werte zwischenspeichern
-							uint32_t tmp_high = pci_readConfig(bus, slot, 0, BarOffset + 4, 4);
+							uint32_t tmp_high = pci_readConfig(bus, slot, func, BarOffset + 4, 4);
 							//Mit lauter 1en überschreiben
-							pci_writeConfig(bus, slot, 0, BarOffset, 4, 0xFFFFFFF0);
-							pci_writeConfig(bus, slot, 0, BarOffset + 4, 4, 0xFFFFFFFF);
+							pci_writeConfig(bus, slot, func, BarOffset, 4, 0xFFFFFFF0);
+							pci_writeConfig(bus, slot, func, BarOffset + 4, 4, 0xFFFFFFFF);
 
-							uint64_t tmp = pci_readConfig(bus, slot, 0, BarOffset, 4) | ((uint64_t)pci_readConfig(bus, slot, 0, BarOffset + 4, 4) << 32);
+							uint64_t tmp = pci_readConfig(bus, slot, func, BarOffset, 4) | ((uint64_t)pci_readConfig(bus, slot, func, BarOffset + 4, 4) << 32);
 							//Daten zurückschreiben
-							pci_writeConfig(bus, slot, 0, BarOffset, 4, Data);
-							pci_writeConfig(bus, slot, 0, BarOffset + 4, 4, tmp_high);
+							pci_writeConfig(bus, slot, func, BarOffset, 4, Data);
+							pci_writeConfig(bus, slot, func, BarOffset + 4, 4, tmp_high);
 							if(tmp == 0)	//Es muss immer mindestens ein Bit beschreibbar sein
 								pciDevice->BAR[Bar].Type = pciDevice->BAR[Bar + 1].Type = BAR_UNUSED;
 							else
@@ -166,11 +166,11 @@ static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 			{
 				//IO
 				//Mit lauter 1en überschreiben
-				pci_writeConfig(bus, slot, 0, BarOffset, 4, 0xFFFFFFFC);
+				pci_writeConfig(bus, slot, func, BarOffset, 4, 0xFFFFFFFC);
 				//und wieder zurücklesen
-				uint32_t tmp = pci_readConfig(bus, slot, 0, BarOffset, 4);
+				uint32_t tmp = pci_readConfig(bus, slot, func, BarOffset, 4);
 				//Anfangszustand wiederherstellen
-				pci_writeConfig(bus, slot, 0, BarOffset, 4, Data);
+				pci_writeConfig(bus, slot, func, BarOffset, 4, Data);
 				if(tmp == 0)	//Es muss immer mind. ein Bit gesetzt bzw. beschreibbar sein
 					pciDevice->BAR[Bar].Type = BAR_UNUSED;
 				else
