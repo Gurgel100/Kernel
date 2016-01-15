@@ -8,6 +8,7 @@
 #include "pci.h"
 #include "../pci.h"
 #include "lists.h"
+#include "stdlib.h"
 
 /**
  * \german
