@@ -124,7 +124,7 @@ void cdi_pci_device_destroy(struct cdi_pci_device* device)
  */
 uint16_t cdi_pci_config_readw(struct cdi_pci_device* device, uint8_t offset)
 {
-	return (uint16_t)ConfigRead(device->bus, device->dev, device->function, offset, 2);
+	return (uint16_t)pci_readConfig(device->bus, device->dev, device->function, offset, 2);
 }
 
 /**
@@ -144,5 +144,5 @@ uint16_t cdi_pci_config_readw(struct cdi_pci_device* device, uint8_t offset)
  */
 void cdi_pci_config_writew(struct cdi_pci_device* device, uint8_t offset, uint16_t value)
 {
-	ConfigWrite(device->bus, device->dev, device->function, offset, 2, value);
+	pci_writeConfig(device->bus, device->dev, device->function, offset, 2, value);
 }
