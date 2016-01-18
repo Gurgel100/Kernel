@@ -28,8 +28,13 @@ extern char *strncat(char *str1, const char *str2, size_t n);
 
 extern char *strchr(const char *str, int ch);
 extern char *strrchr(const char *str, int ch);
+extern size_t strspn(const char *dest, const char *src);
+extern size_t strcspn(const char *dest, const char *src);
+extern char *strpbrk(const char *dest, const char *breakset);
 extern char *strstr(const char *str, const char *substr);
 
+extern void *memchr(const void *ptr, int ch, size_t count);
+extern int memcmp(const void *lhs, const void *rhs, size_t count);
 extern void *memset(void *block, int c, size_t n);
 extern void *memmove(void *to, const void *from, size_t size);
 extern void *memcpy (void *to, const void *from, size_t size);

@@ -8,6 +8,7 @@
 #include "string.h"
 #include "stdlib.h"
 #include "stdint.h"
+#include "stdbool.h"
 
 char *strcpy(char *to, const char *from)
 {
@@ -229,6 +230,67 @@ char *strchr(const char *str, int ch)
 	return NULL;
 }
 
+size_t strspn(const char *dest, const char *src)
+{
+	size_t i;
+
+	for(i = 0; dest[i] != '\0'; i++)
+	{
+		size_t j;
+		bool found = false;
+		for(j = 0; src[j] != '\0'; j++)
+		{
+			if(dest[i] == src[j])
+			{
+				found = true;
+				break;
+			}
+		}
+		if(!found)
+			break;
+	}
+
+	return i;
+}
+
+size_t strcspn(const char *dest, const char *src)
+{
+	size_t i;
+
+	for(i = 0; dest[i] != '\0'; i++)
+	{
+		size_t j;
+		bool found = false;
+		for(j = 0; src[j] != '\0'; j++)
+		{
+			if(dest[i] == src[j])
+			{
+				found = true;
+				break;
+			}
+		}
+		if(found)
+			break;
+	}
+
+	return i;
+}
+
+char *strpbrk(const char *dest, const char *breakset)
+{
+	for(; *dest != '\0'; dest++)
+	{
+		size_t i;
+		for(i = 0; breakset[i] != '\0'; i++)
+		{
+			if(*dest == breakset[i])
+				return (char*)dest;
+		}
+	}
+
+	return NULL;
+}
+
 char *strstr(const char *str, const char *substr)
 {
 	char *s;
@@ -248,6 +310,29 @@ char *strstr(const char *str, const char *substr)
 	return NULL;
 }
 
+
+void *memchr(const void *ptr, int ch, size_t count)
+{
+	unsigned char *p;
+	for(p = (unsigned char*)ptr; count > 0; p++, count--)
+	{
+		if(*p == (unsigned char)ch)
+			return p;
+	}
+
+	return NULL;
+}
+
+int memcmp(const void *lhs, const void *rhs, size_t count)
+{
+	unsigned char *l = (unsigned char*)lhs;
+	unsigned char *r = (unsigned char*)rhs;
+
+	size_t i;
+	for(i = 0; i < count && l[i] == r[i]; i++);
+
+	return l[i] - r[i];
+}
 
 void *memset(void *block, int c, size_t n)
 {
