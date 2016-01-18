@@ -117,7 +117,7 @@ double sqrt(double x)
 	double Ergebnis;
 	if(x < 0.0)
 		return NAN;
-	asm("fsqrt" :"=t"(Ergebnis) :"0"(x));
+	asm("sqrtpd %[x],%[res]": [res]"=x"(Ergebnis): [x]"xm"(x));
 	return Ergebnis;
 }
 
