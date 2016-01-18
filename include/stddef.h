@@ -13,6 +13,8 @@
 typedef unsigned long	size_t;
 #endif
 
+typedef long ptrdiff_t;
+
 #ifndef NULL
 #define NULL	(void*)0
 #endif
