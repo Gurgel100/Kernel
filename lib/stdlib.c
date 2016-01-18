@@ -889,6 +889,29 @@ int abs(int x)
 	return (x < 0) ? -x : x;
 }
 
+long labs(long x)
+{
+	return (x < 0) ? -x : x;
+}
+
+div_t div(int numer, int denom)
+{
+	div_t res = {
+		.quot = numer / denom,
+		.rem = numer % denom
+	};
+	return res;
+}
+
+ldiv_t ldiv(long int numer, long int denom)
+{
+	ldiv_t res = {
+		.quot = numer / denom,
+		.rem = numer % denom
+	};
+	return res;
+}
+
 int32_t rand()
 {
 	uint32_t Number = 0;
