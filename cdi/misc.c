@@ -7,6 +7,7 @@
 
 #include "misc.h"
 #include "isr.h"
+#include "stdlib.h"
 
 typedef struct{
 		uint8_t IRQ;
