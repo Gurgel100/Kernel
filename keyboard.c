@@ -13,10 +13,12 @@
 #include "stddef.h"
 #include "util.h"
 #include "display.h"
-#include "stdbool.h"
 #include "keyboard_SWISS.h"
 #include "console.h"
 #include "ctype.h"
+#include "stdlib.h"
+#include "list.h"
+#include "assert.h"
 
 //Ports
 #define KEYBOARD_PORT		0x60
@@ -61,6 +63,16 @@ typedef struct{
 		void *Next;
 } Puffer_t;
 
+typedef struct{
+	char_handler handler;
+	void *opaque;
+}char_handler_entry_t;
+
+typedef struct{
+	key_handler handler;
+	void *opaque;
+}key_handler_entry_t;
+
 //Tabellen um den Scancode in einen Keycode zu übersetzen
 static const KEY_t ScancodeToKey_default[] =
 //		.0			.1			.2			.3			.4			.5			.6			.7			.8			.9			.A			.B			.C			.D			.E			.F
@@ -80,11 +92,91 @@ static bool PressedKeys[__KEY_LAST];
 static volatile Puffer_t *Puffer;		//Anfang des Zeichenpuffers
 static volatile Puffer_t *ActualPuffer;	//Ende des Zeichenpuffers
 
-KEY_t keyboard_ScancodeToKey(uint8_t Scancode);
-char keyboard_KeyToASCII(KEY_t Key);
-void keyboard_SendCommand(uint8_t Command);
-uint8_t keyboard_getScanCode(void);
-void keyboard_SetLEDs(void);
+//Handlers
+static list_t char_handlers;
+static list_t keydown_handlers;
+static list_t keyup_handlers;
+
+
+/*
+ * Wandelt den Scancode in eine Taste um
+ * Parameter:	Scancode = der umzuwandelne Scancode
+ * Rückgabe:	Die entsprechende Taste
+ */
+static KEY_t keyboard_ScancodeToKey(uint8_t Scancode)
+{
+	if(Scancode != 0xE0 || Scancode != 0xE1)	//Werden momentan noch nicht unterstützt
+		return ScancodeToKey_default[Scancode & 0x7F];
+	return 0;
+}
+
+static char keyboard_KeyToASCII(KEY_t Key)
+{
+	if(PressedKeys[KEY_LSHIFT] || PressedKeys[KEY_RSHIFT] || PressedKeys[KEY_CAPS])
+		return KeyToAscii_Shift[Key];
+	else if(PressedKeys[KEY_ALTGR])
+		return KeyToAscii_AltGr[Key];
+	else
+		return KeyToAscii_default[Key];
+}
+
+/*
+ * Sendet einen Befehl an die Tastatur
+ * Parameter:	Command = Befehl, der an die Tastatur geschickt werden soll
+ */
+static void keyboard_SendCommand(uint8_t Command)
+{
+	while(inb(KBC_COMMAND) & STATUS_IN);
+	outb(KEYBOARD_PORT, Command);
+}
+
+/*
+ * Holt die Ausgabe der Tastatur, die sie in Port 0x60 geschrieben hat
+ * Rückgabe:	Keycode
+ */
+static uint8_t keyboard_getScanCode()
+{
+	if(inb(KBC_COMMAND) | STATUS_OUT) return inb(KBC_BUFFER);
+	return 0;
+}
+
+static void keyboard_SetLEDs()
+{
+	keyboard_SendCommand(KEYBOARD_LED);
+	while(inb(KBC_COMMAND) & STATUS_IN);
+	outb(KEYBOARD_PORT, 0x0 | ((PressedKeys[KEY_CAPS] & 0x1) << 2) | ((PressedKeys[KEY_KPNUM] & 0x1) << 1)
+			| (PressedKeys[KEY_SCROLL] & 0x1));
+}
+
+static void notify_charPress(char c)
+{
+	size_t i = 0;
+	char_handler_entry_t *e;
+	while((e = list_get(char_handlers, i++)))
+	{
+		e->handler(e->opaque, c);
+	}
+}
+
+static void notify_keyDown(KEY_t key)
+{
+	size_t i = 0;
+	key_handler_entry_t *e;
+	while((e = list_get(keydown_handlers, i++)))
+	{
+		e->handler(e->opaque, key);
+	}
+}
+
+static void notify_keyUp(KEY_t key)
+{
+	size_t i = 0;
+	key_handler_entry_t *e;
+	while((e = list_get(keyup_handlers, i++)))
+	{
+		e->handler(e->opaque, key);
+	}
+}
 
 /*
  * Initialisiert die Tastatur und den KBC (Keyboard Controller)
@@ -98,6 +190,11 @@ void keyboard_Init()
 	}
 	Puffer = ActualPuffer = NULL;
 
+	//Handlerlisten initialisieren
+	char_handlers = list_create();
+	keydown_handlers = list_create();
+	keyup_handlers = list_create();
+
 	//Tastatur aktivieren
 	//keyboard_SendCommand(KEYBOARD_AKTIVATE);
 
@@ -110,6 +207,53 @@ void keyboard_Init()
 }
 
 /*
+ * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
+ * Parameter:	Der aufzurufende Handler
+ */
+void keyboard_registerCharHandler(char_handler handler, void *opaque)
+{
+	assert(char_handlers != NULL);
+	char_handler_entry_t *e = malloc(sizeof(char_handler_entry_t));
+	e->handler = handler;
+	e->opaque = opaque;
+
+	list_push(char_handlers, e);
+}
+
+/*
+ * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
+ * Parameter:	Der aufzurufende Handler
+ */
+void keyboard_registerKeydownHandler(key_handler handler, void *opaque)
+{
+	assert(keydown_handlers != NULL);
+	key_handler_entry_t *e = malloc(sizeof(key_handler_entry_t));
+	e->handler = handler;
+	e->opaque = opaque;
+
+	list_push(keydown_handlers, e);
+}
+
+/*
+ * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste losgelassen wurde
+ * Parameter:	Der aufzurufende Handler
+ */
+void keyboard_registerKeyupHandler(key_handler handler, void *opaque)
+{
+	assert(keyup_handlers != NULL);
+	key_handler_entry_t *e = malloc(sizeof(key_handler_entry_t));
+	e->handler = handler;
+	e->opaque = opaque;
+
+	list_push(keyup_handlers, e);
+}
+
+bool keyboard_isKeyPressed(KEY_t key)
+{
+	return PressedKeys[key];
+}
+
+/*
  * Handler für IRQ 1
  * Parameter:	*ihs = Zeiger auf Struktur des Stacks
  */
@@ -119,6 +263,7 @@ void keyboard_Handler(ihs_t *ihs)
 	KEY_t Key = keyboard_ScancodeToKey(Scancode);
 	if(Key == __KEY_INVALID) return;
 	bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
+	bool oldStatus = PressedKeys[Key];
 	//Wenn CapsLock, NumLock oder ScrollLock gedrückt wurde, dann den Status nur ändern beim erneuten Drücken
 	//und nicht beim Break.
 	if(Key == KEY_CAPS || Key == KEY_KPNUM || Key == KEY_SCROLL)
@@ -139,39 +284,12 @@ void keyboard_Handler(ihs_t *ihs)
 	//Ist nur für den Kernel notwendig
 	if(make)
 	{
-		if(PressedKeys[KEY_LALT])
-		{
-			if(PressedKeys[KEY_F1])
-				console_switch(1);
-			else if(PressedKeys[KEY_F2])
-				console_switch(2);
-			else if(PressedKeys[KEY_F3])
-				console_switch(3);
-			else if(PressedKeys[KEY_F4])
-				console_switch(4);
-			else if(PressedKeys[KEY_F5])
-				console_switch(5);
-			else if(PressedKeys[KEY_F6])
-				console_switch(6);
-			else if(PressedKeys[KEY_F7])
-				console_switch(7);
-			else if(PressedKeys[KEY_F8])
-				console_switch(8);
-			else if(PressedKeys[KEY_F9])
-				console_switch(9);
-			else if(PressedKeys[KEY_F10])
-				console_switch(10);
-			else if(PressedKeys[KEY_F11])
-				console_switch(11);
-			else if(PressedKeys[KEY_F12])
-				console_switch(12);
-			else if(PressedKeys[KEY_ESC])
-				console_switch(0);
-		}
-	//Zeichen in Puffer schreiben, wenn es ein ASCII-Zeichen ist
-	char Zeichen = keyboard_KeyToASCII(Key);
-	if(Zeichen != 0)
-		console_keyboardHandler(activeConsole, Zeichen);
+		//Nur einmal benachrichtigen, dass die Taste gedrückt wurde
+		if(!oldStatus)
+			notify_keyDown(Key);
+		char Zeichen = keyboard_KeyToASCII(Key);
+		if(Zeichen != 0)
+			notify_charPress(Zeichen);
 	/*if(Zeichen != 0)
 	{
 		Puffer_t *NewPuffer = malloc(sizeof(Puffer_t));
@@ -184,56 +302,9 @@ void keyboard_Handler(ihs_t *ihs)
 			Puffer = ActualPuffer;
 	}*/
 	}
-}
-
-/*
- * Wandelt den Scancode in eine Taste um
- * Parameter:	Scancode = der umzuwandelne Scancode
- * Rückgabe:	Die entsprechende Taste
- */
-KEY_t keyboard_ScancodeToKey(uint8_t Scancode)
-{
-	if(Scancode != 0xE0 || Scancode != 0xE1)	//Werden momentan noch nicht unterstützt
-		return ScancodeToKey_default[Scancode & 0x7F];
-	return 0;
-}
-
-char keyboard_KeyToASCII(KEY_t Key)
-{
-	if(PressedKeys[KEY_LSHIFT] || PressedKeys[KEY_RSHIFT] || PressedKeys[KEY_CAPS])
-		return KeyToAscii_Shift[Key];
-	else if(PressedKeys[KEY_ALTGR])
-		return KeyToAscii_AltGr[Key];
-	else
-		return KeyToAscii_default[Key];
-}
-
-/*
- * Sendet einen Befehl an die Tastatur
- * Parameter:	Command = Befehl, der an die Tastatur geschickt werden soll
- */
-void keyboard_SendCommand(uint8_t Command)
-{
-	while(inb(KBC_COMMAND) & STATUS_IN);
-	outb(KEYBOARD_PORT, Command);
-}
-
-/*
- * Holt die Ausgabe der Tastatur, die sie in Port 0x60 geschrieben hat
- * Rückgabe:	Keycode
- */
-uint8_t keyboard_getScanCode()
-{
-	if(inb(KBC_COMMAND) | STATUS_OUT) return inb(KBC_BUFFER);
-	return 0;
-}
-
-void keyboard_SetLEDs()
-{
-	keyboard_SendCommand(KEYBOARD_LED);
-	while(inb(KBC_COMMAND) & STATUS_IN);
-	outb(KEYBOARD_PORT, 0x0 | ((PressedKeys[KEY_CAPS] & 0x1) << 2) | ((PressedKeys[KEY_KPNUM] & 0x1) << 1)
-			| (PressedKeys[KEY_SCROLL] & 0x1));
+	//Nur einmal benachrichtigen, dass die Taste losgelassen wurde
+	else if(oldStatus)
+		notify_keyUp(Key);
 }
 
 char __attribute__((deprecated)) getch()

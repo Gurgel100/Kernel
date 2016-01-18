@@ -10,6 +10,8 @@
 #ifndef KEYBOARD_H_
 #define KEYBOARD_H_
 
+#include "stdbool.h"
+
 typedef enum{
 	__KEY_INVALID,	//Ungültige Taste
 	KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J, KEY_K, KEY_L, KEY_M,
@@ -31,7 +33,44 @@ typedef enum{
 	__KEY_LAST
 }KEY_t;	//Alle Tasten
 
+/*
+ *	Parameter:	Buchstabe der Taste
+ */
+typedef void(*char_handler)(void *opaque, char c);
+
+/*
+ *	Parameter:	Keycode der  Taste
+ */
+typedef void(*key_handler)(void *opaque, KEY_t key);
+
+
 void keyboard_Init(void);
+
+/*
+ * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
+ * Parameter:	Der aufzurufende Handler
+ */
+void keyboard_registerCharHandler(char_handler handler, void *opaque);
+
+/*
+ * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
+ * Parameter:	Der aufzurufende Handler
+ */
+void keyboard_registerKeydownHandler(key_handler handler, void *opaque);
+
+/*
+ * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste losgelassen wurde
+ * Parameter:	Der aufzurufende Handler
+ */
+void keyboard_registerKeyupHandler(key_handler handler, void *opaque);
+
+/*
+ * Gibt zurück, ob die Taste aktuell gedrückt ist.
+ * Parameter:	Die Taste, deren Status man haben will
+ * Rückgabe:	Status des Taste
+ */
+bool keyboard_isKeyPressed(KEY_t key);
+
 char getch(void);
 
 #endif /* KEYBOARD_H_ */
