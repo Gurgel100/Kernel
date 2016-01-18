@@ -123,9 +123,16 @@ double sqrt(double x)
 
 double ceil(double x)
 {
+#ifdef __SSE4_1__
+	double Ergebnis;
+	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b10));
+	return Ergebnis;
+#else
+	//TODO: funktioniert nur für "normale" Zahlen
 	long int i = (long int)x;
 	if(i < x) i++;
 	return (double)i;
+#endif
 }
 
 double fabs(double x)
@@ -135,7 +142,14 @@ double fabs(double x)
 
 double floor(double x)
 {
+#ifdef __SSE4_1__
+	double Ergebnis;
+	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b01));
+	return Ergebnis;
+#else
+	//TODO: funktioniert nur für "normale" Zahlen
 	return (double)(long int)x;
+#endif
 }
 
 double fmod(double x, double y)
