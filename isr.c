@@ -251,6 +251,8 @@ ihs_t *exception_Debug(ihs_t *ihs)
 		Debugged = false;
 		return oldState;
 	}
+	#else
+	return ihs;
 	#endif
 }
 
