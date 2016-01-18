@@ -14,6 +14,7 @@
 #include "vfs.h"
 #include "stdio.h"
 #include "scheduler.h"
+#include "keyboard.h"
 
 #define GRAFIKSPEICHER	0xB8000
 #define MAX_PAGES		12
@@ -65,6 +66,59 @@ static size_t console_readHandler(void *c, uint64_t start, size_t length, void *
 static size_t console_writeHandler(void *c, uint64_t start, size_t length, const void *buffer);
 static void *console_getValue(void *c, vfs_device_function_t function);
 
+static void handler_charPress(void *opaque, char c)
+{
+	console_t *console = *(console_t**)opaque;
+
+	if(console->waitingThread)
+	{
+		if(console->id != 0)
+			thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
+		list_push(console->input, (void*)((uint64_t)c));
+	}
+}
+
+static void handler_keyDown(void *opaque, KEY_t key)
+{
+	console_t *console = *(console_t**)opaque;
+
+	if(keyboard_isKeyPressed(KEY_LALT))
+	{
+		if(key == KEY_F1)
+			console_switch(1);
+		else if(key == KEY_F2)
+			console_switch(2);
+		else if(key == KEY_F3)
+			console_switch(3);
+		else if(key == KEY_F4)
+			console_switch(4);
+		else if(key == KEY_F5)
+			console_switch(5);
+		else if(key == KEY_F6)
+			console_switch(6);
+		else if(key == KEY_F7)
+			console_switch(7);
+		else if(key == KEY_F8)
+			console_switch(8);
+		else if(key == KEY_F9)
+			console_switch(9);
+		else if(key == KEY_F10)
+			console_switch(10);
+		else if(key == KEY_F11)
+			console_switch(11);
+		else if(key == KEY_F12)
+			console_switch(12);
+		else if(key == KEY_ESC)
+			console_switch(0);
+	}
+}
+
+static void handler_keyUp(void *opaque, KEY_t key)
+{
+	console_t *console = *(console_t**)opaque;
+}
+
 void console_Init()
 {
 	initConsole.input = list_create();
@@ -113,6 +167,11 @@ void console_Init()
 		tty->getValue = console_getValue;
 		vfs_RegisterDevice(tty);
 	}
+
+	//Keyboardhandler registrieren
+	keyboard_registerCharHandler(handler_charPress, &activeConsole);
+	keyboard_registerKeydownHandler(handler_keyDown, &activeConsole);
+	keyboard_registerKeyupHandler(handler_keyUp, &activeConsole);
 }
 
 /*
@@ -513,17 +572,6 @@ char console_getch(console_t *console)
 	}
 
 	return (char)((uint64_t)list_remove(console->input, list_size(console->input) - 1));
-}
-
-void console_keyboardHandler(console_t *console, char c)
-{
-	if(console->waitingThread)
-	{
-		if(console->id != 0)
-			thread_unblock(console->waitingThread);
-		console->waitingThread = NULL;
-		list_push(console->input, (void*)((uint64_t)c));
-	}
 }
 
 static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
