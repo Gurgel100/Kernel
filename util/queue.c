@@ -6,6 +6,7 @@
  */
 
 #include "queue.h"
+#include "stdlib.h"
 
 /*
  * Erstellt eine neue Queue.
