@@ -1398,6 +1398,17 @@ void vmm_usePages(void *virt, size_t pages)
 
 
 //Prozesse
+
+/*
+ * Überprüft, ob ein Pointer in den Userspace bereich zeigt,
+ * Parameter:	Den zu überprüfenden Pointer
+ * Rückgabe:	True, wenn der Pointer in den Userspace zeigt, ansonsten false
+ */
+bool vmm_userspacePointerValid(const void *ptr)
+{
+	return (USERSPACE_START <= ptr && ptr <= USERSPACE_END);
+}
+
 /*
  * Erstellt einen neuen virtuellen Adressraum und intialisiert diesen
  */
