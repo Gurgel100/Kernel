@@ -16,6 +16,7 @@
 
 typedef enum{
 	PART_TYPE_NONE = 0x00,
+	PART_TYPE_LINUX = 0x83,
 	PART_TYPE_ISO9660 = 0xCD,
 	PART_TYPE_LAST = 0xFF
 }__attribute__((packed))part_type_t;

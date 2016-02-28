@@ -112,19 +112,31 @@ int partition_getPartitions(device_t *dev)
 struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 {
 	struct cdi_fs_filesystem *fs = malloc(sizeof(*fs));
-	struct cdi_fs_driver *driver;
+	char *path;
+	vfs_mode_t mode;
 
 	switch(part->type)
 	{
-		case PART_TYPE_ISO9660:
-			if(!(driver = getFSDriver("iso9660")))
+		case PART_TYPE_LINUX:
+			if(!(fs->driver = getFSDriver("ext2")))
 				goto exit_error;
-			fs->driver = driver;
-			vfs_mode_t mode = {
-					.read = true,
-					.write = true
+
+			mode = (vfs_mode_t){
+				.read = true,
+				.write = true
 			};
-			char *path;
+			asprintf(&path, "dev/%s", part->dev->device->name);
+			fs->osdep.fp = vfs_Open(NULL, path, mode);
+			free(path);
+		break;
+		case PART_TYPE_ISO9660:
+			if(!(fs->driver = getFSDriver("iso9660")))
+				goto exit_error;
+
+			mode = (vfs_mode_t){
+				.read = true,
+				.write = true
+			};
 			asprintf(&path, "dev/%s", part->dev->device->name);
 			fs->osdep.fp = vfs_Open(NULL, path, mode);
 			free(path);
