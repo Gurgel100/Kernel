@@ -889,7 +889,7 @@ size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, cons
 	assert(currentProcess != NULL);
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
-	if(!vmm_userspacePointerValid(buffer))
+	if(!vmm_userspacePointerValid(buffer, length))
 		return 0;
 	return vfs_Read(stream, 0, start, length, buffer);
 }
@@ -900,7 +900,7 @@ size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, voi
 	assert(currentProcess != NULL);
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
-	if(!vmm_userspacePointerValid(buffer))
+	if(!vmm_userspacePointerValid(buffer, length))
 		return 0;
 	return vfs_Write(stream, 0, start, length, buffer);
 }

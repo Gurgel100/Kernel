@@ -57,7 +57,7 @@ bool vmm_getPageStatus(void *Address);
 void vmm_unusePages(void *virt, size_t pages);
 void vmm_usePages(void *virt, size_t pages);
 
-bool vmm_userspacePointerValid(const void *ptr);
+bool vmm_userspacePointerValid(const void *ptr, const size_t size);
 
 context_t *createContext(void);
 void deleteContext(context_t *context);

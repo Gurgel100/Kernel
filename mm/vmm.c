@@ -1404,9 +1404,9 @@ void vmm_usePages(void *virt, size_t pages)
  * Parameter:	Den zu überprüfenden Pointer
  * Rückgabe:	True, wenn der Pointer in den Userspace zeigt, ansonsten false
  */
-bool vmm_userspacePointerValid(const void *ptr)
+bool vmm_userspacePointerValid(const void *ptr, const size_t size)
 {
-	return (USERSPACE_START <= ptr && ptr <= USERSPACE_END);
+	return (USERSPACE_START <= (uintptr_t)ptr && (uintptr_t)ptr + size <= USERSPACE_END);
 }
 
 /*
