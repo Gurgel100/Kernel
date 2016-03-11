@@ -271,7 +271,7 @@ void vfs_Close(vfs_stream_t *stream, vfs_file_t streamid)
  * 				length = Anzahl der Bytes, die gelesen werden sollen
  * 				Buffer = Buffer in den die Bytes geschrieben werden
  */
-size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
+size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, void *buffer)
 {
 	if(buffer == NULL)
 		return 0;
@@ -304,7 +304,7 @@ size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_
 	return sizeRead;
 }
 
-size_t vfs_Write(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, void *buffer)
+size_t vfs_Write(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
 {
 	if(buffer == NULL)
 		return 0;
@@ -883,7 +883,7 @@ void vfs_syscall_close(vfs_file_t streamid)
 	LOCKED_TASK(currentProcess->lock, hashmap_delete(currentProcess->streams, (void*)streamid));
 }
 
-size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
+size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer)
 {
 	vfs_stream_t *stream;
 	assert(currentProcess != NULL);
@@ -894,7 +894,7 @@ size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, cons
 	return vfs_Read(stream, 0, start, length, buffer);
 }
 
-size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, void *buffer)
+size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
 {
 	vfs_stream_t *stream;
 	assert(currentProcess != NULL);

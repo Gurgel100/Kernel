@@ -100,8 +100,8 @@ void vfs_Close(vfs_stream_t *stream, vfs_file_t streamid);
  * Parameter:	Path = Pfad zur Datei
  * 				Buffer = Puffer in dem die Daten reingeschrieben werden bzw. gelesen werden
  */
-size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
-size_t vfs_Write(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
+size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
+size_t vfs_Write(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
 
 /*
  * Initialisiert den Userspace des Prozesses p.
@@ -134,8 +134,8 @@ void vfs_UnregisterDevice(vfs_device_t *dev);
 //Syscalls
 vfs_file_t vfs_syscall_open(const char *path, vfs_mode_t mode);
 void vfs_syscall_close(vfs_file_t streamid);
-size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
-size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
+size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
+size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
 uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
 
 #endif /* VFS_H_ */
