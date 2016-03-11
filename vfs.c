@@ -343,7 +343,6 @@ size_t vfs_Write(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size
 	return sizeWritten;
 }
 
-vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data)
 int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr)
 {
 	assert(p != NULL && ((parent == NULL && stdin != NULL && stdout != NULL && stderr != NULL) || parent != NULL));
