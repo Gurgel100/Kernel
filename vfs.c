@@ -118,6 +118,7 @@ void vfs_Init(void)
 {
 	res_list = list_create();
 	streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_stream_free, NULL, 3);
+	assert(streams != NULL);
 
 	//Root
 	root.Name = VFS_ROOT;
@@ -278,8 +279,9 @@ size_t vfs_Read(vfs_stream_t *stream, vfs_file_t streamid, uint64_t start, size_
 
 	if(stream == NULL)
 	{
-		 if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
-			 return 0;
+		assert(streams != NULL);
+		if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
+			return 0;
 	}
 
 	size_t sizeRead = 0;
