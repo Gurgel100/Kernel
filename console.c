@@ -15,6 +15,7 @@
 #include "stdio.h"
 #include "scheduler.h"
 #include "keyboard.h"
+#include "assert.h"
 
 #define GRAFIKSPEICHER	0xB8000
 #define MAX_PAGES		12
@@ -24,6 +25,8 @@
 #define SIZE_PER_ROW	(COLS * SIZE_PER_CHAR)
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
+
+#define INPUT_BUFFER_SIZE	16
 
 #define MIN(a, b)		((a < b) ? a : b)
 
@@ -70,13 +73,17 @@ static void handler_charPress(void *opaque, char c)
 {
 	console_t *console = *(console_t**)opaque;
 
-	if(console->waitingThread)
+	if(console->id != 0 && console->waitingThread != NULL)
 	{
-		if(console->id != 0)
-			thread_unblock(console->waitingThread);
+		thread_unblock(console->waitingThread);
 		console->waitingThread = NULL;
-		list_push(console->input, (void*)((uint64_t)c));
 	}
+	console->inputBuffer[console->inputBufferEnd++] = c;
+	if(console->inputBufferEnd == console->inputBufferSize)
+		console->inputBufferEnd = 0;
+	if(console->inputBufferEnd == console->inputBufferStart)
+		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
+	assert(console->inputBufferStart != console->inputBufferEnd);
 }
 
 static void handler_keyDown(void *opaque, KEY_t key)
@@ -121,7 +128,8 @@ static void handler_keyUp(void *opaque, KEY_t key)
 
 void console_Init()
 {
-	initConsole.input = list_create();
+	initConsole.inputBufferSize = INPUT_BUFFER_SIZE;
+	initConsole.inputBuffer = malloc(initConsole.inputBufferSize);
 
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
 	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
@@ -204,8 +212,10 @@ console_t *console_create(char *name, uint8_t color)
 	}
 	console->color = color;
 
-	console->input = list_create();
-	if(console->input == NULL)
+	console->inputBufferSize = INPUT_BUFFER_SIZE;
+	console->inputBufferStart = console->inputBufferEnd = 0;
+	console->inputBuffer = malloc(console->inputBufferSize);
+	if(console->inputBuffer == NULL)
 	{
 		free(console->name);
 		free(console->buffer);
@@ -561,17 +571,20 @@ char console_getch(console_t *console)
 {
 	if(console->id == 0)
 	{
-		console->waitingThread = (void*)1;
-		while(list_size(console->input) == 0) asm volatile("hlt");
+		while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
 	}
-	else
+	else if(console->inputBufferStart == console->inputBufferEnd)
 	{
 		//Auf Eingabe warten
 		console->waitingThread = currentThread;
 		thread_waitUserIO(console->waitingThread);
 	}
 
-	return (char)((uint64_t)list_remove(console->input, list_size(console->input) - 1));
+	assert(console->inputBufferStart != console->inputBufferEnd);
+	char c = console->inputBuffer[console->inputBufferStart++];
+	if(console->inputBufferStart == console->inputBufferSize)
+		console->inputBufferStart = 0;
+	return c;
 }
 
 static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
