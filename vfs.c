@@ -739,7 +739,6 @@ void vfs_RegisterDevice(vfs_device_t *dev)
 	tmp->Child = Node;
 	Node->Name = strdup(dev->getValue(dev->opaque, FUNC_NAME));
 	Node->Parent = tmp;
-	printf("Eingehaengt in: /dev/%s\n", Node->Name);
 }
 
 void removeChilds(cdi_list_t childs)
