@@ -398,10 +398,11 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	return 1;
 }
 
-vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, ...)
+vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data)
 {
 	vfs_node_t *child;
 	char *rempath = NULL;
+
 	vfs_node_t *node = getLastNode(path, &rempath);
 
 	if(node->Type != TYPE_DIR)
@@ -416,6 +417,7 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
 	child->Next = node->Child;
 	node->Child = child;
 	child->Type = type;
+
 	switch(type)
 	{
 		case TYPE_DEV:
