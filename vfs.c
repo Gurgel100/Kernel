@@ -130,7 +130,7 @@ void vfs_Init(void)
 	//Virtuelle Ordner anlegen
 	vfs_node_t *Node;
 	//Unterordner "dev" anlegen: für Gerätedateien
-	Node = malloc(sizeof(vfs_node_t));
+	dev = Node = calloc(1, sizeof(vfs_node_t));
 	Node->Next = NULL;
 	Node->Parent = &root;
 	Node->Child = NULL;
@@ -139,7 +139,7 @@ void vfs_Init(void)
 	root.Child = Node;
 
 	//Unterordner "sysinf" anlegen: für Systeminformationen
-	Node->Next = malloc(sizeof(vfs_node_t));
+	Node->Next = calloc(1, sizeof(vfs_node_t));
 	Node = Node->Next;
 	Node->Child = NULL;
 	Node->Next = NULL;
@@ -148,7 +148,7 @@ void vfs_Init(void)
 	Node->Type = TYPE_DIR;
 
 	//Unterordner "mount" anlegen: für Mountpoints
-	Node->Next = malloc(sizeof(vfs_node_t));
+	Node->Next = calloc(1, sizeof(vfs_node_t));
 	Node = Node->Next;
 	Node->Child = NULL;
 	Node->Next = NULL;
