@@ -43,7 +43,7 @@ void cdi_fs_driver_destroy(struct cdi_fs_driver* driver)
 size_t cdi_fs_data_read(struct cdi_fs_filesystem* fs, uint64_t start,
     size_t size, void* buffer)
 {
-	return vfs_Read(NULL, fs->osdep.fp, start, size, buffer);
+	return vfs_Read(fs->osdep.fp, start, size, buffer);
 }
 
 /**
@@ -60,5 +60,5 @@ size_t cdi_fs_data_read(struct cdi_fs_filesystem* fs, uint64_t start,
 size_t cdi_fs_data_write(struct cdi_fs_filesystem* fs, uint64_t start,
     size_t size, const void* buffer)
 {
-	return vfs_Write(NULL, fs->osdep.fp, start, size, buffer);
+	return vfs_Write(fs->osdep.fp, start, size, buffer);
 }
