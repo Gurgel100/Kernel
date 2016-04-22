@@ -11,13 +11,61 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "disasm.h"
+#include "string.h"
 
 #ifdef DEBUGMODE
 
 static uint64_t DebugRegister[4];
 
+static ihs_t *Debug_Handler(ihs_t *ihs)
+{
+	static uint64_t Stack[1000];
+	static ihs_t State;
+	static ihs_t *oldState;
+	if(Debugged == false)	//Wenn noch nicht debugged wurde
+	{
+							//vorübergehend einen neuen Zustand herstellen
+		ihs_t new_state = {
+					.cs = 0x8,						//Kernelspace
+					.ss = 0x10,
+					.es = 0x10,
+					.ds = 0x10,
+					.gs = 0x10,
+					.fs = 0x10,
+
+					.rdi = ihs,						//Als Parameter die Adresse zum Zustand des Programms geben
+
+					.rip = (uint64_t)Debug_Main,	//Einsprungspunkt der Debugfunktion
+
+					.rsp = &Stack[999],
+
+					//IRQs einschalten (IF = 1)
+					.rflags = 0x202
+		};
+		memmove(&State, &new_state, sizeof(ihs_t));
+		oldState = ihs;
+		return &State;
+	}
+	else	//Wenn schon Debugged wurde wieder normalen Zustand herstellen
+	{
+		if(ihs->rax == DEBUG_SINGLESTEP)
+			oldState->rflags |= 0x10100;
+		if(ihs->rax == DEBUG_CONTINUE)
+			oldState->rflags = oldState->rflags & ~0x100 | 0x10000;
+		Debugged = false;
+		return oldState;
+	}
+}
+
 void Debug_Init()
 {
+	//Set handlers
+	isr_setHandler(0, Debug_Handler);
+	isr_setHandler(1, Debug_Handler);
+	isr_setHandler(6, Debug_Handler);
+	isr_setHandler(8, Debug_Handler);
+	isr_setHandler(13, Debug_Handler);
+	isr_setHandler(14, Debug_Handler);
 	Debugged = false;
 	DebugRegister[0] = 0;
 	DebugRegister[1] = 0;

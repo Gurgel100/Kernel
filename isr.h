@@ -13,6 +13,7 @@
 #include "stdint.h"
 
 #define NUM_IRQ	16
+#define NUM_INTERRUPTS 256
 
 typedef struct{
 		uint64_t gs, fs, es, ds;
@@ -23,29 +24,13 @@ typedef struct{
 		uint64_t rip, cs, rflags, rsp, ss;
 }__attribute__((packed)) ihs_t;	//Interrupt-Handler Stack
 
+typedef ihs_t*(*interrupt_handler)(ihs_t *ihs);
+
 void isr_Init(void);
 void isr_RegisterIRQHandler(uint16_t irq, void *Handler);
 
+interrupt_handler isr_setHandler(uint8_t num, interrupt_handler handler);
 ihs_t *isr_Handler(ihs_t *ihs);
-void exception_DivideByZero(ihs_t *ihs);
-ihs_t *exception_Debug(ihs_t *ihs);
-void exception_NonMaskableInterrupt(ihs_t *ihs);
-void exception_BreakPoint(ihs_t *ihs);
-void exception_Overflow(ihs_t *ihs);
-void exception_BoundRange(ihs_t *ihs);
-void exception_InvalidOpcode(ihs_t *ihs);
-void exception_DeviceNotAvailable(ihs_t *ihs);
-void exception_DoubleFault(ihs_t *ihs);
-void exception_CoprocessorSegmentOverrun(ihs_t *ihs);
-void exception_InvalidTSS(ihs_t *ihs);
-void exception_SegmentNotPresent(ihs_t *ihs);
-void exception_StackFault(ihs_t *ihs);
-void exception_GeneralProtection(ihs_t *ihs);
-void exception_PageFault(ihs_t *ihs);
-void exception_MF(ihs_t *ihs);
-void exception_AlignmentCheck(ihs_t *ihs);
-void exception_MachineCheck(ihs_t *ihs);
-void exception_XF(ihs_t *ihs);
 
 #endif /* ISR_H_ */
 
