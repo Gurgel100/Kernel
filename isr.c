@@ -67,8 +67,6 @@ extern ihs_t *pm_Schedule(ihs_t *ihs);
 extern void cdi_irq_handler(uint8_t irq);
 extern void pit_Handler(void);
 
-void traceRegisters(ihs_t *ihs);
-void traceStack(uint64_t rsp, uint8_t length);
 
 ihs_t *isr_Handler(ihs_t *ihs)
 {
@@ -432,71 +430,10 @@ void exception_MachineCheck(ihs_t *ihs)
 void exception_XF(ihs_t *ihs)
 {}
 
-void traceRegisters(ihs_t *ihs)
 {
-	setColor(BG_BLACK | CL_WHITE);
-	//RAX
-	printf("RAX: 0x%X%X                ", ihs->rax >> 32, ihs->rax & 0xFFFFFFFF);
-
-	//RBX
-	printf("RBX: 0x%X%X\n", ihs->rbx >> 32, ihs->rbx & 0xFFFFFFFF);
-
-	//RCX
-	printf("RCX: 0x%X%X                ", ihs->rcx >> 32, ihs->rcx & 0xFFFFFFFF);
-
-	//RDX
-	printf("RDX: 0x%X%X\n", ihs->rdx >> 32, ihs->rdx & 0xFFFFFFFF);
-
-	//RSI
-	printf("RSI: 0x%X%X                ", ihs->rsi >> 32, ihs->rsi & 0xFFFFFFFF);
-
-	//RDI
-	printf("RDI: 0x%X%X\n", ihs->rdi >> 32, ihs->rdi & 0xFFFFFFFF);
-
-	//RSP
-	printf("RSP: 0x%X%X                ", ihs->rsp >> 32, ihs->rsp & 0xFFFFFFFF);
-
-	//RBP
-	printf("RBP: 0x%X%X\n", ihs->rbp >> 32, ihs->rbp & 0xFFFFFFFF);
-
-	//R8
-	printf("R8 : 0x%X%X                ", ihs->r8 >> 32, ihs->r8 & 0xFFFFFFFF);
-
-	//R9
-	printf("R9 : 0x%X%X\n", ihs->r9 >> 32, ihs->r9 & 0xFFFFFFFF);
-
-	//R10
-	printf("R10: 0x%X%X                ", ihs->r10 >> 32, ihs->r10 & 0xFFFFFFFF);
-
-	//R11
-	printf("R11: 0x%X%X\n", ihs->r11 >> 32, ihs->r11 & 0xFFFFFFFF);
-
-	//R12
-	printf("R12: 0x%X%X                ", ihs->r12 >> 32, ihs->r12 & 0xFFFFFFFF);
-
-	//R13
-	printf("R13: 0x%X%X\n", ihs->r13 >> 32, ihs->r13 & 0xFFFFFFFF);
-
-	//R14
-	printf("R14: 0x%X%X                ", ihs->r14 >> 32, ihs->r14 & 0xFFFFFFFF);
-
-	//R15
-	printf("R15: 0x%X%X\n", ihs->r15 >> 32, ihs->r15 & 0xFFFFFFFF);
-
-	//RIP
-	printf("RIP: 0x%X%X\n", ihs->rip >> 32, ihs->rip & 0xFFFFFFFF);
 }
 
-void traceStack(uint64_t rsp, uint8_t length)
 {
-	uint8_t i;
-	for(i = 0; i < length; i += 2)
-	{
-		uint64_t *Value = (rsp + i * 8);
-		printf("%u: 0x%X%X                ", i + 1, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
-		Value = (rsp + (i + 1) * 8);
-		printf("%u: 0x%X%X\n", i + 2, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
-	}
 }
 
 #endif
