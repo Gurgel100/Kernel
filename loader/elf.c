@@ -155,9 +155,6 @@ typedef struct{
 
 extern context_t kernel_context;
 
-char elfCheck(elf_header *ELFHeader);	//Par.: Zeiger auf ELF-Header
-uint64_t getElfEntryAddress(elf_header *ElfHeader);
-
 char elfCheck(elf_header *ELFHeader)
 {
 	//zuerst überprüfen wir auf den Magic-String
