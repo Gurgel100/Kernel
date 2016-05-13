@@ -20,6 +20,7 @@
 #include "cpu.h"
 #include "scheduler.h"
 #include "cleaner.h"
+#include "assert.h"
 
 #define STAR	0xC0000081
 #define LSTAR	0xC0000082
@@ -126,6 +127,8 @@ void syscall_Init()
 
 uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
 {
+	//FIXME
+	assert(func < sizeof(syscalls) / sizeof(syscall));
 	return syscalls[func](arg1, arg2, arg3, arg4, arg5);
 }
 
