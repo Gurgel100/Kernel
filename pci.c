@@ -194,11 +194,26 @@ static pciDevice_t *initDevice(uint8_t bus, uint8_t slot, uint8_t func)
 	return pciDevice;
 }
 
+static void patchDevice(pciDevice_t *pciDevice)
+{
+	//JMicron 2xSATA/1xIDE Card
+	if(pciDevice->VendorID == 0x197B && pciDevice->DeviceID == 0x2363)
+	{
+		uint32_t conf = pci_readConfig(pciDevice->Bus, pciDevice->Slot, pciDevice->Function, 0x40, 4);
+		conf |= 0x00C2A1B3;
+		pci_writeConfig(pciDevice->Bus, pciDevice->Slot, pciDevice->Function, 0x40, 4, conf);
+
+		//Update pciDevice
+		pciDevice->HeaderType = pci_readConfig(pciDevice->Bus, pciDevice->Slot, pciDevice->Function, PCI_HEADERTYPE, 1);
+	}
+}
+
 static void checkSlot(uint8_t bus, uint8_t slot)
 {
 	pciDevice_t *pciDevice = initDevice(bus, slot, 0);
 	if(pciDevice != NULL)
 	{
+		patchDevice(pciDevice);
 		list_push(pciDevices, pciDevice);
 		if(pciDevice->HeaderType & 0x80)	//Mehrere Funktionen werden unterstützt
 		{
