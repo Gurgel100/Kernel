@@ -19,6 +19,7 @@ hlt
 jmp _stop
 
 .section .bss
+.align 0x10
 .space 0x10000		#64KB Platz für den Kernelstack
 stack:
 .endif
