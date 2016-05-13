@@ -155,7 +155,7 @@ typedef struct{
 
 extern context_t kernel_context;
 
-char elfCheck(elf_header *ELFHeader)
+static char elfCheck(elf_header *ELFHeader)
 {
 	//zuerst überprüfen wir auf den Magic-String
 	if(ELFHeader->e_ident.ei_magic != ELF_MAGIC) return 2;
