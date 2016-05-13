@@ -88,7 +88,9 @@ bool vmm_Init(uint64_t Speicher)
 	PML4 = (PML4_t*)VMM_PML4_ADDRESS;
 
 	//Speicher bis 1MB bearbeiten
-	for(i = 0; i < (void*)0x100000; i += 0x1000)
+	//Addresse 0 ist nicht gemappt
+	vmm_UnMap(NULL);
+	for(i = (void*)0x1000; i < (void*)0x100000; i += 0x1000)
 	{
 		vmm_ChangeMap(i, i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
 	}
