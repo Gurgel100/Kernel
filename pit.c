@@ -12,6 +12,7 @@
 #include "list.h"
 #include "stdlib.h"
 #include "scheduler.h"
+#include "lock.h"
 
 #define CH0		0x40
 #define CH1		0x41
@@ -27,6 +28,7 @@ typedef struct{
 }timer_t;
 
 static list_t Timerlist;
+static lock_t Timerlist_lock = LOCK_UNLOCKED;
 
 void pit_Init(uint32_t freq)
 {
@@ -53,13 +55,14 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 		size_t i;
 		uint64_t t;
 
-		if(Timerlist == NULL)
-			Timerlist = list_create();
-
 		Timer = malloc(sizeof(timer_t));
 
 		Timer->thread = thread;
 		Timer->timeout = ((t = Uptime + msec) < Uptime) ? -1ul : t;
+
+		lock(&Timerlist_lock);
+		if(Timerlist == NULL)
+			Timerlist = list_create();
 
 		//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
 		//zuerst abläuft
@@ -71,6 +74,8 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 		}
 
 		list_insert(Timerlist, i, Timer);
+
+		unlock(&Timerlist_lock);
 
 		//Entsprechenden Thread schlafen legen
 		thread_block(thread);
