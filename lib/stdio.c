@@ -16,6 +16,7 @@
 #else
 #include "syscall.h"
 #endif
+#include "math.h"
 
 #define ASPRINTF_INITIAL_BUFFER_SIZE 64
 
@@ -626,18 +627,28 @@ static int jprintf_putsn(jprintf_args *args, const char *str, int num)
 static int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
-	bool minus = (x < 0) ? true : false;
+	bool minus = signbit(x);
+
+	int fptype = fpclassify(x);
 
 	//Herausfinden, wieviele Stellen vor dem Dezimalpunkt sind
 	size_t i = 0;
-	while(x >= 10)
+	switch(fptype)
 	{
-		i++;
-		x /= 10.0;
+		case FP_INFINITE:
+		case FP_NAN:
+			i = 3;
+		break;
+		default:
+			while(x >= 10)
+			{
+				i++;
+				x /= 10.0;
+			}
 	}
 
-	size_t length = i + ((x < 0 || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
-	if(x < 0) x = -x;
+	size_t length = i + ((minus || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
+	if(minus) x = -x;
 
 	while(width-- > length)
 		jprintf_putc(args, lpad);
@@ -663,39 +674,60 @@ static int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool 
 	}
 
 	//Zahlen ausgeben
-	while(i-- + prec + 1)
+	switch(fptype)
 	{
-		jprintf_putc(args, ((uint64_t)x % 10) + '0');
-		n++;
-		x -= (uint64_t)x;
-		x *= 10.0;
-		if(i == (uint64_t)-1)
-		{
-			if(point || prec)
+		case FP_NAN:
+			n += jprintf_putsn(args, "nan", 4);
+		break;
+		case FP_INFINITE:
+			n += jprintf_putsn(args, "inf", 4);
+		break;
+		default:
+			while(i-- + prec + 1)
 			{
-				jprintf_putc(args, '.');
+				jprintf_putc(args, ((uint64_t)x % 10) + '0');
 				n++;
+				x -= (uint64_t)x;
+				x *= 10.0;
+				if(i == (uint64_t)-1)
+				{
+					if(point || prec)
+					{
+						jprintf_putc(args, '.');
+						n++;
+					}
+				}
 			}
-		}
 	}
+
 	return n;
 }
 
 static int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
-	bool minus = (x < 0) ? true : false;
+	bool minus = signbit(x);
+
+	int fptype = fpclassify(x);
 
 	//Herausfinden, wieviele Stellen vor dem Dezimalpunkt sind
 	size_t i = 0;
-	while(x >= 10)
+	switch(fptype)
 	{
-		i++;
-		x /= 10.0;
+		case FP_INFINITE:
+		case FP_NAN:
+			i = 3;
+		break;
+		default:
+			while(x >= 10)
+			{
+				i++;
+				x /= 10.0;
+			}
 	}
 
-	size_t length = i + ((x < 0 || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
-	if(x < 0) x = -x;
+	size_t length = i + ((minus || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
+	if(minus) x = -x;
 
 	while(width-- > length)
 		jprintf_putc(args, lpad);
@@ -721,21 +753,32 @@ static int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign,
 	}
 
 	//Zahlen ausgeben
-	while(i-- + prec + 1)
+	switch(fptype)
 	{
-		jprintf_putc(args, ((uint64_t)x % 10) + '0');
-		n++;
-		x -= (uint64_t)x;
-		x *= 10.0;
-		if(i == (uint64_t)-1)
-		{
-			if(point || prec)
+		case FP_NAN:
+			n += jprintf_putsn(args, "nan", 4);
+		break;
+		case FP_INFINITE:
+			n += jprintf_putsn(args, "inf", 4);
+		break;
+		default:
+			while(i-- + prec + 1)
 			{
-				jprintf_putc(args, '.');
+				jprintf_putc(args, ((uint64_t)x % 10) + '0');
 				n++;
+				x -= (uint64_t)x;
+				x *= 10.0;
+				if(i == (uint64_t)-1)
+				{
+					if(point || prec)
+					{
+						jprintf_putc(args, '.');
+						n++;
+					}
+				}
 			}
-		}
 	}
+
 	return n;
 }
 
