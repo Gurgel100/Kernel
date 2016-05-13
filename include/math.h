@@ -12,9 +12,21 @@
 extern "C" {
 #endif
 
-#define M_E         2.71828182845904523536
-#define NAN         (__builtin_nanf (""))
-#define INFINITY	(__builtin_inff ())
+#define M_E         	2.71828182845904523536
+#define NAN         	(__builtin_nanf (""))
+#define INFINITY		(__builtin_inff ())
+#define isnan(x)		__builtin_isnan(x)
+#define isinf(x)		__builtin_isinf(x)
+#define isnormal(x)		__builtin_isnormal(x)
+#define isfinite(x)		__builtin_isfinite(x)
+#define signbit(x)		__builtin_signbit(x)
+
+#define FP_NORMAL		0
+#define FP_SUBNORMAL	1
+#define FP_ZERO			2
+#define FP_INFINITE		3
+#define FP_NAN			4
+#define fpclassify(x)	__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, x)
 
 extern double sin(double x);
 extern double cos(double x);
