@@ -40,7 +40,7 @@ extern void free(void *ptr);
 extern void *malloc(size_t size);
 extern void *realloc(void *ptr, size_t size);
 
-extern void abort(void);
+extern void abort(void) __attribute__((noreturn));
 extern int atexit(void (*func)(void));
 extern void exit(int status);
 

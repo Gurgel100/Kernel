@@ -51,7 +51,7 @@ void setCursor(uint8_t x, uint8_t y);
 void SysLog(char *Device, char *Text);
 void SysLogError(char *Device, char *Text);
 void Display_Clear(void);
-void Panic(char *Device, char *Text);
+void Panic(char *Device, char *Text) __attribute__((noreturn));
 void hideCursor(void);
 void showCursor(void);
 
