@@ -316,10 +316,13 @@ static void rotate_left(heap_empty_t *node)
 	heap_empty_t *tmp = node->bigger;
 	heap_empty_t *parent = node->parent;
 
-	if(parent->smaller == node)
-		parent->smaller = tmp;
-	else
-		parent->bigger = tmp;
+	if(parent != NULL)
+	{
+		if(parent->smaller == node)
+			parent->smaller = tmp;
+		else
+			parent->bigger = tmp;
+	}
 	tmp->parent = parent;
 	node->parent = tmp;
 
@@ -336,10 +339,13 @@ static void rotate_right(heap_empty_t *node)
 	heap_empty_t *tmp = node->smaller;
 	heap_empty_t *parent = node->parent;
 
-	if(parent->smaller == node)
-		parent->smaller = tmp;
-	else
-		parent->bigger = tmp;
+	if(parent != NULL)
+	{
+		if(parent->smaller == node)
+			parent->smaller = tmp;
+		else
+			parent->bigger = tmp;
+	}
 	tmp->parent = parent;
 	node->parent = tmp;
 
