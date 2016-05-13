@@ -592,7 +592,7 @@ int asprintf(char **str, const char *format, ...)
 }
 
 //Generelle vprintf-Funtkion mit Callbacks
-int jprintf_putc(jprintf_args *args, char c)
+static int jprintf_putc(jprintf_args *args, char c)
 {
 	if(args->putc != NULL)
 	{
@@ -602,7 +602,7 @@ int jprintf_putc(jprintf_args *args, char c)
 	return 1;
 }
 
-int jprintf_putsn(jprintf_args *args, const char *str, int num)
+static int jprintf_putsn(jprintf_args *args, const char *str, int num)
 {
 	if(args->putsn != NULL)
 	{
@@ -623,7 +623,7 @@ int jprintf_putsn(jprintf_args *args, const char *str, int num)
 	}
 }
 
-int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
+static int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
 	bool minus = (x < 0) ? true : false;
@@ -681,7 +681,7 @@ int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_s
 	return n;
 }
 
-int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
+static int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
 	bool minus = (x < 0) ? true : false;
@@ -739,7 +739,7 @@ int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool s
 	return n;
 }
 
-int jvprintf(jprintf_args *args, const char *format, va_list arg)
+static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
 	uint64_t pos = 0;
 	char lpad;
@@ -1115,7 +1115,7 @@ typedef struct{
 	char *buffer;
 	size_t size, bytes_written;
 }vasprintf_t;
-int vasprintf_putc(void *arg, char c)
+static int vasprintf_putc(void *arg, char c)
 {
 	vasprintf_t *args = arg;
 	if(args->size == args->bytes_written)
@@ -1168,12 +1168,12 @@ int vasprintf(char **str, const char *format, va_list arg)
 	return retval;
 }
 //Callback-Funktionen
-int vfprintf_putc(void *arg, char c)
+static int vfprintf_putc(void *arg, char c)
 {
 	return fwrite(&c, 1, sizeof(char), arg);
 }
 
-int vfprintf_putsn(void *arg, const char *str, int n)
+static int vfprintf_putsn(void *arg, const char *str, int n)
 {
 	size_t len = strlen(str);
 	return fwrite(str, MIN(len, (uint64_t)n), sizeof(char), arg);
@@ -1191,13 +1191,13 @@ int vfprintf(FILE *stream, const char *format, va_list arg)
 }
 
 //Callback-Funktionen
-int vprintf_putc(void *arg, char c)
+static int vprintf_putc(void *arg, char c)
 {
 	putchar(c);
 	return 1;
 }
 
-int vprintf_putsn(void *arg, const char *str, int n)
+static int vprintf_putsn(void *arg, const char *str, int n)
 {
 	int len = strlen(str);
 
@@ -1230,7 +1230,7 @@ int vprintf(const char *format, va_list arg)
 
 #ifdef BUILD_KERNEL
 //Callback-Funktionen
-int vkprintf_putc(void *arg, char c)
+static int vkprintf_putc(void *arg, char c)
 {
 	console_ansi_write(&initConsole, c);
 	return 1;
@@ -1251,7 +1251,7 @@ typedef struct{
 	char *str;
 	size_t size;
 }vsprintf_t;
-int vsprintf_putc(void *arg, char c)
+static int vsprintf_putc(void *arg, char c)
 {
 	vsprintf_t *args = arg;
 
@@ -1279,22 +1279,22 @@ int vsprintf(char *str, const char *format, va_list arg)
 	return retval;
 }
 
-void jscanf_ungetc(jscanf_args *arg, int c)
+static void jscanf_ungetc(jscanf_args *arg, int c)
 {
 	arg->ungetc(arg->arg, c);
 }
 
-int jscanf_getc(jscanf_args *arg)
+static int jscanf_getc(jscanf_args *arg)
 {
 	return arg->getc(arg->arg);
 }
 
-int jscanf_tell(jscanf_args *arg)
+static int jscanf_tell(jscanf_args *arg)
 {
 	return arg->tell(arg->arg);
 }
 
-size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t base, int *eof)
+static size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t base, int *eof)
 {
 	size_t first_digit = 0;
 	size_t i;
@@ -1352,7 +1352,7 @@ size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t b
 	return i;
 }
 
-void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
+static void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
 {
 	switch(size)
 	{
@@ -1371,7 +1371,7 @@ void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
 	}
 }
 
-int jvscanf(jscanf_args *args, const char *format, va_list arg)
+static int jvscanf(jscanf_args *args, const char *format, va_list arg)
 {
 	int8_t length;
 	size_t width;
@@ -1606,19 +1606,19 @@ int sscanf(const char *str, const char *format, ...)
 	return pos;
 }
 
-int vfscanf_getc(void *ptr)
+static int vfscanf_getc(void *ptr)
 {
 	FILE *stream = ptr;
 	return fgetc(stream);
 }
 
-void vfscanf_ungetc(void *ptr, int c)
+static void vfscanf_ungetc(void *ptr, int c)
 {
 	FILE *stream = ptr;
 	ungetc(c, stream);
 }
 
-int vfscanf_tell(void *ptr)
+static int vfscanf_tell(void *ptr)
 {
 	FILE *stream = ptr;
 	return ftell(stream);
@@ -1646,7 +1646,7 @@ typedef struct{
 	size_t pos;
 }vsscanf_args;
 
-int vsscanf_getc(void *ptr)
+static int vsscanf_getc(void *ptr)
 {
 	vsscanf_args *arg = ptr;
 	if(arg->str[arg->pos])
@@ -1654,14 +1654,14 @@ int vsscanf_getc(void *ptr)
 	return EOF;
 }
 
-void vsscanf_ungetc(void *ptr, int c)
+static void vsscanf_ungetc(void *ptr, int c)
 {
 	vsscanf_args *arg = ptr;
 	if(arg->pos > 0)
 		arg->pos--;
 }
 
-int vsscanf_tell(void *ptr)
+static int vsscanf_tell(void *ptr)
 {
 	vsscanf_args *arg = ptr;
 	return arg->pos;
