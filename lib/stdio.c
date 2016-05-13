@@ -17,6 +17,7 @@
 #include "syscall.h"
 #endif
 #include "math.h"
+#include "assert.h"
 
 #define ASPRINTF_INITIAL_BUFFER_SIZE 64
 
@@ -595,12 +596,8 @@ int asprintf(char **str, const char *format, ...)
 //Generelle vprintf-Funtkion mit Callbacks
 static int jprintf_putc(jprintf_args *args, char c)
 {
-	if(args->putc != NULL)
-	{
-		return args->putc(args->arg, c);
-	}
-
-	return 1;
+	assert(args->putc != NULL);
+	return args->putc(args->arg, c);
 }
 
 static int jprintf_putsn(jprintf_args *args, const char *str, int num)
