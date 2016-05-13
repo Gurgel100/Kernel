@@ -180,41 +180,42 @@ uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse 
 
 pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
 {
-	elf_header *Header;
+	elf_header Header;
 	char *Ziel;
 
 	//Zurücksetzen des Dateizeigers
 	fseek(fp, 0, SEEK_SET);
 
-	Header = malloc(sizeof(elf_header));
-	if(fread(Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
+	if(fread(&Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
 		return -1;
 
 	//Header überprüfen
-	if(elfCheck(Header) != -1)
+	if(elfCheck(&Header) != -1)
 		return -1;
 
-	if(Header->e_entry < USERSPACE_START)
+	if(Header.e_entry < USERSPACE_START)
 	{
-		free(Header);
 		return -1;
 	}
 
 	//Jetzt einen neuen Prozess anlegen
 	process_t *task = pm_InitTask(currentProcess, (void*)Header->e_entry, (char*)cmd, stdin, stdout, stderr);
-
-	elf_program_header_entry *ProgramHeader = malloc(Header->e_phnum * sizeof(elf_program_header_entry));
-	fseek(fp, Header->e_phoff, SEEK_SET);
-	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header->e_phnum, fp) < Header->e_phnum)
+	elf_program_header_entry *ProgramHeader = malloc(Header.e_phnum * sizeof(elf_program_header_entry));
+	if(ProgramHeader == NULL)
 	{
-		free(Header);
+		return -1;
+	}
+	fseek(fp, Header.e_phoff, SEEK_SET);
+	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header.e_phnum, fp) < Header.e_phnum)
+
+	{
 		free(ProgramHeader);
 		pm_DestroyTask(task);
 		return -1;
 	}
 
 	int i;
-	for(i = 0; i < Header->e_phnum; i++)
+	for(i = 0; i < Header.e_phnum; i++)
 	{
 		//Wenn kein ladbares Segment, dann Springe zum nächsten Segment
 		if(ProgramHeader[i].p_type != ELF_PT_LOAD) continue;
@@ -234,7 +235,6 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, 
 
 	//Temporäre Daten wieder freigeben
 	free(ProgramHeader);
-	free(Header);
 
 	//Prozess aktivieren
 	pm_ActivateTask(task);
