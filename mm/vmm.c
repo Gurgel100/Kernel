@@ -92,7 +92,7 @@ bool vmm_Init(uint64_t Speicher)
 	vmm_UnMap(NULL);
 	for(i = (void*)0x1000; i < (void*)0x100000; i += 0x1000)
 	{
-		vmm_ChangeMap(i, i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
+		vmm_ChangeMap(i, (paddr_t)i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
 	}
 	for(i = (void*)&kernel_start; i <= (void*)&kernel_end; i += 0x1000)
 	{
