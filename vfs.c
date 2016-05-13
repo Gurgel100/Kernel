@@ -89,8 +89,9 @@ static void vfs_stream_free(const void *s)
 
 static void vfs_userspace_stream_free(const void *s)
 {
-	vfs_userspace_stream_t stream = (vfs_userspace_stream_t)s;
-	vfs_Close(s);
+	vfs_userspace_stream_t *stream = (vfs_userspace_stream_t*)s;
+	vfs_Close(stream->stream);
+	free(stream);
 }
 
 static vfs_file_t getNextStreamID()
@@ -336,27 +337,36 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 	return sizeWritten;
 }
 
+//TODO: Erbe alle geöffneten Stream vom Vaterprozess
 int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr)
 {
 	assert(p != NULL && ((parent == NULL && stdin != NULL && stdout != NULL && stderr != NULL) || parent != NULL));
 	if((p->streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_userspace_stream_free, NULL, 3)) == NULL)
 		return 1;
 
-	vfs_file_t stream;
+	vfs_file_t streamid;
+	vfs_userspace_stream_t *stream;
 	vfs_mode_t m = {
 			.read = true
 	};
 	if(parent != NULL && stdin == NULL)
 	{
 		LOCKED_TASK(parent->lock, hashmap_search(parent->streams, (void*)0, (void**)&stream));
-		stream = vfs_Reopen(stream, m);
+		assert(stream != NULL);
+		streamid = vfs_Reopen(stream->stream, m);
 	}
 	else
 	{
-		stream = vfs_Open(stdin, m);
+		streamid = vfs_Open(stdin, m);
 	}
+	if(streamid == -1)
+		return 0;
+	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return 0;
+	stream->id = 0;
+	stream->mode = m;
+	stream->stream = streamid;
 	hashmap_set(p->streams, (void*)0, stream);
 
 	m.write = true;
@@ -364,27 +374,41 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	if(parent != NULL && stdout == NULL)
 	{
 		LOCKED_TASK(parent->lock, hashmap_search(parent->streams, (void*)1, (void**)&stream));
-		stream = vfs_Reopen(stream, m);
+		assert(stream != NULL);
+		streamid = vfs_Reopen(stream->stream, m);
 	}
 	else
 	{
-		stream = vfs_Open(stdout, m);
+		streamid = vfs_Open(stdout, m);
 	}
+	if(streamid == -1)
+		return 0;
+	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return 0;
+	stream->id = 1;
+	stream->mode = m;
+	stream->stream = streamid;
 	hashmap_set(p->streams, (void*)1, stream);
 
 	if(parent != NULL && stderr == NULL)
 	{
 		LOCKED_TASK(parent->lock, hashmap_search(parent->streams, (void*)2, (void**)&stream));
-		stream = vfs_Reopen(stream, m);
+		assert(stream != NULL);
+		streamid = vfs_Reopen(stream->stream, m);
 	}
 	else
 	{
-		stream = vfs_Open(stderr, m);
+		streamid = vfs_Open(stderr, m);
 	}
+	if(streamid == -1)
+		return 0;
+	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return 0;
+	stream->id = 2;
+	stream->mode = m;
+	stream->stream = streamid;
 	hashmap_set(p->streams, (void*)2, stream);
 	return 1;
 }
@@ -861,49 +885,61 @@ struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 vfs_file_t vfs_syscall_open(const char *path, vfs_mode_t mode)
 {
 	assert(currentProcess != NULL);
+	vfs_userspace_stream_t *stream = malloc(sizeof(vfs_userspace_stream_t));
+	if(stream == NULL)
+		return -1;
 	vfs_file_t streamid = vfs_Open(path, mode);
 	if(streamid == -1)
+	{
+		free(stream);
 		return -1;
-	vfs_file_t userspace_id = getNextUserspaceStreamID(currentProcess);
-	LOCKED_TASK(currentProcess->lock, hashmap_set(currentProcess->streams, (void*)userspace_id, (void*)streamid));
-	assert(LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)userspace_id, NULL)));
-	return userspace_id;
+	}
+	stream->id = getNextUserspaceStreamID(currentProcess);
+	stream->mode = mode;
+	stream->stream = streamid;
+	LOCKED_TASK(currentProcess->lock, hashmap_set(currentProcess->streams, (void*)stream->id, stream));
+	assert(LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)stream->id, NULL)));
+	return stream->id;
 }
 
-void vfs_syscall_close(vfs_userspace_stream_t ustream)
+void vfs_syscall_close(vfs_file_t streamid)
 {
 	assert(currentProcess != NULL);
-	LOCKED_TASK(currentProcess->lock, hashmap_delete(currentProcess->streams, (void*)ustream));
+	LOCKED_TASK(currentProcess->lock, hashmap_delete(currentProcess->streams, (void*)streamid));
 }
 
-size_t vfs_syscall_read(vfs_userspace_stream_t ustream, uint64_t start, size_t length, void *buffer)
+size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer)
 {
-	vfs_file_t streamid;
+	vfs_userspace_stream_t *stream;
 	assert(currentProcess != NULL);
-	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)ustream, (void**)&streamid)))
+	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
 	if(!vmm_userspacePointerValid(buffer, length))
 		return 0;
-	return vfs_Read(streamid, start, length, buffer);
+	if(!stream->mode.read)
+		return 0;
+	return vfs_Read(stream->stream, start, length, buffer);
 }
 
-size_t vfs_syscall_write(vfs_userspace_stream_t ustream, uint64_t start, size_t length, const void *buffer)
+size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
 {
-	vfs_file_t streamid;
+	vfs_userspace_stream_t *stream;
 	assert(currentProcess != NULL);
-	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)ustream, (void**)&streamid)))
+	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
 	if(!vmm_userspacePointerValid(buffer, length))
 		return 0;
-	return vfs_Write(streamid, start, length, buffer);
+	if(!stream->mode.write)
+		return 0;
+	return vfs_Write(stream->stream, start, length, buffer);
 }
 
-uint64_t vfs_syscall_getFileinfo(vfs_userspace_stream_t ustream, vfs_fileinfo_t info)
+uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 {
-	vfs_file_t streamid;
+	vfs_userspace_stream_t *stream;
 	assert(currentProcess != NULL);
-	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)ustream, (void**)&streamid)))
+	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
-	return vfs_getFileinfo(streamid, info);
+	return vfs_getFileinfo(stream->stream, info);
 }
 #endif

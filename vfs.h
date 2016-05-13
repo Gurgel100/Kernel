@@ -86,7 +86,11 @@ typedef struct{
 }vfs_stream_t;
 
 //Ein Stream vom Userspace hat eine ID, der auf einen Stream des Kernels gemappt ist
-typedef vfs_file_t vfs_userspace_stream_t;
+typedef struct{
+	vfs_file_t id;
+	vfs_file_t stream;
+	vfs_mode_t mode;
+}vfs_userspace_stream_t;
 
 typedef enum{
 	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
