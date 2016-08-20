@@ -69,7 +69,6 @@ void Init()
 	pit_Init(1000);		//PIT initialisieren mit 1kHz
 	pic_Init();			//PIC initialisieren
 	cmos_Init();		//CMOS initialisieren
-	keyboard_Init();	//Tastatur(treiber) initialisieren
 	syscall_Init();		//Syscall initialisieren
 	#ifdef DEBUGMODE
 	Debug_Init();
@@ -80,6 +79,7 @@ void Init()
 	asm volatile("int $0x1");
 	#endif
 	//isr_Init();
+	keyboard_Init();	//Tastatur(treiber) initialisieren
 	apic_Init();
 	vfs_Init();			//VFS initialisieren
 	pci_Init();			//PCI-Treiber initialisieren
