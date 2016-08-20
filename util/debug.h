@@ -20,6 +20,6 @@ void Debug_Init(void);
 void Debug_Main(ihs_t *ihs);
 
 void traceRegisters(ihs_t *ihs);
-void traceStack(uint64_t rsp, uint8_t length);
+void traceStack(uint64_t rsp, uint64_t *rbp, uint8_t length);
 
 #endif /* DEBUG_H_ */

@@ -218,7 +218,7 @@ static ihs_t *exception_InvalidOpcode(ihs_t *ihs)
 	printf("Exception 6: Invalid Opcode\n");
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 22);
+	traceStack(ihs->rsp, ihs->rbp, 22);
 	asm volatile("cli;hlt");
 	return NULL;
 }
@@ -261,7 +261,7 @@ static ihs_t *exception_DoubleFault(ihs_t *ihs)
 	printf("Exception 8: Double Fault\n\r");
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 22);
+	traceStack(ihs->rsp, ihs->rbp, 22);
 	asm volatile("cli;hlt");
 	return NULL;
 }
@@ -298,7 +298,7 @@ static ihs_t *exception_GeneralProtection(ihs_t *ihs)
 	printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
 	traceRegisters(ihs);
 	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, 22);
+	traceStack(ihs->rsp, ihs->rbp, 22);
 	asm volatile("cli;hlt");
 	return NULL;
 }
@@ -350,7 +350,7 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 
 		traceRegisters(ihs);
 		printf("Stack-backtrace:\n");
-		traceStack(ihs->rsp, 20);
+		traceStack(ihs->rsp, ihs->rbp, 22);
 		printf("PML4e: 0x%lX             ", PML4->PML4E[PML4i]);
 		if(PML4->PML4E[PML4i] & 1)
 		{

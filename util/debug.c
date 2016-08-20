@@ -286,14 +286,17 @@ void traceRegisters(ihs_t *ihs)
 	printf("RIP: 0x%X%X\n", ihs->rip >> 32, ihs->rip & 0xFFFFFFFF);
 }
 
-void traceStack(uint64_t rsp, uint8_t length)
+void traceStack(uint64_t rsp, uint64_t *rbp, uint8_t length)
 {
-	uint8_t i;
-	for(i = 0; i < length; i += 2)
+	uint64_t rip, size, i;
+	i = 0;
+	while(rbp != NULL &&  i++ < length)
 	{
-		uint64_t *Value = (rsp + i * 8);
-		printf("%u: 0x%X%X                ", i + 1, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
-		Value = (rsp + (i + 1) * 8);
-		printf("%u: 0x%X%X\n", i + 2, (*Value) >> 32, (*Value) & 0xFFFFFFFF);
+		rip = *(rbp + 1);
+		rsp = *rbp;
+		size = rsp - (uintptr_t)rbp;
+		printf("0x%08lX(%zu)%s", rip, size, (i % 2 == 0) ? "\n" : "                ");
+		rbp = (uint64_t*)rsp;
 	}
+	if(i % 2) printf("\n");
 }

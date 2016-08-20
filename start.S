@@ -7,6 +7,7 @@
 _start:
 #Initialisiere Stack
 mov $(stack),%rsp
+xor %rbp, %rbp
 
 #Lege Multiboot-Struktur-Adresse auf den Stack
 #push %rbx
