@@ -54,7 +54,7 @@ void dmng_registerDevice(struct cdi_device *dev)
  * 				buffer = Buffer in den die Daten geschrieben werden sollen
  * Rückgabe:	0 bei Fehler und sonst die gelesenen Bytes
  */
-size_t dmng_Read(device_t *dev, uint64_t start, size_t size, const void *buffer)
+size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
 {
 	if(size == 0 || buffer == NULL) return 0;
 
