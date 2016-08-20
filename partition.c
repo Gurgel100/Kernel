@@ -25,7 +25,7 @@ struct cdi_fs_driver *getFSDriver(const char *name);
 /*
  * Liest Daten von einer Partition
  */
-static size_t partition_Read(partition_t *part, uint64_t start, size_t size, const void *buffer)
+static size_t partition_Read(partition_t *part, uint64_t start, size_t size, void *buffer)
 {
 	uint64_t corrected_start = MIN(start, part->size);
 	return dmng_Read(part->dev, part->lbaStart + corrected_start, MIN(part->size - corrected_start, size), buffer);
