@@ -46,7 +46,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/util}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.misc.other.1902618720" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mno-red-zone" valueType="string"/>
+								<option id="gnu.c.compiler.option.misc.other.1902618720" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mno-red-zone -fno-omit-frame-pointer" valueType="string"/>
 								<option id="gnu.c.compiler.option.warnings.extrawarn.1014712980" name="Extra warnings (-Wextra)" superClass="gnu.c.compiler.option.warnings.extrawarn" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.nowarn.1982163389" name="Inhibit all warnings (-w)" superClass="gnu.c.compiler.option.warnings.nowarn" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.optimization.flags.45205910" name="Other optimization flags" superClass="gnu.c.compiler.option.optimization.flags" value="-Og" valueType="string"/>
@@ -209,7 +209,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/util}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.misc.other.1248584633" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mno-red-zone" valueType="string"/>
+								<option id="gnu.c.compiler.option.misc.other.1248584633" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -z max-page-size=0x1000 -mno-red-zone -fno-omit-frame-pointer" valueType="string"/>
 								<option id="gnu.c.compiler.option.warnings.nowarn.203578845" name="Inhibit all warnings (-w)" superClass="gnu.c.compiler.option.warnings.nowarn" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.extrawarn.728900010" name="Extra warnings (-Wextra)" superClass="gnu.c.compiler.option.warnings.extrawarn" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.optimization.flags.1301583785" name="Other optimization flags" superClass="gnu.c.compiler.option.optimization.flags" value="-mtune=generic" valueType="string"/>
@@ -362,7 +362,7 @@
 								<option id="gnu.c.compiler.option.include.paths.24936553" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/include}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.misc.other.343424635" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector" valueType="string"/>
+								<option id="gnu.c.compiler.option.misc.other.343424635" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -fno-omit-frame-pointer" valueType="string"/>
 								<option id="gnu.c.compiler.option.warnings.extrawarn.124727259" name="Extra warnings (-Wextra)" superClass="gnu.c.compiler.option.warnings.extrawarn" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.nowarn.1713960888" name="Inhibit all warnings (-w)" superClass="gnu.c.compiler.option.warnings.nowarn" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.include.files.423254504" name="Include files (-include)" superClass="gnu.c.compiler.option.include.files"/>
@@ -460,7 +460,7 @@
 								<option id="gnu.c.compiler.option.include.paths.111259049" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/include}&quot;"/>
 								</option>
-								<option id="gnu.c.compiler.option.misc.other.1191738936" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector" valueType="string"/>
+								<option id="gnu.c.compiler.option.misc.other.1191738936" name="Other flags" superClass="gnu.c.compiler.option.misc.other" value="-c -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -fno-omit-frame-pointer" valueType="string"/>
 								<option id="gnu.c.compiler.option.warnings.nowarn.314219293" name="Inhibit all warnings (-w)" superClass="gnu.c.compiler.option.warnings.nowarn" value="false" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.extrawarn.1494754235" name="Extra warnings (-Wextra)" superClass="gnu.c.compiler.option.warnings.extrawarn" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.optimization.flags.184896886" name="Other optimization flags" superClass="gnu.c.compiler.option.optimization.flags" value="-Og" valueType="string"/>
