@@ -716,6 +716,10 @@ void free(void *ptr)
 					tmpheap = heap->Next;
 					tmpheap->Prev = heap;
 				}
+				else if(tmpheap == lastHeap)
+				{
+					lastHeap = heap;
+				}
 			}
 		}
 		heap->Flags = HEAP_FLAGS;
@@ -775,8 +779,8 @@ void *malloc(size_t size)
 		{
 			node->heap_base.Prev = lastHeap;
 			lastHeap->Next = node;
-			lastHeap = (heap_t*)node;
 		}
+		lastHeap = (heap_t*)node;
 		node->heap_base.Length = pages * 4096 - sizeof(heap_t);
 		node->heap_base.Flags = HEAP_FLAGS;
 	}
@@ -795,7 +799,8 @@ void *malloc(size_t size)
 
 		//Eintragen in AVL-Baum
 		add_empty_heap((heap_empty_t*)tmp_heap);
-		lastHeap = tmp_heap;
+		if(tmp_heap->Next == NULL)
+			lastHeap = tmp_heap;
 	}
 	heap->Flags |= HEAP_RESERVED;		//Als reserviert markieren
 
