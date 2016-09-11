@@ -585,7 +585,7 @@ static void remove_empty_heap(heap_empty_t *node)
 				if(parent->heap_base.balance == 1)
 				{
 					upout(node);
-					parent->smaller = NULL;
+					((heap_empty_t*)node->parent)->smaller = NULL;
 				}
 				else
 				{
@@ -600,7 +600,7 @@ static void remove_empty_heap(heap_empty_t *node)
 				if(parent->heap_base.balance == -1)
 				{
 					upout(node);
-					parent->bigger = NULL;
+					((heap_empty_t*)node->parent)->bigger = NULL;
 				}
 				else
 				{
