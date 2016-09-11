@@ -47,8 +47,8 @@ typedef struct{
 
 atexit_list_t *Atexit_List_Base = NULL;
 
-heap_t *lastHeap = NULL;
-heap_empty_t *base_emptyHeap = NULL;
+static heap_t *lastHeap = NULL;
+static heap_empty_t *base_emptyHeap = NULL;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
