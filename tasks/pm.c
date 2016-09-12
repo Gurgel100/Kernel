@@ -128,7 +128,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *st
 		return 0;
 	}
 
-	newProcess->PID = nextPID++;
+	newProcess->PID = __sync_fetch_and_add(&nextPID, 1);
 	newProcess->parent = parent;
 
 	newProcess->Context = createContext();
