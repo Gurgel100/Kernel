@@ -679,7 +679,7 @@ static void remove_empty_heap(heap_empty_t *node)
 					}
 				}
 			}
-			else if((node->smaller != NULL && node->bigger == NULL) || (node->smaller == NULL && node->bigger != NULL))	//Knoten hat nur ein Kind
+			else if(!node->smaller != !node->bigger)	//Knoten hat nur ein Kind
 			{
 				heap_empty_t *child;
 				if(node->smaller != NULL)
