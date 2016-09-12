@@ -31,13 +31,23 @@ typedef struct{
 		uint8_t Flags;		//Bit 0: Reserviert (1) oder Frei (0)
 							//(Flags): Alle ungeraden Bits 1 und alle geraden 0
 		int8_t balance;		//Höhe rechts - Höhe links
+		bool is_list_mbr;		//Gibt an, dass der Knoten eindeutig ist
 }heap_t;
 
 typedef struct{
 	heap_t heap_base;
-	void *parent;
-	void *smaller;
-	void *bigger;
+	union{
+		struct{
+			void *parent;
+			void *smaller;
+			void *bigger;
+			void *list;
+		};
+		struct{
+			void *prev;
+			void *next;
+		};
+	};
 }heap_empty_t;
 
 typedef struct{
@@ -510,8 +520,10 @@ static void add_empty_heap(heap_empty_t *node)
 	if(node == NULL)
 		return;
 	node->heap_base.balance = 0;
+	node->heap_base.is_list_mbr = false;
 	node->smaller = NULL;
 	node->bigger = NULL;
+	node->list = NULL;
 	if(base_emptyHeap == NULL)
 	{
 		base_emptyHeap = node;
@@ -522,7 +534,7 @@ static void add_empty_heap(heap_empty_t *node)
 		heap_empty_t *root = base_emptyHeap;
 		while(true)
 		{
-			if(node->heap_base.Length <= root->heap_base.Length && root->smaller != NULL)
+			if(node->heap_base.Length < root->heap_base.Length && root->smaller != NULL)
 				root = root->smaller;
 			else if(node->heap_base.Length > root->heap_base.Length && root->bigger != NULL)
 				root = root->bigger;
@@ -530,20 +542,31 @@ static void add_empty_heap(heap_empty_t *node)
 				break;
 		}
 
-		if(node->heap_base.Length <= root->heap_base.Length)
+		if(node->heap_base.Length == root->heap_base.Length)
 		{
-			root->smaller = node;
-			root->heap_base.balance--;
+			//Knoten in die Liste einfügen
+			node->heap_base.is_list_mbr = true;
+			node->next = root->list;
+			node->prev = root;
+			root->list = node;
 		}
 		else
 		{
-			root->bigger = node;
-			root->heap_base.balance++;
-		}
-		node->parent = root;
+			if(node->heap_base.Length < root->heap_base.Length)
+			{
+				root->smaller = node;
+				root->heap_base.balance--;
+			}
+			else
+			{
+				root->bigger = node;
+				root->heap_base.balance++;
+			}
+			node->parent = root;
 
-		if(root->heap_base.balance != 0)
-			upin(root);
+			if(root->heap_base.balance != 0)
+				upin(root);
+		}
 	}
 }
 
@@ -557,12 +580,12 @@ static heap_empty_t *search_empty_heap(size_t size)
 			if(node->smaller != NULL)
 				node = node->smaller;
 			else
-				return node;
+				return node->list ? : node;
 		}
 		else if(size > node->heap_base.Length)
 			node = node->bigger;
 		else
-			return node;
+			return node->list ? : node;
 	}
 	return NULL;
 }
@@ -571,94 +594,140 @@ static void remove_empty_heap(heap_empty_t *node)
 {
 	if(node == NULL)
 		return;
-	heap_empty_t *parent = node->parent;
-	if(node->smaller == NULL && node->bigger == NULL)	//Knoten hat keine Kinder
+	if(node->heap_base.is_list_mbr)
 	{
-		if(parent == NULL)
+		if(node->next != NULL)
+			((heap_empty_t*)node->next)->prev = node->prev;
+		if(node->prev != NULL)
 		{
-			base_emptyHeap = NULL;
+			if(((heap_empty_t*)node->prev)->heap_base.is_list_mbr)
+				((heap_empty_t*)node->prev)->next = node->next;
+			else
+				((heap_empty_t*)node->prev)->list = node->next;
+		}
+	}
+	else
+	{
+		heap_empty_t *parent = node->parent;
+		if(node->list != NULL)
+		{
+			//Ersetze den Knoten durch den nächsten Knoten in der Liste
+			heap_empty_t *new_node = node->list;
+			heap_empty_t *tmp_next = new_node->next;
+
+			new_node->heap_base.balance = node->heap_base.balance;
+			new_node->heap_base.is_list_mbr = false;
+			new_node->parent = parent;
+			new_node->smaller = node->smaller;
+			new_node->bigger = node->bigger;
+			new_node->list = tmp_next;
+
+			if(parent != NULL)
+			{
+				if(parent->smaller == node)
+					parent->smaller = new_node;
+				else
+					parent->bigger = new_node;
+			}
+			else
+				base_emptyHeap = new_node;
+
+			if(new_node->smaller != NULL)
+				((heap_empty_t*)new_node->smaller)->parent = new_node;
+			if(new_node->bigger != NULL)
+				((heap_empty_t*)new_node->bigger)->parent = new_node;
 		}
 		else
 		{
-			if(parent->smaller == node)	//Knoten ist linkes Kind
+			if(node->smaller == NULL && node->bigger == NULL)	//Knoten hat keine Kinder
 			{
-				if(parent->heap_base.balance == 1)
+				if(parent == NULL)
 				{
-					upout(node);
-					((heap_empty_t*)node->parent)->smaller = NULL;
+					base_emptyHeap = NULL;
 				}
 				else
 				{
-					parent->smaller = NULL;
-					parent->heap_base.balance++;
-					if(parent->heap_base.balance == 0)
-						upout(parent);
+					if(parent->smaller == node)	//Knoten ist linkes Kind
+					{
+						if(parent->heap_base.balance == 1)
+						{
+							upout(node);
+							((heap_empty_t*)node->parent)->smaller = NULL;
+						}
+						else
+						{
+							parent->smaller = NULL;
+							parent->heap_base.balance++;
+							if(parent->heap_base.balance == 0)
+								upout(parent);
+						}
+					}
+					else	//Knoten ist rechtes Kind
+					{
+						if(parent->heap_base.balance == -1)
+						{
+							upout(node);
+							((heap_empty_t*)node->parent)->bigger = NULL;
+						}
+						else
+						{
+							parent->bigger = NULL;
+							parent->heap_base.balance--;
+							if(parent->heap_base.balance == 0)
+								upout(parent);
+						}
+					}
 				}
 			}
-			else	//Knoten ist rechtes Kind
+			else if((node->smaller != NULL && node->bigger == NULL) || (node->smaller == NULL && node->bigger != NULL))	//Knoten hat nur ein Kind
 			{
-				if(parent->heap_base.balance == -1)
+				heap_empty_t *child;
+				if(node->smaller != NULL)
+					child = node->smaller;
+				else
+					child = node->bigger;
+				child->parent = node->parent;
+				if(parent != NULL)
 				{
-					upout(node);
-					((heap_empty_t*)node->parent)->bigger = NULL;
+					if(parent->smaller == node)
+						parent->smaller = child;
+					else
+						parent->bigger = child;
+					upout(child);
 				}
 				else
+					base_emptyHeap = child;
+			}
+			else	//Knoten hat zwei Kinder
+			{
+				//Suche symmetrischer Vorgänger
+				heap_empty_t *tmp = node->smaller;
+				while(tmp->bigger != NULL)
+					tmp = tmp->bigger;
+
+				remove_empty_heap(tmp);
+				parent = node->parent;
+
+				//Ersetzen des aktuellen Knotens mit dem symmetrischen Vorgänger
+				tmp->bigger = node->bigger;
+				if(tmp->bigger != NULL)
+					((heap_empty_t*)tmp->bigger)->parent = tmp;
+				tmp->smaller = node->smaller;
+				if(tmp->smaller != NULL)
+					((heap_empty_t*)tmp->smaller)->parent = tmp;
+				tmp->parent = node->parent;
+				tmp->heap_base.balance = node->heap_base.balance;
+				if(parent != NULL)
 				{
-					parent->bigger = NULL;
-					parent->heap_base.balance--;
-					if(parent->heap_base.balance == 0)
-						upout(parent);
+					if(parent->smaller == node)
+						parent->smaller = tmp;
+					else
+						parent->bigger = tmp;
 				}
+				else
+					base_emptyHeap = tmp;
 			}
 		}
-	}
-	else if((node->smaller != NULL && node->bigger == NULL) || (node->smaller == NULL && node->bigger != NULL))	//Knoten hat nur ein Kind
-	{
-		heap_empty_t *child;
-		if(node->smaller != NULL)
-			child = node->smaller;
-		else
-			child = node->bigger;
-		child->parent = node->parent;
-		if(parent != NULL)
-		{
-			if(parent->smaller == node)
-				parent->smaller = child;
-			else
-				parent->bigger = child;
-			upout(child);
-		}
-		else
-			base_emptyHeap = child;
-	}
-	else	//Knoten hat zwei Kinder
-	{
-		//Suche symmetrischer Vorgänger
-		heap_empty_t *tmp = node->smaller;
-		while(tmp->bigger != NULL)
-			tmp = tmp->bigger;
-
-		remove_empty_heap(tmp);
-		parent = node->parent;
-
-		//Ersetzen des aktuellen Knotens mit dem symmetrischen Vorgänger
-		tmp->bigger = node->bigger;
-		if(tmp->bigger != NULL)
-			((heap_empty_t*)tmp->bigger)->parent = tmp;
-		tmp->smaller = node->smaller;
-		if(tmp->smaller != NULL)
-			((heap_empty_t*)tmp->smaller)->parent = tmp;
-		tmp->parent = node->parent;
-		tmp->heap_base.balance = node->heap_base.balance;
-		if(parent != NULL)
-		{
-			if(parent->smaller == node)
-				parent->smaller = tmp;
-			else
-				parent->bigger = tmp;
-		}
-		else
-			base_emptyHeap = tmp;
 	}
 }
 
