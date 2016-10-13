@@ -47,12 +47,41 @@
 #define PT_LEGACY		0xEE
 #define PT_EFI			0xEF
 
-size_t getDirs(char ***Dirs, const char *Path);
-vfs_node_t *getLastNode(const char *Path, char **remPath);
-vfs_node_t *getNode(const char *Path);
-char *splitPath(const char *path, char **file, char **dev);
-void freeRes(struct cdi_fs_res *res);
-struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path);
+struct vfs_stream;
+
+typedef enum{
+	TYPE_DIR, TYPE_FILE, TYPE_MOUNT, TYPE_LINK, TYPE_DEV
+}vfs_node_type_t;
+
+typedef struct vfs_node{
+		char *name;
+		vfs_node_type_t type;
+		struct vfs_node *parent;
+		struct vfs_node *childs;	//Ungültig wenn kein TYPE_DIR oder TYPE_MOUNT. Bei TYPE_LINK -> Link zum Verknüpften Element
+		struct vfs_node *next;
+		union{
+			vfs_device_t *dev;			//TYPE_DEVICE
+			struct cdi_fs_filesystem *fs;	//TYPE_MOUNT
+			size_t (*handler)(char *name, uint64_t start, size_t length, const void *buffer);
+		};
+		struct vfs_stream *stream;	//Stream, in dem die Node geöffnet ist
+}vfs_node_t;
+
+typedef struct vfs_stream{
+	struct cdi_fs_stream stream;
+	vfs_file_t id;
+	vfs_mode_t mode;
+
+	vfs_node_t *node;
+	size_t ref_count;
+}vfs_stream_t;
+
+//Ein Stream vom Userspace hat eine ID, der auf einen Stream des Kernels gemappt ist
+typedef struct{
+	vfs_file_t id;
+	vfs_file_t stream;
+	vfs_mode_t mode;
+}vfs_userspace_stream_t;
 
 static vfs_node_t root;
 static vfs_node_t *lastNode;
@@ -60,6 +89,159 @@ static uint8_t nextPartID = 0;
 static list_t res_list;
 static hashmap_t *streams = NULL;	//geöffnete Streams
 static lock_t vfs_lock = LOCK_LOCKED;
+
+static size_t getDirs(char ***Dirs, const char *Path)
+{
+	size_t i;
+	char *tmp;
+	//Erst Pfad sichern
+	char *path_copy = strdup(Path);
+	char *tmpPath = path_copy;
+
+	if(!*Dirs)
+		*Dirs = malloc(sizeof(char*));
+
+	(*Dirs)[0] = strdup(strtok_s(&tmpPath, VFS_ROOT));
+	for(i = 1; ; i++)
+	{
+		if((tmp = strtok_s(&tmpPath, VFS_ROOT)) == NULL)
+			break;
+		*Dirs = realloc(*Dirs, sizeof(char*) * (i + 1));
+		(*Dirs)[i] = strdup(tmp);
+	}
+	free(path_copy);
+	return i;
+}
+
+static void freeDirs(char ***Dirs, size_t size)
+{
+	size_t i;
+	for(i = 0; i < size; i++)
+		free((*Dirs)[i]);
+	free(*Dirs);
+}
+
+static void removeChilds(cdi_list_t childs)
+{
+	struct cdi_fs_res *res, *res2;
+	size_t i = 0;
+	while((res = cdi_list_get(childs, i++)))
+	{
+		removeChilds(res->children);
+		size_t j = 0;
+		while((res2 = list_get(res_list, j)))
+		{
+			if(res2 == res)
+				list_remove(res_list, j);
+			j++;
+		}
+	}
+}
+
+//TODO: Wenn der RAM voll ist werden weniger Ressourcen gecacht
+//TODO: Wenn der RAM knapp wird kann die Speicherverwaltung das VFS auffordern den RAM ein bisschen frei zu machen
+/*
+ * Lädt wenn nötig eine Ressource
+ * Parameter:	res = Ressource, die geladen werden soll
+ * 				stream = Zu verwendenden Stream
+ * Rückgabe:	false = Fehler / Ressource konnte nicht geladen werden
+ * 				true = Ressource erfolgreich geladen
+ */
+static bool loadRes(struct cdi_fs_res *res, struct cdi_fs_stream *stream)
+{
+	struct cdi_fs_stream tmpStream = {
+			.fs = stream->fs,
+			.res = res
+	};
+
+	if(!res->loaded)
+	{
+		if(list_size(res_list) >= MAX_RES_BUFFER)
+		{
+			struct cdi_fs_res *tmpRes;
+			size_t i = 0;
+			while((tmpRes = list_get(res_list, i)) != NULL)
+			{
+				//Wenn die Ressource nicht geladen ist löschen wir sie einfach aus der Liste
+				if(!tmpRes->loaded)
+				{
+					list_remove(res_list, i);
+					break;
+				}
+
+				//Wenn die Ressource nirgends verwendet wird, können wir sie entladen
+				if(tmpRes->stream_cnt <= 0)
+				{
+					struct cdi_fs_stream unload_stream = {
+							.fs = stream->fs,
+							.res = res
+					};
+
+					//Erst müssen wir alle Kinder noch von der Liste entfernen, da diese auch zerstört werden
+					removeChilds(tmpRes->children);
+
+					if(tmpRes->res->unload(&unload_stream))
+					{
+						list_remove(res_list, i);
+						break;
+					}
+				}
+				i++;
+			}
+			//Wenn keine Ressource freigegeben werden konnte, dann kann die neue Ressource nicht geladen werden
+			if(i >= list_size(res_list))
+				return false;
+		}
+
+		if(!res->res->load(&tmpStream))
+			return false;
+		list_push(res_list, res);
+	}
+	res->stream_cnt++;
+	return true;
+}
+
+static void freeRes(struct cdi_fs_res *res)
+{
+	//Referenzzähler decrementieren
+	do
+	{
+		res->stream_cnt -= (res->stream_cnt > 0) ? 1 : 0;
+	}
+	while ((res = res->parent) != NULL);
+}
+
+static struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
+{
+	struct cdi_fs_res *res = NULL;
+	struct cdi_fs_res *prevRes = stream->fs->root_res;
+
+	char **dirs = NULL;
+	size_t dirSize = getDirs(&dirs, path);
+
+	if(!loadRes(prevRes, stream))
+		return NULL;
+
+	size_t i = 0;
+	size_t j = 0;
+	while(j < dirSize && (res = cdi_list_get(prevRes->children, i++)))
+	{
+		if(!strcmp(res->name, dirs[j]))
+		{
+			if(!loadRes(res, stream))
+			{
+				freeRes(res);
+				return NULL;
+			}
+			prevRes = res;
+			j++;
+			i = 0;
+		}
+	}
+	freeDirs(&dirs, dirSize);
+
+	return res;
+}
 
 uint64_t streamid_hash(const void *key, __attribute__((unused)) void *context)
 {
@@ -77,13 +259,12 @@ static void vfs_stream_free(const void *s)
 
 	assert(stream != NULL);
 
-	switch(stream->node->Type)
+	switch(stream->node->type)
 	{
 		case TYPE_MOUNT:
 			freeRes(stream->stream.res);
 		break;
 	}
-	locked_dec(&stream->node->ref_count);
 	free(stream);
 }
 
@@ -116,6 +297,74 @@ static vfs_file_t getNextUserspaceStreamID(process_t *p)
 	return id;
 }
 
+/*
+ * Finde die letzte Node, die sich im Pfad befindet. Der Pfad muss absolut abgeben werden.
+ * Parameter:	Path = Absoluter Pfad
+ * 				remPath = restlicher Pfad
+ */
+static vfs_node_t *getLastNode(const char *Path, char **remPath)
+{
+	vfs_node_t *Node = &root;
+	vfs_node_t *oldNode;
+	char **Dirs = NULL;
+	size_t NumDirs, i;
+
+	//Welche Ordner?
+	NumDirs = getDirs(&Dirs, Path);
+	for(i = 0; i < NumDirs; i++)
+	{
+		oldNode = Node;
+		Node = Node->childs;
+		while(Node && strcmp(Node->name, Dirs[i]))
+			Node = Node->next;
+		if(!Node) break;
+	}
+	if(!Node)
+	{
+		Node = oldNode;
+	}
+	if(remPath != NULL)
+	{
+		*remPath = NULL;
+		size_t size = 0;
+		size_t j;
+		for(j = 1; i < NumDirs; i++, j++)
+		{
+			size += strlen(Dirs[i]);
+			*remPath = realloc(*remPath, size + j + 1);
+			strcpy(*remPath + size - strlen(Dirs[i]) + j - 1, "/");
+			strcpy(*remPath + size - strlen(Dirs[i]) + j, Dirs[i]);
+		}
+	}
+
+	freeDirs(&Dirs, NumDirs);
+	return Node;
+}
+
+/*
+ * Finde die Node auf die der Pfad zeigt. Der Pfad muss absolut abgeben werden.
+ * Parameter:	Path = Absoluter Pfad
+ */
+static vfs_node_t *getNode(const char *Path)
+{
+	vfs_node_t *Node = &root;
+	char **Dirs = NULL;
+	size_t NumDirs, i;
+
+	//Welche Ordner?
+	NumDirs = getDirs(&Dirs, Path);
+	for(i = 0; i < NumDirs; i++)
+	{
+		Node = Node->childs;
+		while(Node && strcmp(Node->name, Dirs[i]))
+			Node = Node->next;
+		if(!Node) return NULL;
+	}
+
+	freeDirs(&Dirs, NumDirs);
+	return Node;
+}
+
 void vfs_Init(void)
 {
 	res_list = list_create();
@@ -123,40 +372,40 @@ void vfs_Init(void)
 	assert(streams != NULL);
 
 	//Root
-	root.Name = VFS_ROOT;
-	root.Next = NULL;
-	root.Child = NULL;
-	root.Parent = &root;
-	root.Type = TYPE_DIR;
+	root.name = VFS_ROOT;
+	root.next = NULL;
+	root.childs = NULL;
+	root.parent = &root;
+	root.type = TYPE_DIR;
 
 	//Virtuelle Ordner anlegen
 	vfs_node_t *Node;
 	//Unterordner "dev" anlegen: für Gerätedateien
-	dev = Node = calloc(1, sizeof(vfs_node_t));
-	Node->Next = NULL;
-	Node->Parent = &root;
-	Node->Child = NULL;
-	Node->Name = "dev";
-	Node->Type = TYPE_DIR;	//Mount->fs wird nicht benötigt
-	root.Child = Node;
+	Node = calloc(1, sizeof(vfs_node_t));
+	Node->next = NULL;
+	Node->parent = &root;
+	Node->childs = NULL;
+	Node->name = "dev";
+	Node->type = TYPE_DIR;	//Mount->fs wird nicht benötigt
+	root.childs = Node;
 
 	//Unterordner "sysinf" anlegen: für Systeminformationen
-	Node->Next = calloc(1, sizeof(vfs_node_t));
-	Node = Node->Next;
-	Node->Child = NULL;
-	Node->Next = NULL;
-	Node->Parent = &root;
-	Node->Name = "sysinf";
-	Node->Type = TYPE_DIR;
+	Node->next = calloc(1, sizeof(vfs_node_t));
+	Node = Node->next;
+	Node->childs = NULL;
+	Node->next = NULL;
+	Node->parent = &root;
+	Node->name = "sysinf";
+	Node->type = TYPE_DIR;
 
 	//Unterordner "mount" anlegen: für Mountpoints
-	Node->Next = calloc(1, sizeof(vfs_node_t));
-	Node = Node->Next;
-	Node->Child = NULL;
-	Node->Next = NULL;
-	Node->Parent = &root;
-	Node->Name = "mount";
-	Node->Type = TYPE_DIR;
+	Node->next = calloc(1, sizeof(vfs_node_t));
+	Node = Node->next;
+	Node->childs = NULL;
+	Node->next = NULL;
+	Node->parent = &root;
+	Node->name = "mount";
+	Node->type = TYPE_DIR;
 
 	lastNode = Node;
 	unlock(&vfs_lock);
@@ -180,8 +429,8 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	stream->mode = mode;
 
 	stream->node = node;
-	locked_inc(&stream->node->ref_count);
-	switch(node->Type)
+	stream->ref_count = 1;
+	switch(node->type)
 	{
 		case TYPE_MOUNT:
 			stream->stream.fs = node->fs;
@@ -242,7 +491,6 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 		return -1;
 
 	stream->mode = mode;
-	locked_inc(&stream->node->ref_count);
 
 	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
 
@@ -283,9 +531,9 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 	if(!stream->mode.read)
 		return 0;
 
-	vfs_node_t *node = (stream->node->Type == TYPE_LINK) ? stream->node->Child : stream->node;
+	vfs_node_t *node = (stream->node->type == TYPE_LINK) ? stream->node->childs : stream->node;
 
-	switch(node->Type)
+	switch(node->type)
 	{
 		case TYPE_DEV:
 			if(stream->node->dev->read != NULL)
@@ -315,9 +563,9 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 	if(!stream->mode.write)
 		return 0;
 
-	vfs_node_t *node = (stream->node->Type == TYPE_LINK) ? stream->node->Child : stream->node;
+	vfs_node_t *node = (stream->node->type == TYPE_LINK) ? stream->node->childs : stream->node;
 
-	switch(node->Type)
+	switch(node->type)
 	{
 		case TYPE_DEV:
 			if(stream->node->dev->write != NULL)
@@ -330,8 +578,8 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 		break;
 		case TYPE_FILE:
 			//Wenn ein Handler gesetzt ist, dann Handler aufrufen
-			if(stream->node->Handler != NULL)
-				sizeWritten = stream->node->Handler(stream->node->Name, start, length, buffer);
+			if(stream->node->handler != NULL)
+				sizeWritten = stream->node->handler(stream->node->name, start, length, buffer);
 		break;
 	}
 	return sizeWritten;
@@ -420,18 +668,18 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
 
 	vfs_node_t *node = getLastNode(path, &rempath);
 
-	if(node->Type != TYPE_DIR)
+	if(node->type != TYPE_DIR)
 	{
 		free(rempath);
 		return NULL;
 	}
 
 	child = calloc(1, sizeof(vfs_node_t));
-	child->Name = strdup(name);
-	child->Parent = node;
-	child->Next = node->Child;
-	node->Child = child;
-	child->Type = type;
+	child->name = strdup(name);
+	child->parent = node;
+	child->next = node->childs;
+	node->childs = child;
+	child->type = type;
 
 	switch(type)
 	{
@@ -439,10 +687,10 @@ vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t t
 			child->dev = data;
 		break;
 		case TYPE_FILE:
-			child->Handler = data;
+			child->handler = data;
 		break;
 		case TYPE_LINK:
-			child->Child = data;
+			child->childs = data;
 		break;
 		case TYPE_MOUNT:
 			child->fs = data;
@@ -466,7 +714,7 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
 		return 0;
 
-	if(stream->node->Type == TYPE_MOUNT && stream->stream.res->file != NULL)
+	if(stream->node->type == TYPE_MOUNT && stream->stream.res->file != NULL)
 	{
 		switch(info)
 		{
@@ -511,7 +759,7 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if((mount = getNode(Mountpath)) == NULL)
 		return 2;
 
-	if(devNode->Type != TYPE_DEV)
+	if(devNode->type != TYPE_DEV)
 		return 3;
 
 	if(devNode->dev->getValue == NULL || strcmp(VFS_DEVICE_PARTITION, (char*)devNode->dev->getValue(devNode->dev->opaque, FUNC_TYPE)) != 0)
@@ -522,11 +770,11 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 		return 5;
 
 	vfs_node_t *new = calloc(1, sizeof(vfs_node_t));
-	asprintf(&new->Name, "%u", nextPartID++);
-	new->Type = TYPE_MOUNT;
-	new->Parent = mount;
-	new->Next = mount->Child;
-	mount->Child = new;
+	asprintf(&new->name, "%u", nextPartID++);
+	new->type = TYPE_MOUNT;
+	new->parent = mount;
+	new->next = mount->childs;
+	mount->childs = new;
 	new->fs = fs;
 	//Dateisystem initialisieren
 	if(!fs->driver->fs_init(fs))
@@ -543,20 +791,20 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 int vfs_Unmount(const char *Mount)
 {
 	vfs_node_t *mount = getNode(Mount);
-	if(!mount || mount->Type != TYPE_MOUNT)
+	if(!mount || mount->type != TYPE_MOUNT)
 		return 1;
 
 	vfs_node_t *parentNode;
-	parentNode = mount->Parent;
-	if(parentNode->Child == mount)
-		parentNode->Child = mount->Next;
+	parentNode = mount->parent;
+	if(parentNode->childs == mount)
+		parentNode->childs = mount->next;
 	else
-		parentNode->Child->Next = mount->Next;
+		parentNode->childs->next = mount->next;
 
 	//FS deinitialisieren
 	mount->fs->driver->fs_destroy(mount->fs);
 
-	free(mount->Name);
+	free(mount->name);
 	free(mount);
 
 	return 0;
@@ -571,13 +819,13 @@ int vfs_MountRoot(void)
 	char *DevPath;
 	int status = -1;
 	vfs_node_t *dev = getNode("dev");
-	vfs_node_t *node = dev->Child;
+	vfs_node_t *node = dev->childs;
 	do
 	{
-		if(node->Type == TYPE_DEV)
+		if(node->type == TYPE_DEV)
 		{
 			nextPartID = 0;
-			asprintf(&DevPath, "dev/%s", node->Name);
+			asprintf(&DevPath, "dev/%s", node->name);
 			status = vfs_Mount("/mount", DevPath);
 			free(DevPath);
 			if(status == 0)
@@ -592,7 +840,7 @@ int vfs_MountRoot(void)
 			}
 		}
 	}
-	while((node = node->Next) != NULL);
+	while((node = node->next) != NULL);
 	return status;
 }
 
@@ -634,106 +882,6 @@ char *splitPath(const char *path, char **file, char **dev)
 	*dev = path;
 
 	return path + strlen(*dev) + 1;
-}
-
-size_t getDirs(char ***Dirs, const char *Path)
-{
-	size_t i;
-	char *tmp;
-	//Erst Pfad sichern
-	char *path_copy = strdup(Path);
-	char *tmpPath = path_copy;
-
-	if(!*Dirs)
-		*Dirs = malloc(sizeof(char*));
-
-	(*Dirs)[0] = strdup(strtok_s(&tmpPath, VFS_ROOT));
-	for(i = 1; ; i++)
-	{
-		if((tmp = strtok_s(&tmpPath, VFS_ROOT)) == NULL)
-			break;
-		*Dirs = realloc(*Dirs, sizeof(char*) * (i + 1));
-		(*Dirs)[i] = strdup(tmp);
-	}
-	free(path_copy);
-	return i;
-}
-
-void freeDirs(char ***Dirs, size_t size)
-{
-	size_t i;
-	for(i = 0; i < size; i++)
-		free((*Dirs)[i]);
-	free(*Dirs);
-}
-
-/*
- * Finde die letzte Node, die sich im Pfad befindet. Der Pfad muss absolut abgeben werden.
- * Parameter:	Path = Absoluter Pfad
- * 				remPath = restlicher Pfad
- */
-vfs_node_t *getLastNode(const char *Path, char **remPath)
-{
-	vfs_node_t *Node = &root;
-	vfs_node_t *oldNode;
-	char **Dirs = NULL;
-	size_t NumDirs, i;
-
-	//Welche Ordner?
-	NumDirs = getDirs(&Dirs, Path);
-	for(i = 0; i < NumDirs; i++)
-	{
-		oldNode = Node;
-		Node = Node->Child;
-		while(Node && strcmp(Node->Name, Dirs[i]))
-			Node = Node->Next;
-		if(!Node) break;
-	}
-	if(!Node)
-	{
-		Node = oldNode;
-	}
-	if(remPath != NULL)
-	{
-		*remPath = NULL;
-		size_t size = 0;
-		size_t j;
-		for(j = 1; i < NumDirs; i++, j++)
-		{
-			size += strlen(Dirs[i]);
-			*remPath = realloc(*remPath, size + j + 1);
-			strcpy(*remPath + size - strlen(Dirs[i]) + j - 1, "/");
-			strcpy(*remPath + size - strlen(Dirs[i]) + j, Dirs[i]);
-		}
-	}
-
-	freeDirs(&Dirs, NumDirs);
-	return Node;
-}
-
-/*de
- * Finde die Node auf die der Pfad zeigt. Der Pfad muss absolut abgeben werden.
- * Parameter:	Path = Absoluter Pfad
- */
-vfs_node_t *getNode(const char *Path)
-{
-	vfs_node_t *Node = &root;
-	char **Dirs = NULL;
-	size_t NumDirs, i;
-
-	//Welche Ordner?
-	NumDirs = getDirs(&Dirs, Path);
-	for(i = 0; i < NumDirs; i++)
-	{
-		Node = Node->Child;
-		while(Node && strcmp(Node->Name, Dirs[i]))
-			Node = Node->Next;
-		if(!Node) return NULL;
-	}
-
-	freeDirs(&Dirs, NumDirs);
-	return Node;
-}
 
 /*
  * Registriert ein Gerät. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
@@ -749,136 +897,15 @@ void vfs_RegisterDevice(vfs_device_t *dev)
 	//Gerätedatei anlegen
 	//wird vorne angelegt
 	Node = calloc(1, sizeof(*Node));
-	Node->Type = TYPE_DEV;
+	Node->type = TYPE_DEV;
 	Node->dev = dev;
-	Node->Next = tmp->Child;
-	tmp->Child = Node;
-	Node->Name = strdup(dev->getValue(dev->opaque, FUNC_NAME));
-	Node->Parent = tmp;
-}
-
-void removeChilds(cdi_list_t childs)
-{
-	struct cdi_fs_res *res, *res2;
-	size_t i = 0;
-	while((res = cdi_list_get(childs, i++)))
+	Node->next = tmp->childs;
+	tmp->childs = Node;
+	Node->name = strdup(dev->getValue(dev->opaque, FUNC_NAME));
+	Node->parent = tmp;
 	{
-		removeChilds(res->children);
-		size_t j = 0;
-		while((res2 = list_get(res_list, j)))
-		{
-			if(res2 == res)
-				list_remove(res_list, j);
-			j++;
-		}
 	}
 }
-
-//TODO: Wenn der RAM voll ist werden weniger Ressourcen gecacht
-//TODO: Wenn der RAM knapp wird kann die Speicherverwaltung das VFS auffordern den RAM ein bisschen frei zu machen
-/*
- * Lädt wenn nötig eine Ressource
- * Parameter:	res = Ressource, die geladen werden soll
- * 				stream = Zu verwendenden Stream
- * Rückgabe:	false = Fehler / Ressource konnte nicht geladen werden
- * 				true = Ressource erfolgreich geladen
- */
-bool loadRes(struct cdi_fs_res *res, struct cdi_fs_stream *stream)
-{
-	struct cdi_fs_stream tmpStream = {
-			.fs = stream->fs,
-			.res = res
-	};
-
-	if(!res->loaded)
-	{
-		if(list_size(res_list) >= MAX_RES_BUFFER)
-		{
-			struct cdi_fs_res *tmpRes;
-			size_t i = 0;
-			while((tmpRes = list_get(res_list, i)) != NULL)
-			{
-				//Wenn die Ressource nicht geladen ist löschen wir sie einfach aus der Liste
-				if(!tmpRes->loaded)
-				{
-					list_remove(res_list, i);
-					break;
-				}
-
-				//Wenn die Ressource nirgends verwendet wird, können wir sie entladen
-				if(tmpRes->stream_cnt <= 0)
-				{
-					struct cdi_fs_stream unload_stream = {
-							.fs = stream->fs,
-							.res = res
-					};
-
-					//Erst müssen wir alle Kinder noch von der Liste entfernen, da diese auch zerstört werden
-					removeChilds(tmpRes->children);
-
-					if(tmpRes->res->unload(&unload_stream))
-					{
-						list_remove(res_list, i);
-						break;
-					}
-				}
-				i++;
-			}
-			//Wenn keine Ressource freigegeben werden konnte, dann kann die neue Ressource nicht geladen werden
-			if(i >= list_size(res_list))
-				return false;
-		}
-
-		if(!res->res->load(&tmpStream))
-			return false;
-		list_push(res_list, res);
-	}
-	res->stream_cnt++;
-	return true;
-}
-
-void freeRes(struct cdi_fs_res *res)
-{
-	//Referenzzähler decrementieren
-	do
-	{
-		res->stream_cnt -= (res->stream_cnt > 0) ? 1 : 0;
-	}
-	while ((res = res->parent) != NULL);
-}
-
-struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
-{
-	struct cdi_fs_res *res = NULL;
-	struct cdi_fs_res *prevRes = stream->fs->root_res;
-
-	char **dirs = NULL;
-	size_t dirSize = getDirs(&dirs, path);
-
-	if(!loadRes(prevRes, stream))
-		return NULL;
-
-	size_t i = 0;
-	size_t j = 0;
-	while(j < dirSize && (res = cdi_list_get(prevRes->children, i++)))
-	{
-		if(!strcmp(res->name, dirs[j]))
-		{
-			if(!loadRes(res, stream))
-			{
-				freeRes(res);
-				return NULL;
-			}
-			prevRes = res;
-			j++;
-			i = 0;
-		}
-	}
-	freeDirs(&dirs, dirSize);
-
-	return res;
-}
-
 
 //Syscalls
 //TODO: Define errors correctly via macros

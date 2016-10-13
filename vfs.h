@@ -26,17 +26,10 @@
 #define EOF -1
 #endif
 
-typedef struct cdi_fs_filesystem vfs_fs_t;
-
-typedef enum{
-	TYPE_DIR, TYPE_FILE, TYPE_MOUNT, TYPE_LINK, TYPE_DEV
-}vfs_node_type_t;
-
 /*
  * FUNC_TYPE:	Gibt den Typ des Gerätes zurück
  * FUNC_NAME:	Gibt den Namen des Gerätes zurück
  * FUNC_DATA:	Gibt Gerätespezifische Daten zurück
- * 		DEVICE_PARTITION:	Gibt Dateisystem zurück
  */
 typedef enum{
 	FUNC_TYPE, FUNC_NAME, FUNC_DATA
@@ -57,40 +50,11 @@ typedef struct{
 	void *opaque;
 }vfs_device_t;
 
-typedef struct vfs_node{
-		char *Name;
-		vfs_node_type_t Type;
-		struct vfs_node *Parent;
-		struct vfs_node *Child;	//Ungültig wenn kein TYPE_DIR oder TYPE_MOUNT. Bei TYPE_LINK -> Link zum Verknüpften Element
-		struct vfs_node *Next;
-		union{
-			vfs_device_t *dev;			//TYPE_DEVICE
-			struct cdi_fs_filesystem *fs;	//TYPE_MOUNT
-			size_t (*Handler)(char *name, uint64_t start, size_t length, const void *buffer);
-		};
-		size_t ref_count;			//Anzahl der Stream, die auf diesen Knoten verweisen
-}vfs_node_t;
-
 typedef struct{
 	bool read, write, append, empty, create;
 }vfs_mode_t;
 
 typedef uint64_t vfs_file_t;
-
-typedef struct{
-	struct cdi_fs_stream stream;
-	vfs_file_t id;
-	vfs_mode_t mode;
-
-	vfs_node_t *node;
-}vfs_stream_t;
-
-//Ein Stream vom Userspace hat eine ID, der auf einen Stream des Kernels gemappt ist
-typedef struct{
-	vfs_file_t id;
-	vfs_file_t stream;
-	vfs_mode_t mode;
-}vfs_userspace_stream_t;
 
 typedef enum{
 	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
@@ -117,8 +81,6 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
  * 				1: Fehler
  */
 int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr);
-
-vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data);
 
 uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
 
