@@ -592,7 +592,7 @@ static heap_empty_t *search_empty_heap(size_t size)
 	return NULL;
 }
 
-static void remove_empty_heap(heap_empty_t *node)
+static void remove_empty_heap(heap_empty_t *node, bool with_list)
 {
 	if(node == NULL)
 		return;
@@ -611,7 +611,7 @@ static void remove_empty_heap(heap_empty_t *node)
 	else
 	{
 		heap_empty_t *parent = node->parent;
-		if(node->list != NULL)
+		if(node->list != NULL && !with_list)
 		{
 			//Ersetze den Knoten durch den nächsten Knoten in der Liste
 			heap_empty_t *new_node = node->list;
@@ -707,7 +707,8 @@ static void remove_empty_heap(heap_empty_t *node)
 				while(tmp->bigger != NULL)
 					tmp = tmp->bigger;
 
-				remove_empty_heap(tmp);
+				remove_empty_heap(tmp, true);
+
 				parent = node->parent;
 
 				//Ersetzen des aktuellen Knotens mit dem symmetrischen Vorgänger
@@ -757,7 +758,7 @@ void free(void *ptr)
 					&& !(tmpheap->Flags & HEAP_RESERVED))	//Wenn der Speicherbereich vornedran frei ist, dann mit diesem fusionieren
 			{
 				//Aus AVL-Baum entfernen
-				remove_empty_heap((heap_empty_t*)tmpheap);
+				remove_empty_heap((heap_empty_t*)tmpheap, false);
 				tmpheap->Next = heap->Next;
 				tmpheap->Length += heap->Length + sizeof(heap_t);
 				heap = tmpheap;
@@ -777,7 +778,7 @@ void free(void *ptr)
 					&& !(tmpheap->Flags & HEAP_RESERVED))	//Wenn der Speicherbereich hintendran frei ist, dann mit diesem fusionieren
 			{
 				//Aus AVL-Baum entfernen
-				remove_empty_heap((heap_empty_t*)tmpheap);
+				remove_empty_heap((heap_empty_t*)tmpheap, false);
 				heap->Next = tmpheap->Next;
 				heap->Length += tmpheap->Length + sizeof(heap_t);
 
@@ -856,7 +857,7 @@ void *malloc(size_t size)
 		node->heap_base.Flags = HEAP_FLAGS;
 	}
 	else
-		remove_empty_heap((heap_empty_t*)node);
+		remove_empty_heap((heap_empty_t*)node, false);
 
 	//Eintrag anpassen
 	heap = (heap_t*)node;
@@ -908,7 +909,7 @@ void *realloc(void *ptr, size_t size)
 				if(!(tmpHeap->Flags & HEAP_RESERVED) && Heap->Length + tmpHeap->Length + sizeof(heap_t) >= size)
 				{
 					//Aus AVL-Baum entfernen
-					remove_empty_heap((heap_empty_t*)tmpHeap);
+					remove_empty_heap((heap_empty_t*)tmpHeap, false);
 					//Müssen wir den Header auch noch nehmen?
 					if(tmpHeap->Length < (size - Heap->Length))
 					{
