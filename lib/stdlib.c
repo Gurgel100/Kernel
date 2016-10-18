@@ -549,6 +549,8 @@ static void add_empty_heap(heap_empty_t *node)
 			node->next = root->list;
 			node->prev = root;
 			root->list = node;
+			if(node->next != NULL)
+				((heap_empty_t*)node->next)->prev = node;
 		}
 		else
 		{
