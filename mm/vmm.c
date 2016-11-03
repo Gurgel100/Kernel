@@ -308,7 +308,7 @@ void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
 					//Physischen Speicher mappen
 					for(j = 0; j < k; j++)
 					{
-						Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, *Phys, 0, 0);
+						Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, *Phys + j * MM_BLOCK_SIZE, 0, 0);
 						if(Fehler == 1)
 						{
 							unlock(&vmm_lock);
