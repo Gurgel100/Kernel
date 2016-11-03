@@ -170,6 +170,10 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	if(!stream->mode.read)
 		return 0;
 
+	//Überprüfen, ob überhaupt etwas gelesen werden soll
+	if(length == 0)
+		return 0;
+
 	//Schauen, ob die angeforderten Daten im Cache sind
 	if(stream->bufMode != IO_MODE_NO_BUFFER)
 	{
@@ -325,6 +329,10 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
 	//Überprüfen, ob es erlaubt ist, diese Datei zu schreiben
 	if(!stream->mode.write)
+		return 0;
+
+	//Überprüfen, ob überhaupt etwas geschrieben werden soll
+	if(length == 0)
 		return 0;
 
 	if(stream->bufMode == IO_MODE_NO_BUFFER)
