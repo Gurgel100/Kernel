@@ -893,6 +893,9 @@ void *realloc(void *ptr, size_t size)
 	heap_t *Heap, *tmpHeap;
 	void *Address = NULL;
 	Heap = ptr - sizeof(heap_t);
+
+	//Size sollte ein Vielfaches von 8 sein und mindestens gross genug für die Erweiterung des Baumes
+	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + 7) & ~7));
 	//Ist dieser Heap gültig?
 	if(Heap->Flags == (HEAP_FLAGS | HEAP_RESERVED))
 	{
