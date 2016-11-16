@@ -914,7 +914,7 @@ void *realloc(void *ptr, size_t size)
 					//Aus AVL-Baum entfernen
 					remove_empty_heap((heap_empty_t*)tmpHeap, false);
 					//Müssen wir den Header auch noch nehmen?
-					if(tmpHeap->Length < (size - Heap->Length))
+					if(tmpHeap->Length < (size - Heap->Length) || tmpHeap->Length <= sizeof(heap_empty_t) - sizeof(heap_t))
 					{
 						Heap->Next = tmpHeap->Next;
 						if(tmpHeap->Next != NULL)
