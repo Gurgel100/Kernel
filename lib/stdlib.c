@@ -922,10 +922,13 @@ void *realloc(void *ptr, size_t size)
 							((heap_t*)tmpHeap->Next)->Prev = Heap;
 						}
 						Heap->Length += tmpHeap->Length + sizeof(heap_t);
+						if(lastHeap == tmpHeap)
+							lastHeap = Heap;
 					}
 					//Ansonsten verschieben wir den Header des nächsten Eintrags einfach
 					else
 					{
+						heap_t *oldHeap = tmpHeap;
 						tmpHeap = memmove((void*)Heap + sizeof(heap_t) + size, tmpHeap, sizeof(heap_t));
 						Heap->Next = tmpHeap;
 						tmpHeap->Length -= size - Heap->Length;
@@ -935,6 +938,8 @@ void *realloc(void *ptr, size_t size)
 							((heap_t*)tmpHeap->Next)->Prev = tmpHeap;
 						}
 						Heap->Length = size;
+						if(lastHeap == oldHeap)
+							lastHeap = tmpHeap;
 						//Wieder in den AVL-Baum eintragen
 						add_empty_heap((heap_empty_t*)tmpHeap);
 					}
