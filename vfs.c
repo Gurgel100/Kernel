@@ -882,6 +882,7 @@ char *splitPath(const char *path, char **file, char **dev)
 	*dev = path;
 
 	return path + strlen(*dev) + 1;
+}
 
 /*
  * Registriert ein Gerät. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
