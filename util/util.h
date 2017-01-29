@@ -10,17 +10,17 @@
 
 #include "stdint.h"
 
-inline void outb(uint16_t Port, uint8_t Data);
-inline uint8_t inb(uint16_t Port);
+void outb(uint16_t Port, uint8_t Data);
+uint8_t inb(uint16_t Port);
 
-inline void outw(uint16_t Port, uint16_t Data);
-inline uint16_t inw(uint16_t Port);
+void outw(uint16_t Port, uint16_t Data);
+uint16_t inw(uint16_t Port);
 
-inline void outd(uint16_t Port, uint32_t Data);
-inline uint32_t ind(uint16_t Port);
+void outd(uint16_t Port, uint32_t Data);
+uint32_t ind(uint16_t Port);
 
-inline void outq(uint16_t Port, uint64_t Data);
-inline uint64_t inq(uint16_t Port);
+void outq(uint16_t Port, uint64_t Data);
+uint64_t inq(uint16_t Port);
 
 void IntToHex(uint64_t Value, char *Destination);
 

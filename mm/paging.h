@@ -88,10 +88,10 @@ void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, u
 void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
 		uint8_t PCD, uint8_t A, uint8_t D, uint8_t G, uint16_t AVL,
 		uint8_t PAT, uint8_t NX, paddr_t Address);
-inline void clearPML4Entry(uint16_t i, PML4_t *PML4);
-inline void clearPDPEntry(uint16_t i, PDP_t *PDP);
-inline void clearPDEntry(uint16_t i, PD_t *PD);
-inline void clearPTEntry(uint16_t i, PT_t *PT);
+void clearPML4Entry(uint16_t i, PML4_t *PML4);
+void clearPDPEntry(uint16_t i, PDP_t *PDP);
+void clearPDEntry(uint16_t i, PD_t *PD);
+void clearPTEntry(uint16_t i, PT_t *PT);
 
-inline void InvalidateTLBEntry(void *Address);
+void InvalidateTLBEntry(void *Address);
 #endif /* PAGING_H_ */

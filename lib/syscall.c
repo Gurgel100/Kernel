@@ -11,74 +11,74 @@
 
 extern uint64_t (*_syscall)(uint64_t func, ...);
 
-inline void *AllocPage(size_t Pages)
+void *AllocPage(size_t Pages)
 {
 	return (void*)_syscall(0, Pages);
 }
 
-inline void FreePage(void *Address, size_t Pages)
+void FreePage(void *Address, size_t Pages)
 {
 	_syscall(1, Address, Pages);
 }
 
-inline void syscall_unusePage(void *Address, size_t Pages)
+void syscall_unusePage(void *Address, size_t Pages)
 {
 	_syscall(2, Address, Pages);
 }
 
-inline pid_t syscall_createProcess(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
+pid_t syscall_createProcess(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
 {
 	return (pid_t)_syscall(10, path, cmd, stdin, stdout, stderr);
 }
 
-inline void __attribute__((noreturn)) syscall_exit(int status)
+void __attribute__((noreturn)) syscall_exit(int status)
 {
 	//Dieser syscall funktioniert nur über Interrupts
 	asm volatile("int $0x30" : : "D"(11), "S"(status));
 	while(1);
 }
 
-inline tid_t syscall_createThread(void *entry)
+tid_t syscall_createThread(void *entry)
 {
 	return (tid_t)_syscall(12, entry);
 }
 
-inline void __attribute__((noreturn)) syscall_exitThread(int status)
+void __attribute__((noreturn)) syscall_exitThread(int status)
 {
 	asm volatile("int $0x30" : : "D"(13), "S"(status));
 }
 
-inline void *syscall_fopen(char *path, vfs_mode_t mode)
+void *syscall_fopen(char *path, vfs_mode_t mode)
 {
 	return (void*)_syscall(40, path, mode);
 }
 
-inline void syscall_fclose(void *stream)
+void syscall_fclose(void *stream)
 {
 	_syscall(41, stream);
 }
 
-inline size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer)
+size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer)
 {
 	return _syscall(42, stream, start, length, buffer);
 }
 
-inline size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer)
+size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer)
 {
 	return _syscall(43, stream, start, length, buffer);
 }
 
-inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info)
+uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info)
 {
 	return _syscall(44, stream, info);
 }
 
-inline void syscall_sleep(uint64_t msec)
+void syscall_sleep(uint64_t msec)
 {
 	_syscall(52, msec);
 }
 
-inline void syscall_getSysInfo(void *Struktur)
+void syscall_getSysInfo(void *Struktur)
 {
 	_syscall(60, Struktur);
 }

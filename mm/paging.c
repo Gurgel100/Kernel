@@ -90,22 +90,22 @@ void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, u
 }
 
 //XXX
-inline void clearPML4Entry(uint16_t i, PML4_t *PML4)
+void clearPML4Entry(uint16_t i, PML4_t *PML4)
 {
 	PML4->PML4E[i] = 0;
 }
 
-inline void clearPDPEntry(uint16_t i, PDP_t *PDP)
+void clearPDPEntry(uint16_t i, PDP_t *PDP)
 {
 	PDP->PDPE[i] = 0;
 }
 
-inline void clearPDEntry(uint16_t i, PD_t *PD)
+void clearPDEntry(uint16_t i, PD_t *PD)
 {
 	PD->PDE[i] = 0;
 }
 
-inline void clearPTEntry(uint16_t i, PT_t *PT)
+void clearPTEntry(uint16_t i, PT_t *PT)
 {
 	PT->PTE[i] = 0;
 }
@@ -114,7 +114,7 @@ inline void clearPTEntry(uint16_t i, PT_t *PT)
  * Invalidiert eine Page im TLB der CPU
  * Parameter:	Address = virt. Addresse der Page
  */
-inline void InvalidateTLBEntry(void *Address)
+void InvalidateTLBEntry(void *Address)
 {
 	asm volatile("invlpg (%0)" : :"r" (Address));
 }

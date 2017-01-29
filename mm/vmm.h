@@ -61,6 +61,6 @@ bool vmm_userspacePointerValid(const void *ptr, const size_t size);
 
 context_t *createContext(void);
 void deleteContext(context_t *context);
-inline void activateContext(context_t *context);
+void activateContext(context_t *context);
 
 #endif /* VMM_H_ */
