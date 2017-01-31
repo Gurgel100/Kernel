@@ -243,7 +243,7 @@ static struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 	return res;
 }
 
-uint64_t streamid_hash(const void *key, __attribute__((unused)) void *context)
+static uint64_t streamid_hash(const void *key, __attribute__((unused)) void *context)
 {
 	return (uint64_t)key;
 }
