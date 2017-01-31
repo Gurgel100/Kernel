@@ -329,32 +329,37 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 				return SUCCESS;
 			case 'A':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				if(console->cursor.y > n1)
 					console->cursor.y -= n1;
 				return SUCCESS;
 			case 'B':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				console->cursor.y = MIN(console->height, console->cursor.y + n1);
 				return SUCCESS;
 			case 'C':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				console->cursor.x = MIN(console->width, console->cursor.x + n1);
 				return SUCCESS;
 			case 'D':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				if(console->cursor.x > n1)
 					console->cursor.x -= n1;
 				return SUCCESS;
-			case 'H':	//Setze Cursor Position an n1,n2
+			case 'H':	//Setze Cursor Position an n1,n2, wobei n1 und n2 1-basiert sind
 			case 'f':
-				if(!have_n1 || !have_n2)
-					console_setCursor(console, (cursor_t){0, 0});
-				else
-					console_setCursor(console, (cursor_t){MIN(console->width, n1), MIN(console->height, n2)});
+				if(!have_n1)
+					n1 = 1;
+				else if(n1 == 0)
+					return INVALID;
+				if(!have_n2)
+					n2 = 1;
+				else if(n2 == 0)
+					return INVALID;
+				console_setCursor(console, (cursor_t){MIN(console->width, n1 - 1), MIN(console->height, n2 - 1)});
 				return SUCCESS;
 			case 's':	//Cursor speichern
 				console->saved_cursor = console->cursor;
