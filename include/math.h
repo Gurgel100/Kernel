@@ -13,6 +13,7 @@ extern "C" {
 #endif
 
 #define M_E         	2.71828182845904523536
+#define M_PI			3.14159265358979323846
 #define NAN         	(__builtin_nanf (""))
 #define INFINITY		(__builtin_inff ())
 #define isnan(x)		__builtin_isnan(x)
