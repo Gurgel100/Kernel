@@ -48,8 +48,27 @@ double atan(double x)
 	return Ergebnis;
 }
 
-//TODO
-//double atan2(double x, double y);
+double atan2(double x, double y)
+{
+	if(x > 0)
+		return atan(y / x);
+	else if(x < 0)
+	{
+		double t = atan(y / x);
+		if(y >= 0)
+			return t + M_PI;
+		else
+			return t - M_PI;
+	}
+	else
+	{
+		if(y < 0)
+			return M_PI / 2;
+		else					//x = 0 & y = 0 ergibt ein undefiniertes Resultat
+			return -M_PI / 2;
+	}
+}
+
 double sinh(double x)
 {
 	return (exp(x) - exp(-x)) / 2;
