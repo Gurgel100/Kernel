@@ -27,7 +27,7 @@
 #include "vfs.h"
 #include "pit.h"
 #include "sound.h"
-
+#include "version.h"
 #include "stdio.h"
 #include "stdlib.h"
 
@@ -42,6 +42,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 	sound_Play(10000, 1000);
+	printf("Kernel version: %i.%i.%i - %s %s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, BUILD_DATE, BUILD_TIME);
 	if(vfs_MountRoot())
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
