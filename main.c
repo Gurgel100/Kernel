@@ -37,7 +37,7 @@
 #include "pci.h"
 #include "devicemng.h"
 #include "console.h"
-#include "syscall.h"
+#include "syscalls.h"
 #include "string.h"
 
 static multiboot_structure static_MBS;
