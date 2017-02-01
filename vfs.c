@@ -478,7 +478,6 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	return stream->id;
 }
 
-//TODO: Correctly handle modes
 vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 {
 	vfs_stream_t *stream;
@@ -490,7 +489,23 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
 		return -1;
 
-	stream->mode = mode;
+	if(memcmp(&mode, &stream->mode, sizeof(vfs_mode_t)) != 0)
+	{
+		//Klone den Stream mit dem entsprechendem Modus
+		vfs_stream_t *new_stream = malloc(sizeof(vfs_stream_t));
+		if(new_stream == NULL)
+			return -1;
+
+		memcpy(new_stream, stream, sizeof(vfs_stream_t));
+
+		new_stream->id = getNextStreamID();
+		new_stream->ref_count = 1;
+		new_stream->stream.res->stream_cnt++;
+
+		stream = new_stream;
+
+		LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)new_stream->id, new_stream));
+	}
 
 	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
 
