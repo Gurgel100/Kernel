@@ -173,11 +173,6 @@ static char elfCheck(elf_header *ELFHeader)
 	return -1;
 }
 
-uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse zurück
-{
-	return ElfHeader->e_entry;
-}
-
 pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
