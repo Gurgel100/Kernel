@@ -6,6 +6,8 @@
  */
 
 #include "scsi.h"
+#include "stdlib.h"
+#include "devicemng.h"
 
 /**
  * Initialisiert die Datenstrukturen fuer einen SCSI-Treiber

@@ -9,6 +9,7 @@
 
 #include "sound.h"
 #include "pit.h"
+#include "util.h"
 
 #define PIT_FRQ	1193182
 

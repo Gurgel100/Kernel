@@ -32,6 +32,13 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "scheduler.h"
+#include "apic.h"
+#include "tss.h"
+#include "pci.h"
+#include "devicemng.h"
+#include "console.h"
+#include "syscall.h"
+#include "string.h"
 
 static multiboot_structure static_MBS;
 
