@@ -1343,7 +1343,7 @@ paddr_t vmm_getPhysAddress(void *virtualAddress)
 	return (paddr_t)(PT->PTE[PTi] & PG_ADDRESS);
 }
 
-void clearPage(void *address)
+static void clearPage(void *address)
 {
 	asm volatile("rep stosq" : :"c"(VMM_SIZE_PER_PAGE / sizeof(uint64_t)), "D"((uintptr_t)address & ~0xFFF), "a"(0) :"memory");
 }
