@@ -28,8 +28,10 @@
 #include "pit.h"
 #include "sound.h"
 #include "version.h"
+#include "loader.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "scheduler.h"
 
 static multiboot_structure static_MBS;
 
