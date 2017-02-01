@@ -51,6 +51,7 @@ void cdi_register_irq(uint8_t irq, void (*handler)(struct cdi_device*), struct c
 	Handler_t *Handler;
 	Handler = malloc(sizeof(Handler_t));
 	*Handler = (Handler_t){
+			.IRQ = irq,
 			.Handler = handler,
 			.Device = device
 	};
