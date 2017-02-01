@@ -130,30 +130,14 @@ interrupt_handler isr_setHandler(uint8_t num, interrupt_handler handler)
 ihs_t *isr_Handler(ihs_t *ihs)
 {
 	Counter++;
-	ihs = interrupt_handlers[ihs->interrupt](ihs);
-	if(ihs->interrupt >= 32 && ihs->interrupt < 48)	//Ab hier fangen IRQs an
-	{
-		uint8_t irq = ihs->interrupt - 32;
-		/*uint64_t i;
-		HandlerList_t *Handler;
-		Handler = Handlers[irq]->Handlers;
-		for(i = 0; i < Handlers[irq]->numHandlers; i++)
-		{
-			if(Handler)
-			{
-				Handler->Handler(ihs);
-				Handler = Handler->Next;
-			}
-		}*/
-		cdi_irq_handler(irq);
-		pic_SendEOI(ihs->interrupt - 32);		//PIC sagen, dass IRQ behandelt wurde
-	}
-	return ihs;
+	return interrupt_handlers[ihs->interrupt](ihs);
 }
 
 static ihs_t *irq_handler(ihs_t *ihs)
 {
 	ihs_t *new_ihs = ihs;
+
+	uint8_t irq = ihs->interrupt - 32;
 	switch(ihs->interrupt)
 	{
 		case 32:
@@ -171,6 +155,10 @@ static ihs_t *irq_handler(ihs_t *ihs)
 			keyboard_Handler(ihs);
 		break;
 	}
+
+	cdi_irq_handler(irq);
+	pic_SendEOI(irq);		//PIC sagen, dass IRQ behandelt wurde
+
 	return new_ihs;
 }
 
