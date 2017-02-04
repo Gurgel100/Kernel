@@ -146,7 +146,7 @@ paddr_t pmm_Alloc()
 				bool status;
 				j = tmp - 1;
 				asm volatile("lock btr %2,%0;"
-							"setc %1": "=m"(Map[i]), "=r"(status): "r"(j): "cc");
+							"setc %1": "=m"(Map[i]), "=r"(status): "r"(j): "cc", "memory");
 				if(status)
 				{
 					locked_dec(&pmm_freePages);
@@ -171,7 +171,7 @@ void pmm_Free(paddr_t Address)
 	size_t i = Address / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
 	uint8_t bit = (Address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
 	asm volatile("lock bts %1,%2;"
-				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]): "cc");
+				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]): "cc", "memory");
 	if(bit_status == 0)
 		locked_inc(&pmm_freePages);
 	else
