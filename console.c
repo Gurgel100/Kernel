@@ -134,33 +134,6 @@ void console_Init()
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
 	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
 
-	//stdin
-	/*console_t *stdin = console_create("stdin", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
-	vfs_device_t *dev = malloc(sizeof(vfs_device_t));
-	dev->read = console_readHandler;
-	dev->write = console_writeHandler;
-	dev->getValue = console_getValue;
-	dev->opaque = stdin;
-	vfs_RegisterDevice(dev);
-
-	//stdout
-	console_t *stdout = console_create("stdout", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
-	dev = malloc(sizeof(vfs_device_t));
-	dev->read = console_readHandler;
-	dev->write = console_writeHandler;
-	dev->getValue = console_getValue;
-	dev->opaque = stdout;
-	vfs_RegisterDevice(dev);
-
-	//stderr
-	console_t *stderr = console_create("stderr", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
-	dev = malloc(sizeof(vfs_device_t));
-	dev->read = console_readHandler;
-	dev->write = console_writeHandler;
-	dev->getValue = console_getValue;
-	dev->opaque = stderr;
-	vfs_RegisterDevice(dev);*/
-
 	//Alle Konsolen anlegen
 	uint64_t i;
 	for(i = 0; i < CONSOLE_NUM; i++)
