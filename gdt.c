@@ -59,7 +59,7 @@ void GDT_SetSystemDescriptor(int i, uint64_t base, uint32_t limit, uint8_t acces
 	gdt[i] |= ((limit >> 16) & 0xFLL) << 48;
 	gdt[i] |= (flags & 0xFLL) << 52;
 	gdt[i + 1] = base >> 24;
-	gdt[i + 1] |= 0 << 32;
+	gdt[i + 1] |= 0ul << 32;
 }
 
 #endif
