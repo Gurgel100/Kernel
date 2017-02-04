@@ -74,7 +74,7 @@ static void clearPage(void *address)
  * Parameter:	Speicher = Grösse des phys. Speichers
  * 				Stack = Zeiger auf den Stack
  */
-bool vmm_Init(uint64_t Speicher)
+bool vmm_Init()
 {
 	extern uint8_t kernel_start, kernel_end, kernel_code_start, kernel_code_end;
 	uint64_t cr3;
