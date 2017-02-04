@@ -15,6 +15,7 @@
 #include "string.h"
 #include "stdlib.h"
 #include "lock.h"
+#include "assert.h"
 #ifdef DEBUGMODE
 #include "stdio.h"
 #endif
@@ -30,6 +31,7 @@ extern uint8_t kernel_start;
 extern uint8_t kernel_end;
 
 static uint64_t pmm_totalMemory;		//Maximal verfügbarer RAM (physisch)
+static uint64_t pmm_totalPages;			//Gesamtanzahl an phys. Pages
 static uint64_t pmm_freePages;			//Verfügbarer (freier) physischer Speicher (4kb)
 static uint64_t pmm_Kernelsize;			//Grösse des Kernels in Bytes
 
@@ -60,6 +62,9 @@ bool pmm_Init()
 		pmm_totalMemory += map[i].length;
 		maxAddress = map[i].base_addr + map[i].length;
 	}
+
+	pmm_totalPages = pmm_totalMemory / MM_BLOCK_SIZE;
+	assert(pmm_totalMemory % MM_BLOCK_SIZE == 0);
 
 	//Stack auf den ersten Stackframe legen
 
@@ -261,7 +266,7 @@ paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t size)
 
 uint64_t pmm_getTotalPages()
 {
-	return pmm_totalMemory;
+	return pmm_totalPages;
 }
 
 uint64_t pmm_getFreePages()
