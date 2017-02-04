@@ -76,17 +76,17 @@ bool pmm_Init()
 	do
 	{
 		if(map->type == 1)
-			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
+			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
 				if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
 				{
 					pmm_Free(i);
 				}
-		if(i < MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT)
+		if(i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT)
 			map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
-	while(i < MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT && map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength));
+	while(i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength));
 
-	if(i >= MM_BLOCK_SIZE * mapLength * PMM_BITS_PER_ELEMENT)
+	if(i >= MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT)
 	{
 		//neuen Speicher für die Bitmap anfordern und zwar so viel wie nötig
 		Map = memcpy(calloc(PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8), 1), Map, mapSize * sizeof(*Map));
