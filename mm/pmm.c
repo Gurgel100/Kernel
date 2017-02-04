@@ -258,3 +258,13 @@ paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t size)
 	__sync_fetch_and_add(&pmm_Speicher_Verfuegbar, bitFreed);
 	goto search;
 }
+
+uint64_t pmm_getTotalPages()
+{
+	return pmm_TotalPages;
+}
+
+uint64_t pmm_getFreePages()
+{
+	return pmm_FreePages;
+}
