@@ -6,9 +6,8 @@
  */
 
 #include "system.h"
+#include "pmm.h"
 
-extern uint64_t pmm_Speicher;
-extern uint64_t pmm_Speicher_Verfuegbar;
 extern uint64_t Uptime;
 /*
  * Speichert Systeminformationen in die übergebene Struktur
@@ -16,7 +15,7 @@ extern uint64_t Uptime;
  */
 void getSystemInformation(SIS *Struktur)
 {
-	Struktur->physSpeicher = pmm_Speicher;
-	Struktur->physFree = pmm_Speicher_Verfuegbar * 4096;
+	Struktur->physSpeicher = pmm_getTotalPages() * 4096;
+	Struktur->physFree = pmm_getFreePages() * 4096;
 	Struktur->Uptime = Uptime;
 }
