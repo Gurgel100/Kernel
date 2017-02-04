@@ -447,9 +447,7 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		//Könnte gecacht sein
 		InvalidateTLBEntry(PDP);
-		uint32_t i;
-		for(i = 0; i < 512; i++)
-			PDP->PDPE[i] = 0;
+		clearPage(PDP);
 	}
 	else
 	{
@@ -478,9 +476,7 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		//Könnte gecacht sein
 		InvalidateTLBEntry(PD);
-		uint32_t i;
-		for(i = 0; i < 512; i++)
-			PD->PDE[i] = 0;
+		clearPage(PD);
 	}
 	else
 	{
@@ -509,9 +505,7 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		//Könnte gecacht sein
 		InvalidateTLBEntry(PT);
-		uint32_t i;
-		for(i = 0; i < 512; i++)
-			PT->PTE[i] = 0;
+		clearPage(PT);
 	}
 	else
 	{
@@ -1010,9 +1004,7 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//PDP mappen
 		PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PDP, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
-		uint32_t i;
-		for(i = 0; i < 512; i++)
-			PDP->PDPE[i] = 0;
+		clearPage(PDP);
 	}
 	else
 	{
@@ -1046,9 +1038,7 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//PD mappen
 		PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PD, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
-		uint32_t i;
-		for(i = 0; i < 512; i++)
-			PD->PDE[i] = 0;
+		clearPage(PD);
 	}
 	else
 	{
@@ -1083,9 +1073,7 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//PT mappen
 		PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PT, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
-		uint32_t i;
-		for(i = 0; i < 512; i++)
-			PT->PTE[i] = 0;
+		clearPage(PT);
 	}
 	else
 	{
