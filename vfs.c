@@ -852,47 +852,6 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	return 1;
 }
 
-vfs_node_t *vfs_createNode(const char *path, const char *name, vfs_node_type_t type, void *data)
-{
-	vfs_node_t *child;
-	char *rempath = NULL;
-
-	vfs_node_t *node = getLastNode(path, &rempath);
-
-	if(node->type != TYPE_DIR)
-	{
-		free(rempath);
-		return NULL;
-	}
-
-	child = calloc(1, sizeof(vfs_node_t));
-	child->name = strdup(name);
-	child->parent = node;
-	child->next = node->childs;
-	node->childs = child;
-	child->type = type;
-
-	switch(type)
-	{
-		case TYPE_DEV:
-			child->dev = data;
-		break;
-		case TYPE_FILE:
-			child->handler = data;
-		break;
-		case TYPE_LINK:
-			child->childs = data;
-		break;
-		case TYPE_MOUNT:
-			child->fs = data;
-		break;
-	}
-
-	free(rempath);
-
-	return child;
-}
-
 /*
  * Gibt die Metainformationen einer Datei zurück
  * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)
