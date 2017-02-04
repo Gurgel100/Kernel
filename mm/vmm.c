@@ -435,6 +435,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
 			setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, Address);
+		//Könnte gecacht sein
+		InvalidateTLBEntry(PDP);
 		uint32_t i;
 		for(i = 0; i < 512; i++)
 			PDP->PDPE[i] = 0;
@@ -448,6 +450,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 				setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
 			else
 				setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+			//Könnte gecacht sein
+			InvalidateTLBEntry(PDP);
 		}
 	}
 
@@ -462,6 +466,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
 			setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, Address);
+		//Könnte gecacht sein
+		InvalidateTLBEntry(PD);
 		uint32_t i;
 		for(i = 0; i < 512; i++)
 			PD->PDE[i] = 0;
@@ -475,6 +481,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 				setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
 			else
 				setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+			//Könnte gecacht sein
+			InvalidateTLBEntry(PD);
 		}
 	}
 
@@ -489,6 +497,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
 			setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, Address);
+		//Könnte gecacht sein
+		InvalidateTLBEntry(PT);
 		uint32_t i;
 		for(i = 0; i < 512; i++)
 			PT->PTE[i] = 0;
@@ -502,6 +512,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 				setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
 			else
 				setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
+			//Könnte gecacht sein
+			InvalidateTLBEntry(PT);
 		}
 	}
 
@@ -513,6 +525,8 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, VMM_KERNELSPACE | avl, 0, NX, pAddress);
 		else
 			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
+		//Könnte gecacht sein
+		InvalidateTLBEntry(vAddress);
 	}
 	else
 		return 2;							//virtuelle Addresse schon besetzt
