@@ -26,6 +26,8 @@
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
 
+#define TAB_HORIZONTAL	4
+
 #define INPUT_BUFFER_SIZE	16
 
 #define MIN(a, b)		((a < b) ? a : b)
@@ -424,6 +426,30 @@ void console_write(console_t *console, char c)
 				buffer[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
 				if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
 					gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Screen updaten
+			break;
+			case '\t':
+			{
+				//Horizontal tabs go to the next 4 bound
+				uint8_t diff = TAB_HORIZONTAL - console->cursor.x % TAB_HORIZONTAL;
+				//Zeichen löschen
+				uint8_t i;
+				for(i = 0; i < diff; i++)
+				{
+					buffer[console->cursor.y * COLS + console->cursor.x + i] = (' ' | (Farbwert << 8));
+					if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+						gs[console->cursor.y * COLS + console->cursor.x] = (' ' | (Farbwert << 8));
+				}
+				console->cursor.x += diff;
+				if(console->cursor.x > 79)
+				{
+					console->cursor.x = 0;
+					if(++console->cursor.y > 24)
+					{
+						console_scrollDown(console);
+						console->cursor.y = 24;
+					}
+				}
+			}
 			break;
 			default:
 				//Zeichen in den Grafikspeicher kopieren
