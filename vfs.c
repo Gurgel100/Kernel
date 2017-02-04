@@ -84,7 +84,6 @@ typedef struct{
 }vfs_userspace_stream_t;
 
 static vfs_node_t root;
-static vfs_node_t *lastNode;
 static uint8_t nextPartID = 0;
 static list_t res_list;
 static hashmap_t *streams = NULL;	//geöffnete Streams
@@ -365,6 +364,203 @@ static vfs_node_t *getNode(const char *Path)
 	return Node;
 }
 
+/*
+ * Erstelle eine simple Node. Setzt nicht den Typ der Node und nicht die abhängigen Daten.
+ * Parameter:	parent = Node zu welcher die neue Node hinzugefügt werden soll
+ * 				name = Name der Node
+ * Rückgabe:	Pointer zur neuen Node
+ */
+static vfs_node_t *createBaseNode(vfs_node_t *parent, const char *name)
+{
+	vfs_node_t *node;
+
+	if(parent == NULL || parent->type != TYPE_DIR)
+		return NULL;
+
+	node = calloc(1, sizeof(vfs_node_t));
+	if(node == NULL)
+		return NULL;
+
+	node->name = strdup(name);
+	node->parent = parent;
+	node->next = parent->childs;
+	parent->childs = node;
+
+	return node;
+}
+
+/*
+ * Löscht eine Node. Löscht keine Kinder.
+ * Parameter:	node = Node die gelöscht werden soll
+ */
+static void deleteNode(vfs_node_t *node)
+{
+	if(node != NULL)
+	{
+		assert(node != &root);	//Rootnode darf nicht gelöscht werden
+
+		lock(&vfs_lock);
+		vfs_node_t *parentNode;
+		parentNode = node->parent;
+		if(parentNode->childs == node)
+			parentNode->childs = node->next;
+		else
+		{
+			vfs_node_t *tmp;
+			for(tmp = parentNode->childs; tmp != NULL; tmp = tmp->next)
+			{
+				if(tmp->next == node)
+				{
+					tmp->next = node->next;
+					break;
+				}
+			}
+			if(tmp == NULL)
+			{
+				unlock(&vfs_lock);
+				return;
+			}
+		}
+		unlock(&vfs_lock);
+
+		free(node->name);
+		free(node);
+	}
+}
+
+/*
+ * Erstelle eine Gerätenode.
+ * Parameter:	parent = Node zu welcher die neue Node hinzugefügt werden soll
+ * 				name = Name der Node
+ * Rückgabe:	Pointer zur neuen Node
+ */
+static vfs_node_t *createDirNode(vfs_node_t *parent, const char *name)
+{
+	lock(&vfs_lock);
+
+	vfs_node_t *node = createBaseNode(parent, name);
+
+	if(node == NULL)
+	{
+		unlock(&vfs_lock);
+		return NULL;
+	}
+
+	node->type = TYPE_DIR;
+
+	unlock(&vfs_lock);
+
+	return node;
+}
+
+/*
+ * Erstelle eine Dateinode.
+ * Parameter:	parent = Node zu welcher die neue Node hinzugefügt werden soll
+ * 				name = Name der Node
+ * 				handler = Handler für die Dateioperation
+ * Rückgabe:	Pointer zur neuen Node
+ */
+static vfs_node_t *createFileNode(vfs_node_t *parent, const char *name, size_t (*handler)(char*, uint64_t, size_t, const void*))
+{
+	lock(&vfs_lock);
+
+	vfs_node_t *node = createBaseNode(parent, name);
+
+	if(node == NULL)
+	{
+		unlock(&vfs_lock);
+		return NULL;
+	}
+
+	node->type = TYPE_FILE;
+	node->handler = handler;
+
+	unlock(&vfs_lock);
+
+	return node;
+}
+
+/*
+ * Erstelle eine Mountnode.
+ * Parameter:	parent = Node zu welcher die neue Node hinzugefügt werden soll
+ * 				name = Name der Node
+ * 				fs = Dateisystem, welches gemounted wurde
+ * Rückgabe:	Pointer zur neuen Node
+ */
+static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, struct cdi_fs_filesystem *fs)
+{
+	lock(&vfs_lock);
+
+	vfs_node_t *node = createBaseNode(parent, name);
+
+	if(node == NULL)
+	{
+		unlock(&vfs_lock);
+		return NULL;
+	}
+
+	node->type = TYPE_MOUNT;
+	node->fs = fs;
+
+	unlock(&vfs_lock);
+
+	return node;
+}
+
+/*
+ * Erstelle eine Linknode.
+ * Parameter:	parent = Node zu welcher die neue Node hinzugefügt werden soll
+ * 				name = Name der Node
+ * 				link = Node zu der verlinkt wird
+ * Rückgabe:	Pointer zur neuen Node
+ */
+static vfs_node_t *createLinkNode(vfs_node_t *parent, const char *name, vfs_node_t *link)
+{
+	lock(&vfs_lock);
+
+	vfs_node_t *node = createBaseNode(parent, name);
+
+	if(node == NULL)
+	{
+		unlock(&vfs_lock);
+		return NULL;
+	}
+
+	node->type = TYPE_LINK;
+	node->childs = link;
+
+	unlock(&vfs_lock);
+
+	return node;
+}
+
+/*
+ * Erstelle einen Gerätenode.
+ * Parameter:	parent = Node zu welcher die neue Node hinzugefügt werden soll
+ * 				name = Name der Node
+ * 				device = Gerät für die die Node erstellt werden soll
+ * Rückgabe:	Pointer zur neuen Node
+ */
+static vfs_node_t *createDeviceNode(vfs_node_t *parent, const char *name, vfs_device_t *device)
+{
+	lock(&vfs_lock);
+
+	vfs_node_t *node = createBaseNode(parent, name);
+
+	if(node == NULL)
+	{
+		unlock(&vfs_lock);
+		return NULL;
+	}
+
+	node->type = TYPE_DEV;
+	node->dev = device;
+
+	unlock(&vfs_lock);
+
+	return node;
+}
+
 void vfs_Init(void)
 {
 	res_list = list_create();
@@ -378,37 +574,17 @@ void vfs_Init(void)
 	root.parent = &root;
 	root.type = TYPE_DIR;
 
+	unlock(&vfs_lock);
+
 	//Virtuelle Ordner anlegen
-	vfs_node_t *Node;
 	//Unterordner "dev" anlegen: für Gerätedateien
-	Node = calloc(1, sizeof(vfs_node_t));
-	Node->next = NULL;
-	Node->parent = &root;
-	Node->childs = NULL;
-	Node->name = "dev";
-	Node->type = TYPE_DIR;	//Mount->fs wird nicht benötigt
-	root.childs = Node;
+	createDirNode(&root, "dev");
 
 	//Unterordner "sysinf" anlegen: für Systeminformationen
-	Node->next = calloc(1, sizeof(vfs_node_t));
-	Node = Node->next;
-	Node->childs = NULL;
-	Node->next = NULL;
-	Node->parent = &root;
-	Node->name = "sysinf";
-	Node->type = TYPE_DIR;
+	createDirNode(&root, "sysinf");
 
 	//Unterordner "mount" anlegen: für Mountpoints
-	Node->next = calloc(1, sizeof(vfs_node_t));
-	Node = Node->next;
-	Node->childs = NULL;
-	Node->next = NULL;
-	Node->parent = &root;
-	Node->name = "mount";
-	Node->type = TYPE_DIR;
-
-	lastNode = Node;
-	unlock(&vfs_lock);
+	createDirNode(&root, "mount");
 }
 
 /*
@@ -768,6 +944,8 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 {
 	vfs_node_t *mount;
 	vfs_node_t *devNode;
+	char *name;
+
 	if((devNode = getNode(Dev)) == NULL)
 		return 1;
 
@@ -784,13 +962,10 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if(fs == NULL)
 		return 5;
 
-	vfs_node_t *new = calloc(1, sizeof(vfs_node_t));
-	asprintf(&new->name, "%u", nextPartID++);
-	new->type = TYPE_MOUNT;
-	new->parent = mount;
-	new->next = mount->childs;
-	mount->childs = new;
-	new->fs = fs;
+	asprintf(&name, "%u", nextPartID++);
+	createMountNode(mount, name, fs);
+	free(name);
+
 	//Dateisystem initialisieren
 	if(!fs->driver->fs_init(fs))
 		return 4;
@@ -809,18 +984,10 @@ int vfs_Unmount(const char *Mount)
 	if(!mount || mount->type != TYPE_MOUNT)
 		return 1;
 
-	vfs_node_t *parentNode;
-	parentNode = mount->parent;
-	if(parentNode->childs == mount)
-		parentNode->childs = mount->next;
-	else
-		parentNode->childs->next = mount->next;
-
 	//FS deinitialisieren
 	mount->fs->driver->fs_destroy(mount->fs);
 
-	free(mount->name);
-	free(mount);
+	deleteNode(mount);
 
 	return 0;
 }
@@ -911,16 +1078,7 @@ void vfs_RegisterDevice(vfs_device_t *dev)
 	if(!(tmp = getNode(Path))) return;	//Fehler
 
 	//Gerätedatei anlegen
-	//wird vorne angelegt
-	Node = calloc(1, sizeof(*Node));
-	Node->type = TYPE_DEV;
-	Node->dev = dev;
-	Node->next = tmp->childs;
-	tmp->childs = Node;
-	Node->name = strdup(dev->getValue(dev->opaque, FUNC_NAME));
-	Node->parent = tmp;
-	{
-	}
+	createDeviceNode(tmp, dev->getValue(dev->opaque, FUNC_NAME), dev);
 }
 
 //Syscalls
