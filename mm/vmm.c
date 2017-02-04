@@ -59,6 +59,16 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 void *getFreePages(void *start, void *end, size_t pages);
 //Ende der Funktionendeklaration
 
+
+/*
+ * Löscht eine (virtuelle) Page.
+ * Parameter:	address = virtuelle Addresse der Page
+ */
+static void clearPage(void *address)
+{
+	asm volatile("rep stosq" : :"c"(VMM_SIZE_PER_PAGE / sizeof(uint64_t)), "D"((uintptr_t)address & ~0xFFF), "a"(0) :"memory");
+}
+
 /*
  * Initialisiert die virtuelle Speicherverwaltung.
  * Parameter:	Speicher = Grösse des phys. Speichers
@@ -1355,11 +1365,6 @@ paddr_t vmm_getPhysAddress(void *virtualAddress)
 	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
 
 	return (paddr_t)(PT->PTE[PTi] & PG_ADDRESS);
-}
-
-static void clearPage(void *address)
-{
-	asm volatile("rep stosq" : :"c"(VMM_SIZE_PER_PAGE / sizeof(uint64_t)), "D"((uintptr_t)address & ~0xFFF), "a"(0) :"memory");
 }
 
 void vmm_unusePages(void *virt, size_t pages)
