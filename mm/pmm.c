@@ -46,30 +46,22 @@ static size_t mapSize = 4096;			//Grösse der Bitmap
  */
 bool pmm_Init()
 {
-	mmap *map;
-	uint32_t mapLength;
-	paddr_t i, maxAddress;
+	paddr_t i = 0;
+	paddr_t maxAddress = 0;
+	mmap *map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
+	uint32_t mapLength = MBS->mbs_mmap_length;
 
 	pmm_Kernelsize = &kernel_end - &kernel_start;
-	map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
-	mapLength = MBS->mbs_mmap_length;
-
-	//"Nachschauen", wieviel Speicher vorhanden ist
-	uint32_t maxLength = mapLength / sizeof(mmap);
 	pmm_totalMemory = pmm_freePages = 0;
-	for(i = 0; i < maxLength; i++)
-	{
-		pmm_totalMemory += map[i].length;
-		maxAddress = map[i].base_addr + map[i].length;
-	}
-
-	pmm_totalPages = pmm_totalMemory / MM_BLOCK_SIZE;
-	assert(pmm_totalMemory % MM_BLOCK_SIZE == 0);
 
 	//Die ersten 1GB eintragen
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
 	do
 	{
+		//Zählen wieviel Speicher zur Verfügung steht
+		pmm_totalMemory += map->length;
+		maxAddress = MAX(maxAddress, map->base_addr + map->length);
+
 		if(map->type == 1)
 			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
 				if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
@@ -86,9 +78,14 @@ bool pmm_Init()
 		//neuen Speicher für die Bitmap anfordern und zwar so viel wie nötig
 		Map = memcpy(calloc(PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8), 1), Map, mapSize * sizeof(*Map));
 		mapSize = PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8) / sizeof(*Map);
+
 		//Weiter Speicher freigeben
 		while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
 		{
+			//Zählen wieviel Speicher zur Verfügung steht
+			pmm_totalMemory += map->length;
+			maxAddress = MAX(maxAddress, map->base_addr + map->length);
+
 			if(map->type == 1)
 			{
 				if(i < map->base_addr || i > map->base_addr + map->length)
@@ -102,6 +99,9 @@ bool pmm_Init()
 			map = (mmap*)((uintptr_t)map + map->size + 4);
 		}
 	}
+
+	pmm_totalPages = pmm_totalMemory / MM_BLOCK_SIZE;
+	assert(pmm_totalMemory % MM_BLOCK_SIZE == 0);
 
 	#ifdef DEBUGMODE
 	printf("    %u MB Speicher gefunden\n    %u GB Speicher gefunden\n", pmm_totalMemory >> 20, pmm_totalMemory >> 30);
