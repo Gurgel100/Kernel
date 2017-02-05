@@ -1398,6 +1398,9 @@ void vmm_usePages(void *virt, size_t pages)
 
 		uint64_t entry = PT->PTE[PTi];
 		paddr_t pAddr = pmm_Alloc();
+		if(pAddr == 1)
+			Panic("VMM", "Out of memory!");
+
 		setPTEntry(PTi, PT, 1, !!(entry & PG_RW), !!(entry & PG_US), !!(entry & PG_PWT), !!(entry & PG_PCD), !!(entry & PG_A),
 				!!(entry & PG_D), !!(entry & PG_G), PG_AVL(entry) & ~VMM_UNUSED_PAGE, !!(entry & PG_PAT), !!(entry & PG_NX), pAddr);
 		InvalidateTLBEntry(address);
