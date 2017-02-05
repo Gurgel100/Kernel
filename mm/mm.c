@@ -15,8 +15,7 @@
 //Speicherverwaltung
 bool mm_Init()
 {
-	if(!pmm_Init()) return false;
-	return true;
+	return vmm_Init() && pmm_Init();
 }
 
 /*

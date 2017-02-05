@@ -66,11 +66,6 @@ bool pmm_Init()
 	pmm_totalPages = pmm_totalMemory / MM_BLOCK_SIZE;
 	assert(pmm_totalMemory % MM_BLOCK_SIZE == 0);
 
-	//Stack auf den ersten Stackframe legen
-
-	//Jetzt muss zuerst die virt. Speicherverwaltung initialisiert werden
-	if(!vmm_Init()) return false;
-
 	//Die ersten 1GB eintragen
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
 	do
