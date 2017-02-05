@@ -50,7 +50,8 @@ bool pmm_Init()
 	paddr_t phys_kernel_end = vmm_getPhysAddress(&kernel_end);
 	mmap *map;
 	uint32_t mapLength;
-	paddr_t i, maxAddress;
+	paddr_t i;
+	paddr_t maxAddress = 0;
 
 	pmm_Kernelsize = &kernel_end - &kernel_start;
 	map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
@@ -62,11 +63,13 @@ bool pmm_Init()
 	for(i = 0; i < maxLength; i++)
 	{
 		pmm_totalMemory += map[i].length;
-		maxAddress = map[i].base_addr + map[i].length;
+		maxAddress = MAX(map[i].base_addr + map[i].length, maxAddress);
 	}
 
 	pmm_totalPages = pmm_totalMemory / MM_BLOCK_SIZE;
 	assert(pmm_totalMemory % MM_BLOCK_SIZE == 0);
+
+	i = 0;
 
 	//Die ersten 1GB eintragen
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
