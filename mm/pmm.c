@@ -110,6 +110,7 @@ bool pmm_Init()
 	//Liste mit reservierten Pages
 	extern context_t kernel_context;
 	list_t reservedPages = vmm_getTables(&kernel_context);
+	__sync_fetch_and_add(&pmm_freePages, -list_size(reservedPages));
 	//Liste durchgehen und Bits in der BitMap löschen
 	uintptr_t Address;
 	while((Address = (uintptr_t)list_pop(reservedPages)))
