@@ -77,7 +77,7 @@ bool pmm_Init()
 	{
 		if(map->type == 1)
 			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-				if(i < phys_kernel_start || i > phys_kernel_end)
+				if(i >= 0x100000 && (i < phys_kernel_start || i > phys_kernel_end))
 				{
 					pmm_Free(i);
 				}
@@ -99,7 +99,7 @@ bool pmm_Init()
 				if(i < map->base_addr || i > map->base_addr + map->length)
 					i = map->base_addr;
 				for(; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-					if(i < phys_kernel_start || i > phys_kernel_end)
+					if(i >= 0x100000 && (i < phys_kernel_start || i > phys_kernel_end))
 					{
 						pmm_Free(i);
 					}
