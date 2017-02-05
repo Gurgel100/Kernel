@@ -50,6 +50,8 @@ bool pmm_Init()
 	paddr_t maxAddress = 0;
 	mmap *map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
 	uint32_t mapLength = MBS->mbs_mmap_length;
+	paddr_t phys_kernel_start = vmm_getPhysAddress(&kernel_start);
+	paddr_t phys_kernel_end = vmm_getPhysAddress(&kernel_end);
 
 	pmm_Kernelsize = &kernel_end - &kernel_start;
 	pmm_totalMemory = pmm_freePages = 0;
@@ -64,7 +66,7 @@ bool pmm_Init()
 
 		if(map->type == 1)
 			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-				if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
+				if(i < phys_kernel_start || i > phys_kernel_end)
 				{
 					pmm_Free(i);
 				}
@@ -91,7 +93,7 @@ bool pmm_Init()
 				if(i < map->base_addr || i > map->base_addr + map->length)
 					i = map->base_addr;
 				for(; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-					if(i < vmm_getPhysAddress(&kernel_start) || i > vmm_getPhysAddress(&kernel_end))
+					if(i < phys_kernel_start || i > phys_kernel_end)
 					{
 						pmm_Free(i);
 					}
