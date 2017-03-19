@@ -220,11 +220,14 @@ static struct cdi_fs_res *getRes(struct cdi_fs_stream *stream, const char *path)
 	struct cdi_fs_res *res = NULL;
 	struct cdi_fs_res *prevRes = stream->fs->root_res;
 
-	char **dirs = NULL;
-	size_t dirSize = getDirs(&dirs, path);
-
 	if(!loadRes(prevRes, stream))
 		return NULL;
+
+	if(path == NULL)
+		return prevRes;
+
+	char **dirs = NULL;
+	size_t dirSize = getDirs(&dirs, path);
 
 	size_t i = 0;
 	size_t j = 0;
