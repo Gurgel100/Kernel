@@ -83,6 +83,11 @@ typedef struct{
 	vfs_mode_t mode;
 }vfs_userspace_stream_t;
 
+typedef struct{
+	size_t size;
+	char name[];
+}vfs_userspace_direntry_t;
+
 static vfs_node_t root;
 static uint8_t nextPartID = 0;
 static list_t res_list;
@@ -594,7 +599,7 @@ void vfs_Init(void)
  */
 vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 {
-	if(path == NULL || strlen(path) == 0 || (!mode.read && !mode.write))
+	if(path == NULL || strlen(path) == 0 || (!mode.read && !mode.write) || (mode.write && mode.directory))
 		return -1;
 
 	char *remPath;
@@ -611,7 +616,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 		case TYPE_MOUNT:
 			stream->stream.fs = node->fs;
 			stream->stream.res = getRes(&stream->stream, remPath);
-			if(stream->stream.res == NULL)
+			if(stream->stream.res == NULL || (mode.directory && stream->stream.res->dir == NULL))
 			{
 				free(stream);
 				if(remPath)
@@ -619,21 +624,30 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 				return -1;
 			}
 		break;
-		case TYPE_DIR:	//Ordner kann man nicht öffnen
-			printf("Versucht Ordner zu öffnen!\n");
-			free(stream);
-			if(remPath)
-				free(remPath);
-			return -1;
+		case TYPE_DIR:
+			if(!mode.directory)
+			{
+				free(stream);
+				if(remPath)
+					free(remPath);
+				return -1;
+			}
 		break;
 		case TYPE_DEV:
-			mode.empty = false;
-			mode.append = false;
-			mode.create = false;
+			if(mode.directory)
+			{
+				free(stream);
+				if(remPath)
+					free(remPath);
+				return -1;
+			}
+			stream->mode.empty = false;
+			stream->mode.append = false;
+			stream->mode.create = false;
 		break;
 	}
 
-	if(mode.empty)
+	if(stream->mode.empty)
 	{
 		if(stream->stream.fs->read_only || !stream->stream.res->flags.write)
 		{
@@ -699,6 +713,60 @@ void vfs_Close(vfs_file_t streamid)
 }
 
 /*
+ * Einträge aus einem Ordner lesen
+ * Parameter:	streamid = Id des Streams, der den Ordner repräsentiert
+ * 				start = Index des zu startenden Ordnereintrags
+ * 				size = Grösse des Buffers
+ * 				buffer = Buffer in die die Einträge geschrieben werden
+ * Rückgabe:	Anzahl Bytes, die geschrieben wurden
+ */
+static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_userspace_direntry_t *buffer)
+{
+	assert(buffer != NULL);
+	assert(streams != NULL);
+
+	size_t sizeRead = 0;
+
+	//Erst überprüfen ob der Stream zum lesen geöffnet wurde und einen Ordner repräsentiert
+	if(!stream->mode.read || !stream->mode.directory)
+		return 0;
+
+	vfs_node_t *node = stream->node;
+
+	assert(node->type == TYPE_MOUNT || node->type == TYPE_DIR);
+	switch(node->type)
+	{
+		case TYPE_MOUNT:
+		{
+			cdi_list_t childs;
+			struct cdi_fs_res *child_res;
+			vfs_userspace_direntry_t *entry;
+			childs = stream->stream.res->dir->list(&stream->stream);
+			if(childs == NULL || cdi_list_size(childs) == 0)
+				return 0;
+			size_t i = start;
+			while((child_res = cdi_list_get(childs, i++)))
+			{
+				size_t name_length = strlen(child_res->name);
+				size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
+				if(sizeRead + entry_size > size)
+					break;
+				entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
+				entry->size = entry_size;
+				strcpy(&entry->name, child_res->name);
+				sizeRead += entry_size;
+			}
+		}
+		break;
+		case TYPE_DIR:
+			//TODO
+		break;
+	}
+
+	return sizeRead;
+}
+
+/*
  * Eine Datei lesen
  * Parameter:	Path = Pfad zur Datei als String
  * 				start = Anfangsbyte, an dem angefangen werden soll zu lesen
@@ -723,6 +791,10 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 		return 0;
 
 	vfs_node_t *node = (stream->node->type == TYPE_LINK) ? stream->node->childs : stream->node;
+
+	//Wenn der Stream einen Ordner repräsentiert rufen wir die entsprechende Funktion auf
+	if(stream->mode.directory)
+		return ReadDir(stream, start, length, buffer);
 
 	switch(node->type)
 	{

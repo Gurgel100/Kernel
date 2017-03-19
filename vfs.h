@@ -51,7 +51,7 @@ typedef struct{
 }vfs_device_t;
 
 typedef struct{
-	bool read, write, append, empty, create;
+	bool read, write, append, empty, create, directory;
 }vfs_mode_t;
 
 typedef uint64_t vfs_file_t;
