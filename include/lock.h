@@ -14,7 +14,7 @@
 #define LOCK_LOCKED		1
 #define LOCK_UNLOCKED	0
 
-typedef uint8_t lock_t;
+typedef uint64_t lock_t;
 
 //Führt eine Funktion gelockt aus und gibt deren Resultat zurück
 #define LOCKED_RESULT(lck, task)\
@@ -33,6 +33,7 @@ typedef uint8_t lock_t;
 		unlock(&lck);\
 	}
 
+bool try_lock(lock_t *l);
 void lock(lock_t *l);
 void unlock(lock_t *l);
 bool locked(lock_t *l);

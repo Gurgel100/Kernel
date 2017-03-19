@@ -7,9 +7,14 @@
 
 #include "lock.h"
 
+bool try_lock(lock_t *l)
+{
+	return __sync_bool_compare_and_swap(l, 0, 1);
+}
+
 void lock(lock_t *l)
 {
-	while(!__sync_bool_compare_and_swap(l, 0, 1))
+	while(!try_lock(l))
 		asm volatile("pause");
 }
 
