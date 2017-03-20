@@ -75,17 +75,18 @@ static void handler_charPress(void *opaque, char c)
 {
 	console_t *console = *(console_t**)opaque;
 
-	if(console->id != 0 && console->waitingThread != NULL)
-	{
-		thread_unblock(console->waitingThread);
-		console->waitingThread = NULL;
-	}
 	console->inputBuffer[console->inputBufferEnd++] = c;
 	if(console->inputBufferEnd == console->inputBufferSize)
 		console->inputBufferEnd = 0;
 	if(console->inputBufferEnd == console->inputBufferStart)
 		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
 	assert(console->inputBufferStart != console->inputBufferEnd);
+
+	if(console->id != 0 && console->waitingThread != NULL)
+	{
+		thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
+	}
 }
 
 static void handler_keyDown(void *opaque, KEY_t key)
