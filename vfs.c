@@ -889,7 +889,7 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 		case TYPE_MOUNT:
 			//Überprüfen, ob auf das Dateisystem geschrieben werden darf
 			if(!stream->stream.fs->read_only && stream->stream.res->flags.write)
-				sizeWritten = stream->stream.res->file->read(&stream->stream, start, length, buffer);
+				sizeWritten = stream->stream.res->file->write(&stream->stream, start, length, buffer);
 		break;
 		case TYPE_FILE:
 			//Wenn ein Handler gesetzt ist, dann Handler aufrufen
