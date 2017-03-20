@@ -271,6 +271,9 @@ static void vfs_stream_free(const void *s)
 		case TYPE_MOUNT:
 			freeRes(stream->stream.res);
 		break;
+		default:
+			//Nichts machen
+		break;
 	}
 	free(stream);
 }
@@ -312,7 +315,7 @@ static vfs_file_t getNextUserspaceStreamID(process_t *p)
 static vfs_node_t *getLastNode(const char *Path, char **remPath)
 {
 	vfs_node_t *Node = &root;
-	vfs_node_t *oldNode;
+	vfs_node_t *oldNode = NULL;	//Ohne Initialisierung meckert der Compiler
 	char **Dirs = NULL;
 	size_t NumDirs, i;
 
@@ -670,6 +673,12 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 			stream->mode.append = false;
 			stream->mode.create = false;
 		break;
+		case TYPE_LINK:
+			assert(false);
+		break;
+		case TYPE_FILE:
+			//Nichts zu tun
+		break;
 	}
 
 	if(stream->mode.empty)
@@ -758,7 +767,6 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 
 	vfs_node_t *node = stream->node;
 
-	assert(node->type == TYPE_MOUNT || node->type == TYPE_DIR);
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
@@ -785,6 +793,9 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 		break;
 		case TYPE_DIR:
 			//TODO
+		break;
+		default:
+			assert(false);
 		break;
 	}
 
@@ -831,6 +842,9 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 			if(stream->stream.res->flags.read)
 				sizeRead = stream->stream.res->file->read(&stream->stream, start, length, buffer);
 		break;
+		default:
+			assert(false);
+		break;
 	}
 	return sizeRead;
 }
@@ -868,6 +882,9 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 			//Wenn ein Handler gesetzt ist, dann Handler aufrufen
 			if(stream->node->handler != NULL)
 				sizeWritten = stream->node->handler(stream->node->name, start, length, buffer);
+		break;
+		default:
+			assert(false);
 		break;
 	}
 	return sizeWritten;
