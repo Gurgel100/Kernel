@@ -724,11 +724,15 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 
 		new_stream->id = getNextStreamID();
 		new_stream->ref_count = 1;
-		new_stream->stream.res->stream_cnt++;
+		__sync_fetch_and_add(&new_stream->stream.res->stream_cnt, 1);
 
 		stream = new_stream;
 
 		LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)new_stream->id, new_stream));
+	}
+	else
+	{
+		__sync_fetch_and_add(&stream->ref_count, 1);
 	}
 
 	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
@@ -739,11 +743,20 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 /*
  * Eine Datei schliessen
  * Parameter:	stream = Stream der geschlossen werden soll
- *///TODO: Prüfen, ob der Stream noch in verwendung ist und erst dann löschen
+ */
 void vfs_Close(vfs_file_t streamid)
 {
-	LOCKED_TASK(vfs_lock, hashmap_delete(streams, (void*)streamid));
-	assert(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, NULL)));
+	vfs_stream_t *stream;
+	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
+		return;
+
+	//Prüfe, ob Stream noch verwendet wird
+	if(__sync_add_and_fetch(&stream->ref_count, -1) == 0)
+	{
+		//Stream freigeben, wenn er nicht mehr verwendet wird
+		LOCKED_TASK(vfs_lock, hashmap_delete(streams, (void*)streamid));
+		assert(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, NULL)));
+	}
 }
 
 /*
