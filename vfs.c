@@ -569,6 +569,21 @@ static vfs_node_t *createDeviceNode(vfs_node_t *parent, const char *name, vfs_de
 	return node;
 }
 
+/*
+ * Gibt den verlinkten Knoten zurück
+ * Parameter:	node = Startknoten
+ * Rückgabe:	Pointer zur verlinkten Node
+ */
+static vfs_node_t *resolveLink(vfs_node_t *node)
+{
+	while(node->type == TYPE_LINK)
+	{
+		node = node->childs;
+		assert(node != NULL);
+	}
+	return node;
+}
+
 void vfs_Init(void)
 {
 	res_list = list_create();
@@ -612,13 +627,20 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	stream->id = getNextStreamID();
 	stream->mode = mode;
 
-	stream->node = node;
+	stream->node = resolveLink(node);
 	stream->ref_count = 1;
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
 			stream->stream.fs = node->fs;
 			stream->stream.res = getRes(&stream->stream, remPath);
+			//Löse symlinks auf
+			while(stream->stream.res != NULL && stream->stream.res->link != NULL)
+			{
+				const char *link_path = stream->stream.res->link->read_link(&stream->stream);
+				stream->stream.res = getRes(&stream->stream, link_path);
+			}
+
 			if(stream->stream.res == NULL || (mode.directory && stream->stream.res->dir == NULL))
 			{
 				free(stream);
@@ -793,7 +815,7 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 	if(!stream->mode.read)
 		return 0;
 
-	vfs_node_t *node = (stream->node->type == TYPE_LINK) ? stream->node->childs : stream->node;
+	vfs_node_t *node = stream->node;
 
 	//Wenn der Stream einen Ordner repräsentiert rufen wir die entsprechende Funktion auf
 	if(stream->mode.directory)
@@ -829,7 +851,7 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 	if(!stream->mode.write)
 		return 0;
 
-	vfs_node_t *node = (stream->node->type == TYPE_LINK) ? stream->node->childs : stream->node;
+	vfs_node_t *node = stream->node;
 
 	switch(node->type)
 	{
