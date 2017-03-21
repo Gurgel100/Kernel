@@ -136,7 +136,7 @@ double sqrt(double x)
 	double Ergebnis;
 	if(x < 0.0)
 		return NAN;
-	asm("sqrtpd %[x],%[res]": [res]"=x"(Ergebnis): [x]"xm"(x));
+	asm("sqrtsd %[x],%[res]": [res]"=x"(Ergebnis): [x]"xm"(x));
 	return Ergebnis;
 }
 
