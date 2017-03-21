@@ -818,7 +818,7 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 					break;
 				entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
 				entry->size = entry_size;
-				strcpy(&entry->name, child_res->name);
+				strcpy((char*)&entry->name, child_res->name);
 				sizeRead += entry_size;
 			}
 		}
@@ -944,7 +944,7 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	{
 		streamid = vfs_Open(stdin, m);
 	}
-	if(streamid == -1)
+	if(streamid == -1ul)
 		return 0;
 	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
@@ -966,7 +966,7 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	{
 		streamid = vfs_Open(stdout, m);
 	}
-	if(streamid == -1)
+	if(streamid == -1ul)
 		return 0;
 	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
@@ -986,7 +986,7 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	{
 		streamid = vfs_Open(stderr, m);
 	}
-	if(streamid == -1)
+	if(streamid == -1ul)
 		return 0;
 	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
@@ -1178,7 +1178,7 @@ char *splitPath(const char *path, char **file, char **dev)
 void vfs_RegisterDevice(vfs_device_t *dev)
 {
 	const char *Path = "/dev";	//Pfad zu den Gerätendateien
-	vfs_node_t *Node, *tmp;
+	vfs_node_t *tmp;
 	//ist der Ordner schon vorhanden?
 	if(!(tmp = getNode(Path))) return;	//Fehler
 
@@ -1195,7 +1195,7 @@ vfs_file_t vfs_syscall_open(const char *path, vfs_mode_t mode)
 	if(stream == NULL)
 		return -1;
 	vfs_file_t streamid = vfs_Open(path, mode);
-	if(streamid == -1)
+	if(streamid == -1ul)
 	{
 		free(stream);
 		return -1;
