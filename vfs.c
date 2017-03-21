@@ -19,6 +19,7 @@
 #include "assert.h"
 #include "pm.h"
 #include "hashmap.h"
+#include "refcount.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
@@ -73,7 +74,7 @@ typedef struct vfs_stream{
 	vfs_mode_t mode;
 
 	vfs_node_t *node;
-	size_t ref_count;
+	REFCOUNT_FIELD;
 }vfs_stream_t;
 
 //Ein Stream vom Userspace hat eine ID, der auf einen Stream des Kernels gemappt ist
@@ -279,6 +280,19 @@ static void vfs_stream_free(const void *s)
 		break;
 	}
 	free(stream);
+}
+
+/*
+ * Wird aufgerufen, wenn ein Stream keine Verweise mehr hat.
+ */
+static void vfs_stream_closed(const void *s)
+{
+	const vfs_stream_t *stream = (const vfs_stream_t*)s;
+	vfs_file_t streamid = stream->id;
+
+	//Stream wird nicht mehr verwendet
+	LOCKED_TASK(vfs_lock, hashmap_delete(streams, (void*)streamid));
+	assert(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, NULL)));
 }
 
 /*
@@ -637,7 +651,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	stream->mode = mode;
 
 	stream->node = resolveLink(node);
-	stream->ref_count = 1;
+	REFCOUNT_INIT(stream, vfs_stream_closed);
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
@@ -719,6 +733,11 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
 		return -1;
 
+	//Stream reservieren
+	stream = REFCOUNT_RETAIN(stream);
+	if(stream == NULL)
+		return -1;
+
 	if(memcmp(&mode, &stream->mode, sizeof(vfs_mode_t)) != 0)
 	{
 		//Klone den Stream mit dem entsprechendem Modus
@@ -729,16 +748,15 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 		memcpy(new_stream, stream, sizeof(vfs_stream_t));
 
 		new_stream->id = getNextStreamID();
-		new_stream->ref_count = 1;
+		REFCOUNT_INIT(new_stream, vfs_stream_closed);
 		__sync_fetch_and_add(&new_stream->stream.res->stream_cnt, 1);
+
+		//Reservierten Stream wieder freigeben
+		REFCOUNT_RELEASE(stream);
 
 		stream = new_stream;
 
 		LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)new_stream->id, new_stream));
-	}
-	else
-	{
-		__sync_fetch_and_add(&stream->ref_count, 1);
 	}
 
 	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
@@ -756,13 +774,8 @@ void vfs_Close(vfs_file_t streamid)
 	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
 		return;
 
-	//Prüfe, ob Stream noch verwendet wird
-	if(__sync_add_and_fetch(&stream->ref_count, -1) == 0)
-	{
-		//Stream freigeben, wenn er nicht mehr verwendet wird
-		LOCKED_TASK(vfs_lock, hashmap_delete(streams, (void*)streamid));
-		assert(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, NULL)));
-	}
+	//Reservierten Stream freigeben
+	REFCOUNT_RELEASE(stream);
 }
 
 /*
