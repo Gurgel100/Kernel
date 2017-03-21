@@ -260,6 +260,9 @@ static bool streamid_equal(const void *a, const void *b, __attribute__((unused))
 	return a == b;
 }
 
+/*
+ * Wird für die Hashtable verwendet. Darf nicht auf vfs_lock locken.
+ */
 static void vfs_stream_free(const void *s)
 {
 	vfs_stream_t *stream = (vfs_stream_t*)s;
@@ -278,6 +281,9 @@ static void vfs_stream_free(const void *s)
 	free(stream);
 }
 
+/*
+ * Wird für die Userspace Hashtable verwendet. Darf nicht auf current_thread->lock locken.
+ */
 static void vfs_userspace_stream_free(const void *s)
 {
 	vfs_userspace_stream_t *stream = (vfs_userspace_stream_t*)s;
