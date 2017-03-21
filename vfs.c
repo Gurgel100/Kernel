@@ -1141,37 +1141,6 @@ int vfs_UnmountRoot(void)
 }
 
 /*
- * Splittet den Pfad in Dateinamen und Pfad auf
- * Parameter:	path = Pfad
- * 				file = Name der Datei
- * 				dev = Name der Partition
- * Rückgabe:	NULL bei Fehler oder den Pfad
- */
-char *splitPath(const char *path, char **file, char **dev)
-{
-	if(strlen(path) == 0)
-		return NULL;
-
-	char *tmp = strrchr(path, VFS_SEPARATOR);
-	if(tmp == NULL)
-		return NULL;
-	*tmp = '\0';
-	tmp++;
-	if(*tmp == '\0')
-		*file = NULL;
-	else
-		*file = tmp;
-
-	tmp = strchr(path, ':');
-	if(tmp == NULL)
-		return NULL;
-	*tmp = '\0';
-	*dev = path;
-
-	return path + strlen(*dev) + 1;
-}
-
-/*
  * Registriert ein Gerät. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
  * Parameter:	dev = Gerätestruktur
  */
