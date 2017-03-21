@@ -48,8 +48,27 @@ double atan(double x)
 	return Ergebnis;
 }
 
-//TODO
-//double atan2(double x, double y);
+double atan2(double x, double y)
+{
+	if(x > 0)
+		return atan(y / x);
+	else if(x < 0)
+	{
+		double t = atan(y / x);
+		if(y >= 0)
+			return t + M_PI;
+		else
+			return t - M_PI;
+	}
+	else
+	{
+		if(y < 0)
+			return M_PI / 2;
+		else					//x = 0 & y = 0 ergibt ein undefiniertes Resultat
+			return -M_PI / 2;
+	}
+}
+
 double sinh(double x)
 {
 	return (exp(x) - exp(-x)) / 2;
@@ -117,15 +136,22 @@ double sqrt(double x)
 	double Ergebnis;
 	if(x < 0.0)
 		return NAN;
-	asm("fsqrt" :"=t"(Ergebnis) :"0"(x));
+	asm("sqrtsd %[x],%[res]": [res]"=x"(Ergebnis): [x]"xm"(x));
 	return Ergebnis;
 }
 
 double ceil(double x)
 {
+#ifdef __SSE4_1__
+	double Ergebnis;
+	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b10));
+	return Ergebnis;
+#else
+	//TODO: funktioniert nur für "normale" Zahlen
 	long int i = (long int)x;
 	if(i < x) i++;
 	return (double)i;
+#endif
 }
 
 double fabs(double x)
@@ -135,7 +161,14 @@ double fabs(double x)
 
 double floor(double x)
 {
+#ifdef __SSE4_1__
+	double Ergebnis;
+	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b01));
+	return Ergebnis;
+#else
+	//TODO: funktioniert nur für "normale" Zahlen
 	return (double)(long int)x;
+#endif
 }
 
 double fmod(double x, double y)

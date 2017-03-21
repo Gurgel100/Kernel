@@ -42,6 +42,8 @@
 //Systemfunktionen
 #define SYSINF	60
 
+void syscall_Init();
+
 #endif /* SYSCALLS_H_ */
 
 #endif

@@ -8,6 +8,7 @@
 #include "pci.h"
 #include "../pci.h"
 #include "lists.h"
+#include "stdlib.h"
 
 /**
  * \german
@@ -22,7 +23,8 @@
 void cdi_pci_get_all_devices(cdi_list_t list)
 {
 	pciDevice_t *pciDevice;
-	for(pciDevice = pci_firstDevice; pciDevice != NULL; pciDevice = pciDevice->NextDevice)
+	size_t i = 0;
+	while((pciDevice = list_get(pciDevices, i++)))
 	{
 		struct cdi_pci_device *cdi_pciDevice;
 		cdi_list_t resources = cdi_list_create();
@@ -54,7 +56,7 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 						{
 							*cdi_pciRes = (struct cdi_pci_resource){
 								.type = CDI_PCI_MEMORY,
-								.start = pciDevice->BAR[Bar].Address | (pciDevice->BAR[Bar + 1].Address << 32),
+								.start = pciDevice->BAR[Bar].Address | ((uint64_t)pciDevice->BAR[Bar + 1].Address << 32),
 								.length = pciDevice->BAR[Bar + 1].Size,
 								.index = Bar
 							};
@@ -68,6 +70,9 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 							.length = pciDevice->BAR[Bar].Size,
 							.index = Bar
 						};
+					break;
+					default:
+					break;
 				}
 				cdi_list_push(resources, cdi_pciRes);
 			}
@@ -75,10 +80,10 @@ void cdi_pci_get_all_devices(cdi_list_t list)
 
 		cdi_pciDevice = malloc(sizeof(*cdi_pciDevice));
 		*cdi_pciDevice = (struct cdi_pci_device){
-			.bus_data = CDI_PCI,
+			.bus_data = { CDI_PCI },
 			.bus = pciDevice->Bus,
 			.dev = pciDevice->Slot,
-			.function = pciDevice->Functions,
+			.function = pciDevice->Function,
 			.vendor_id = pciDevice->VendorID,
 			.device_id = pciDevice->DeviceID,
 			.class_id = pciDevice->ClassCode,
@@ -124,7 +129,7 @@ void cdi_pci_device_destroy(struct cdi_pci_device* device)
  */
 uint16_t cdi_pci_config_readw(struct cdi_pci_device* device, uint8_t offset)
 {
-	return (uint16_t)ConfigRead(device->bus, device->dev, device->function, offset, 2);
+	return (uint16_t)pci_readConfig(device->bus, device->dev, device->function, offset, 2);
 }
 
 /**
@@ -144,5 +149,5 @@ uint16_t cdi_pci_config_readw(struct cdi_pci_device* device, uint8_t offset)
  */
 void cdi_pci_config_writew(struct cdi_pci_device* device, uint8_t offset, uint16_t value)
 {
-	ConfigWrite(device->bus, device->dev, device->function, offset, 2, value);
+	pci_writeConfig(device->bus, device->dev, device->function, offset, 2, value);
 }

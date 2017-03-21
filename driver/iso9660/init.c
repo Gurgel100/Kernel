@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "cdi/fs.h"
 #include "cdi/cache.h"
@@ -25,6 +26,30 @@
 #include "iso9660_cdi.h"
 
 #include "volume_descriptor.h"
+
+int iso9660_fs_probe(struct cdi_fs_filesystem* cdi_fs, char** volname)
+{
+    struct iso9660_voldesc_prim voldesc;
+    size_t len;
+    int ret;
+
+    ret = iso9660_voldesc_load(cdi_fs, ISO9660_VOLDESC_PRIM, &voldesc);
+    if (ret != 0) {
+        return 0;
+    }
+
+    len = sizeof(voldesc.volume_identifier);
+    *volname = malloc(len + 1);
+    memcpy(*volname, voldesc.volume_identifier, len);
+    (*volname)[len] = '\0';
+
+    /* Remove padding */
+    while (--len && (*volname)[len] == ' ') {
+        (*volname)[len] = '\0';
+    }
+
+    return 1;
+}
 
 /**
  * Initializes a ISO9660 filesystem

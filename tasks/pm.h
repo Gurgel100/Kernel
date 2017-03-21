@@ -11,8 +11,9 @@
 #include "isr.h"
 #include "stdint.h"
 #include "vmm.h"
-#include "console.h"
 #include "list.h"
+#include "hashmap.h"
+#include "lock.h"
 
 typedef uint64_t pid_t;
 
@@ -31,21 +32,21 @@ typedef struct process_t{
 		struct process_t *parent;
 		char *cmd;
 		pm_status_t Status;
-		console_t *console;
 		list_t threads;
+		hashmap_t *streams;
 
 		void *nextThreadStack;
+		lock_t lock;
 }process_t;
 
 extern process_t *currentProcess;			//Aktueller Prozess
 
 void pm_Init(void);
-process_t *pm_InitTask(process_t *process, void *entry, char* cmd, bool newConsole);
+process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *stdin, const char *stdout, const char *stderr);
 void pm_DestroyTask(process_t *process);
 void pm_ExitTask(uint64_t code);
 void pm_BlockTask(process_t *process);
 void pm_ActivateTask(process_t *process);
 process_t *pm_getTask(pid_t PID);
-console_t *pm_getConsole();
 
 #endif /* PM_H_ */

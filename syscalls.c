@@ -8,6 +8,8 @@
 #ifdef BUILD_KERNEL
 
 #include "syscalls.h"
+#include "stddef.h"
+#include "stdbool.h"
 #include "isr.h"
 #include "cmos.h"
 #include "pm.h"
@@ -18,14 +20,13 @@
 #include "cpu.h"
 #include "scheduler.h"
 #include "cleaner.h"
+#include "assert.h"
 
 #define STAR	0xC0000081
 #define LSTAR	0xC0000082
 #define CSTAR	0xC0000083
 #define SFMASK	0xC0000084
 
-extern void putch(char);
-extern char getch(void);
 //extern uintptr_t mm_SysAlloc(uint64_t);
 //extern void mm_SysFree(uintptr_t, uint64_t);
 extern void setColor(uint8_t);
@@ -35,6 +36,7 @@ extern void isr_syscall();
 static void nop();
 static uint64_t createThreadHandler(void *entry);
 static void exitThreadHandler();
+static void sleepHandler(uint64_t msec);
 
 typedef uint64_t(*syscall)(uint64_t arg, ...);
 
@@ -61,8 +63,8 @@ static syscall syscalls[] = {
 		(syscall)&nop,
 		(syscall)&nop,
 
-		(syscall)&getch,				//20
-		(syscall)&putch,				//21
+		(syscall)&nop,					//20
+		(syscall)&nop,					//21
 		(syscall)&nop,
 		(syscall)&setColor,				//23
 		(syscall)&setCursor,			//24
@@ -83,11 +85,11 @@ static syscall syscalls[] = {
 		(syscall)&nop,
 		(syscall)&nop,
 
-		(syscall)&vfs_Open,				//40
-		(syscall)&vfs_Close,			//41
-		(syscall)&vfs_Read,				//42
-		(syscall)&vfs_Write,			//43
-		(syscall)&vfs_getFileinfo,		//44
+		(syscall)&vfs_syscall_open,		//40
+		(syscall)&vfs_syscall_close,	//41
+		(syscall)&vfs_syscall_read,		//42
+		(syscall)&vfs_syscall_write,	//43
+		(syscall)&vfs_syscall_getFileinfo,		//44
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,
@@ -96,7 +98,7 @@ static syscall syscalls[] = {
 
 		(syscall)&cmos_GetTime,			//50
 		(syscall)&cmos_GetDate,			//51
-		(syscall)&pit_RegisterTimer,	//52
+		(syscall)&sleepHandler,			//52
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,
@@ -125,6 +127,8 @@ void syscall_Init()
 
 uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
 {
+	//FIXME
+	assert(func < sizeof(syscalls) / sizeof(syscall));
 	return syscalls[func](arg1, arg2, arg3, arg4, arg5);
 }
 
@@ -153,6 +157,11 @@ static void exitThreadHandler()
 {
 	cleaner_cleanThread(currentThread);
 	yield();
+}
+
+static void sleepHandler(uint64_t msec)
+{
+	pit_RegisterTimer(currentThread, msec);
 }
 
 #endif

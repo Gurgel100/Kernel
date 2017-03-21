@@ -14,6 +14,8 @@
 #include "vfs.h"
 #include "stdio.h"
 #include "scheduler.h"
+#include "keyboard.h"
+#include "assert.h"
 
 #define GRAFIKSPEICHER	0xB8000
 #define MAX_PAGES		12
@@ -23,6 +25,10 @@
 #define SIZE_PER_ROW	(COLS * SIZE_PER_CHAR)
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
+
+#define TAB_HORIZONTAL	4
+
+#define INPUT_BUFFER_SIZE	16
 
 #define MIN(a, b)		((a < b) ? a : b)
 
@@ -61,43 +67,75 @@ static char *console_names[CONSOLE_NUM] = {
 };
 
 static void console_scrollDown();
-static size_t console_readHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
-static size_t console_writeHandler(console_t *console, uint64_t start, size_t length, const void *buffer);
-static void *console_getValue(console_t *console, vfs_device_function_t function);
+static size_t console_readHandler(void *c, uint64_t start, size_t length, void *buffer);
+static size_t console_writeHandler(void *c, uint64_t start, size_t length, const void *buffer);
+static void *console_getValue(void *c, vfs_device_function_t function);
+
+static void handler_charPress(void *opaque, char c)
+{
+	console_t *console = *(console_t**)opaque;
+
+	console->inputBuffer[console->inputBufferEnd++] = c;
+	if(console->inputBufferEnd == console->inputBufferSize)
+		console->inputBufferEnd = 0;
+	if(console->inputBufferEnd == console->inputBufferStart)
+		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
+	assert(console->inputBufferStart != console->inputBufferEnd);
+
+	if(console->id != 0 && console->waitingThread != NULL)
+	{
+		thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
+	}
+}
+
+static void handler_keyDown(void *opaque, KEY_t key)
+{
+	console_t *console = *(console_t**)opaque;
+
+	if(keyboard_isKeyPressed(KEY_LALT))
+	{
+		if(key == KEY_F1)
+			console_switch(1);
+		else if(key == KEY_F2)
+			console_switch(2);
+		else if(key == KEY_F3)
+			console_switch(3);
+		else if(key == KEY_F4)
+			console_switch(4);
+		else if(key == KEY_F5)
+			console_switch(5);
+		else if(key == KEY_F6)
+			console_switch(6);
+		else if(key == KEY_F7)
+			console_switch(7);
+		else if(key == KEY_F8)
+			console_switch(8);
+		else if(key == KEY_F9)
+			console_switch(9);
+		else if(key == KEY_F10)
+			console_switch(10);
+		else if(key == KEY_F11)
+			console_switch(11);
+		else if(key == KEY_F12)
+			console_switch(12);
+		else if(key == KEY_ESC)
+			console_switch(0);
+	}
+}
+
+static void handler_keyUp(void *opaque, KEY_t key)
+{
+	console_t *console = *(console_t**)opaque;
+}
 
 void console_Init()
 {
-	initConsole.input = list_create();
+	initConsole.inputBufferSize = INPUT_BUFFER_SIZE;
+	initConsole.inputBuffer = malloc(initConsole.inputBufferSize);
 
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
 	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
-
-	//stdin
-	/*console_t *stdin = console_create("stdin", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
-	vfs_device_t *dev = malloc(sizeof(vfs_device_t));
-	dev->read = console_readHandler;
-	dev->write = console_writeHandler;
-	dev->getValue = console_getValue;
-	dev->opaque = stdin;
-	vfs_RegisterDevice(dev);
-
-	//stdout
-	console_t *stdout = console_create("stdout", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
-	dev = malloc(sizeof(vfs_device_t));
-	dev->read = console_readHandler;
-	dev->write = console_writeHandler;
-	dev->getValue = console_getValue;
-	dev->opaque = stdout;
-	vfs_RegisterDevice(dev);
-
-	//stderr
-	console_t *stderr = console_create("stderr", COLS, ROWS, BG_BLACK | CL_LIGHT_GREY);
-	dev = malloc(sizeof(vfs_device_t));
-	dev->read = console_readHandler;
-	dev->write = console_writeHandler;
-	dev->getValue = console_getValue;
-	dev->opaque = stderr;
-	vfs_RegisterDevice(dev);*/
 
 	//Alle Konsolen anlegen
 	uint64_t i;
@@ -113,6 +151,11 @@ void console_Init()
 		tty->getValue = console_getValue;
 		vfs_RegisterDevice(tty);
 	}
+
+	//Keyboardhandler registrieren
+	keyboard_registerCharHandler(handler_charPress, &activeConsole);
+	keyboard_registerKeydownHandler(handler_keyDown, &activeConsole);
+	keyboard_registerKeyupHandler(handler_keyUp, &activeConsole);
 }
 
 /*
@@ -145,8 +188,10 @@ console_t *console_create(char *name, uint8_t color)
 	}
 	console->color = color;
 
-	console->input = list_create();
-	if(console->input == NULL)
+	console->inputBufferSize = INPUT_BUFFER_SIZE;
+	console->inputBufferStart = console->inputBufferEnd = 0;
+	console->inputBuffer = malloc(console->inputBufferSize);
+	if(console->inputBuffer == NULL)
 	{
 		free(console->name);
 		free(console->buffer);
@@ -201,7 +246,6 @@ static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
 static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_buf, uint8_t ansi_buf_len)
 {
 	uint8_t i;
-	uint16_t tmp;
 	uint8_t n1 = 0, n2 = 0;
 	bool delimiter = false;
 	bool have_n1 = false, have_n2 = false;
@@ -261,32 +305,37 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 				return SUCCESS;
 			case 'A':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				if(console->cursor.y > n1)
 					console->cursor.y -= n1;
 				return SUCCESS;
 			case 'B':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				console->cursor.y = MIN(console->height, console->cursor.y + n1);
 				return SUCCESS;
 			case 'C':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				console->cursor.x = MIN(console->width, console->cursor.x + n1);
 				return SUCCESS;
 			case 'D':
 				if(!have_n1)
-					return INVALID;
+					n1 = 1;
 				if(console->cursor.x > n1)
 					console->cursor.x -= n1;
 				return SUCCESS;
-			case 'H':	//Setze Cursor Position an n1,n2
+			case 'H':	//Setze Cursor Position an n1,n2, wobei n1 und n2 1-basiert sind
 			case 'f':
-				if(!have_n1 || !have_n2)
-					console_setCursor(console, (cursor_t){0, 0});
-				else
-					console_setCursor(console, (cursor_t){MIN(console->width, n1), MIN(console->height, n2)});
+				if(!have_n1)
+					n1 = 1;
+				else if(n1 == 0)
+					return INVALID;
+				if(!have_n2)
+					n2 = 1;
+				else if(n2 == 0)
+					return INVALID;
+				console_setCursor(console, (cursor_t){MIN(console->width, n1 - 1), MIN(console->height, n2 - 1)});
 				return SUCCESS;
 			case 's':	//Cursor speichern
 				console->saved_cursor = console->cursor;
@@ -326,6 +375,7 @@ void console_ansi_write(console_t *console, char c)
 				case NEED_MORE:
 					if(console->ansi_buf_ofs <= sizeof(console->ansi_buf))
 						break;
+					/* no break */
 				case INVALID:
 					for(i = 0; i < console->ansi_buf_ofs; i++)
 						console_write(console, console->ansi_buf[i]);
@@ -377,6 +427,30 @@ void console_write(console_t *console, char c)
 				buffer[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
 				if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
 					gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Screen updaten
+			break;
+			case '\t':
+			{
+				//Horizontal tabs go to the next 4 bound
+				uint8_t diff = TAB_HORIZONTAL - console->cursor.x % TAB_HORIZONTAL;
+				//Zeichen löschen
+				uint8_t i;
+				for(i = 0; i < diff; i++)
+				{
+					buffer[console->cursor.y * COLS + console->cursor.x + i] = (' ' | (Farbwert << 8));
+					if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+						gs[console->cursor.y * COLS + console->cursor.x] = (' ' | (Farbwert << 8));
+				}
+				console->cursor.x += diff;
+				if(console->cursor.x > 79)
+				{
+					console->cursor.x = 0;
+					if(++console->cursor.y > 24)
+					{
+						console_scrollDown(console);
+						console->cursor.y = 24;
+					}
+				}
+			}
 			break;
 			default:
 				//Zeichen in den Grafikspeicher kopieren
@@ -442,14 +516,21 @@ void displayConsole(console_t *console)
 void console_switch(uint8_t id)
 {
 	if(id == 0)
-		displayConsole(&initConsole);
+	{
+		if(activeConsole != &initConsole)
+			displayConsole(&initConsole);
+	}
 	else
 	{
 		size_t i;
 		for(i = 0; i < CONSOLE_NUM; i++)
 		{
 			if(consoles[i]->id == id)
-				displayConsole(consoles[i]);
+			{
+				if(activeConsole != consoles[i])
+					displayConsole(consoles[i]);
+				return;
+			}
 		}
 	}
 }
@@ -493,27 +574,29 @@ void console_setCursor(console_t *console, cursor_t cursor)
 
 char console_getch(console_t *console)
 {
-	//Auf Eingabe warten
-	console->waitingThread = currentThread;
-	thread_waitUserIO(console->waitingThread);
-
-	return (char)((uint64_t)list_remove(console->input, list_size(console->input) - 1));
-}
-
-void console_keyboardHandler(console_t *console, char c)
-{
-	if(console->waitingThread)
+	if(console->id == 0)
 	{
-		thread_unblock(console->waitingThread);
-		console->waitingThread = NULL;
-		list_push(console->input, (void*)((uint64_t)c));
+		while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
 	}
+	else if(console->inputBufferStart == console->inputBufferEnd)
+	{
+		//Auf Eingabe warten
+		console->waitingThread = currentThread;
+		thread_waitUserIO(console->waitingThread);
+	}
+
+	assert(console->inputBufferStart != console->inputBufferEnd);
+	char c = console->inputBuffer[console->inputBufferStart++];
+	if(console->inputBufferStart == console->inputBufferSize)
+		console->inputBufferStart = 0;
+	return c;
 }
 
-static size_t console_writeHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
+static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
 {
+	console_t *console = c;
 	size_t size = 0;
-	char *str = (char*)buffer;
+	const char *str = buffer;
 	while(length-- && *str != '\0')
 	{
 		console_ansi_write(console, *str++);
@@ -522,10 +605,11 @@ static size_t console_writeHandler(console_t *console, uint64_t __attribute__((u
 	return size;
 }
 
-static size_t console_readHandler(console_t *console, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
+static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, void *buffer)
 {
+	console_t *console = c;
 	size_t size = 0;
-	char *buf = (char*)buffer;
+	char *buf = buffer;
 
 	while(length-- != 0)
 	{
@@ -536,8 +620,9 @@ static size_t console_readHandler(console_t *console, uint64_t __attribute__((un
 	return size;
 }
 
-static void *console_getValue(console_t *console, vfs_device_function_t function)
+static void *console_getValue(void *c, vfs_device_function_t function)
 {
+	console_t *console = c;
 	switch (function)
 	{
 		case FUNC_TYPE:

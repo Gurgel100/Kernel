@@ -40,7 +40,7 @@ extern void free(void *ptr);
 extern void *malloc(size_t size);
 extern void *realloc(void *ptr, size_t size);
 
-extern void abort(void);
+extern void abort(void) __attribute__((noreturn));
 extern int atexit(void (*func)(void));
 extern void exit(int status);
 
@@ -51,6 +51,12 @@ extern ldiv_t ldiv(long int numer, long int denom);
 extern int rand(void);
 extern long lrand(void);
 extern void srand(unsigned int seed);
+
+extern void qsort(void *base, size_t n, size_t size, int (*cmp)(const void*, const void*));
+extern void qsort_s(void *base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void *context);
+
+extern void *bsearch(const void *key, const void *base, size_t n, size_t size, int (*cmp)(const void*, const void*));
+extern void *bsearch_s(const void *key, const void *base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void *context);
 
 #ifdef __cplusplus
 }

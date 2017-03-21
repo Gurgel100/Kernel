@@ -11,13 +11,61 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "disasm.h"
+#include "string.h"
 
 #ifdef DEBUGMODE
 
 static uint64_t DebugRegister[4];
 
+static ihs_t *Debug_Handler(ihs_t *ihs)
+{
+	static uint64_t Stack[1000];
+	static ihs_t State;
+	static ihs_t *oldState;
+	if(Debugged == false)	//Wenn noch nicht debugged wurde
+	{
+							//vorübergehend einen neuen Zustand herstellen
+		ihs_t new_state = {
+					.cs = 0x8,						//Kernelspace
+					.ss = 0x10,
+					.es = 0x10,
+					.ds = 0x10,
+					.gs = 0x10,
+					.fs = 0x10,
+
+					.rdi = ihs,						//Als Parameter die Adresse zum Zustand des Programms geben
+
+					.rip = (uint64_t)Debug_Main,	//Einsprungspunkt der Debugfunktion
+
+					.rsp = &Stack[999],
+
+					//IRQs einschalten (IF = 1)
+					.rflags = 0x202
+		};
+		memmove(&State, &new_state, sizeof(ihs_t));
+		oldState = ihs;
+		return &State;
+	}
+	else	//Wenn schon Debugged wurde wieder normalen Zustand herstellen
+	{
+		if(ihs->rax == DEBUG_SINGLESTEP)
+			oldState->rflags |= 0x10100;
+		if(ihs->rax == DEBUG_CONTINUE)
+			oldState->rflags = oldState->rflags & ~0x100 | 0x10000;
+		Debugged = false;
+		return oldState;
+	}
+}
+
 void Debug_Init()
 {
+	//Set handlers
+	isr_setHandler(0, Debug_Handler);
+	isr_setHandler(1, Debug_Handler);
+	isr_setHandler(6, Debug_Handler);
+	isr_setHandler(8, Debug_Handler);
+	isr_setHandler(13, Debug_Handler);
+	isr_setHandler(14, Debug_Handler);
 	Debugged = false;
 	DebugRegister[0] = 0;
 	DebugRegister[1] = 0;
@@ -182,3 +230,73 @@ uint64_t atou(char *s)
 }
 
 #endif
+
+void traceRegisters(ihs_t *ihs)
+{
+	setColor(BG_BLACK | CL_WHITE);
+	//RAX
+	printf("RAX: 0x%X%X                ", ihs->rax >> 32, ihs->rax & 0xFFFFFFFF);
+
+	//RBX
+	printf("RBX: 0x%X%X\n", ihs->rbx >> 32, ihs->rbx & 0xFFFFFFFF);
+
+	//RCX
+	printf("RCX: 0x%X%X                ", ihs->rcx >> 32, ihs->rcx & 0xFFFFFFFF);
+
+	//RDX
+	printf("RDX: 0x%X%X\n", ihs->rdx >> 32, ihs->rdx & 0xFFFFFFFF);
+
+	//RSI
+	printf("RSI: 0x%X%X                ", ihs->rsi >> 32, ihs->rsi & 0xFFFFFFFF);
+
+	//RDI
+	printf("RDI: 0x%X%X\n", ihs->rdi >> 32, ihs->rdi & 0xFFFFFFFF);
+
+	//RSP
+	printf("RSP: 0x%X%X                ", ihs->rsp >> 32, ihs->rsp & 0xFFFFFFFF);
+
+	//RBP
+	printf("RBP: 0x%X%X\n", ihs->rbp >> 32, ihs->rbp & 0xFFFFFFFF);
+
+	//R8
+	printf("R8 : 0x%X%X                ", ihs->r8 >> 32, ihs->r8 & 0xFFFFFFFF);
+
+	//R9
+	printf("R9 : 0x%X%X\n", ihs->r9 >> 32, ihs->r9 & 0xFFFFFFFF);
+
+	//R10
+	printf("R10: 0x%X%X                ", ihs->r10 >> 32, ihs->r10 & 0xFFFFFFFF);
+
+	//R11
+	printf("R11: 0x%X%X\n", ihs->r11 >> 32, ihs->r11 & 0xFFFFFFFF);
+
+	//R12
+	printf("R12: 0x%X%X                ", ihs->r12 >> 32, ihs->r12 & 0xFFFFFFFF);
+
+	//R13
+	printf("R13: 0x%X%X\n", ihs->r13 >> 32, ihs->r13 & 0xFFFFFFFF);
+
+	//R14
+	printf("R14: 0x%X%X                ", ihs->r14 >> 32, ihs->r14 & 0xFFFFFFFF);
+
+	//R15
+	printf("R15: 0x%X%X\n", ihs->r15 >> 32, ihs->r15 & 0xFFFFFFFF);
+
+	//RIP
+	printf("RIP: 0x%X%X\n", ihs->rip >> 32, ihs->rip & 0xFFFFFFFF);
+}
+
+void traceStack(uint64_t rsp, uint64_t *rbp, uint8_t length)
+{
+	uint64_t rip, size, i;
+	i = 0;
+	while(rbp != NULL &&  i++ < length)
+	{
+		rip = *(rbp + 1);
+		rsp = *rbp;
+		size = rsp - (uintptr_t)rbp;
+		printf("0x%08lX(%zu)%s", rip, size, (i % 2 == 0) ? "\n" : "                ");
+		rbp = (uint64_t*)rsp;
+	}
+	if(i % 2) printf("\n");
+}

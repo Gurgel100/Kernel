@@ -17,15 +17,19 @@
 #include "thread.h"
 #include "scheduler.h"
 #include "cleaner.h"
+#include "avl.h"
+#include "assert.h"
+#include "vfs.h"
 
 static pid_t nextPID = 1;
 static uint64_t numTasks = 0;
-static list_t ProcessList;					//Liste aller Prozesse (Status)
-extern thread_t *currentThread;
 extern process_t kernel_process;				//Handler für idle-Task
 extern thread_t* idleThread;				//Handler für idle-Task
 thread_t* cleanerThread;				//Handler für cleaner-Task
 extern list_t threadList;
+
+static avl_tree *process_list = NULL;	//Liste aller Prozesse
+static lock_t pm_lock = LOCK_UNLOCKED;
 
 ihs_t *pm_Schedule(ihs_t *cpu);
 
@@ -38,6 +42,48 @@ static void idle(void)
 	while(1) asm volatile("hlt");
 }
 
+static int pid_cmp(const void *a, const void *b, void *c)
+{
+	process_t *p1 = (process_t*)a;
+	process_t *p2 = (process_t*)b;
+	process_t **p = (process_t**)c;
+	if(c != NULL && p1->PID == p2->PID)
+		*p = (p1->Context == NULL) ? p2 : p1;
+	return (p1->PID < p2->PID) ? -1 : ((p1->PID == p2->PID) ? 0 : 1);
+}
+
+static void pid_visit(const void *a, void *b)
+{
+	process_t *p = (process_t*)a;
+	process_t *parent = (process_t*)((uintptr_t*)b)[0];
+	list_t childs = (list_t)((uintptr_t*)b)[1];
+	if(parent == p->parent)
+		list_push(childs, p);
+}
+
+static void pid_list(const void *a, void *b)
+{
+	process_info_t *process_info = *(process_info_t**)b;
+	size_t max_count = (size_t)((uintptr_t*)b)[1];
+	size_t *i = (size_t*)((uintptr_t*)b)[2];
+	process_t *p = (process_t*)a;
+
+	if(*i < max_count)
+	{
+		process_info[*i].pid = p->PID;
+		process_info[*i] = (process_info_t){
+			.pid = p->PID,
+			.ppid = (p->parent) ? p->parent->PID : 0,
+			.num_threads = list_size(p->threads),
+			.status = p->Status
+		};
+		memcpy(&process_info[*i].cmd, p->cmd, 19 * sizeof(char));
+		process_info[*i].cmd[19] = '\0';
+		(*i)++;
+	}
+}
+
+
 /*
  * Prozessverwaltung initialisieren
  */
@@ -46,8 +92,6 @@ void pm_Init()
 	thread_Init();
 	scheduler_Init();
 	cleaner_Init();
-
-	ProcessList = list_create();
 
 	kernel_process.threads = list_create();
 	idleThread = thread_create(&kernel_process, idle, 0, NULL, true);
@@ -72,10 +116,9 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsole)
+process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *stdin, const char *stdout, const char *stderr)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
-	numTasks++;
 
 	//Argumente kopieren
 	newProcess->cmd = strdup(cmd);
@@ -85,33 +128,34 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsol
 		return 0;
 	}
 
-	newProcess->PID = nextPID++;
+	newProcess->PID = __sync_fetch_and_add(&nextPID, 1);
 	newProcess->parent = parent;
 
 	newProcess->Context = createContext();
-
-	if(newConsole || !parent)
-	{
-		static uint64_t nextConsole = 1;
-		char tmp[6];
-		sprintf(tmp, "tty%02u", nextConsole++);
-		newProcess->console = console_getByName(tmp);
-	}
-	else
-	{
-		newProcess->console = parent->console;
-	}
 
 	newProcess->nextThreadStack = (void*)(MM_USER_STACK + 1);
 
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
 
+	if(!vfs_initUserspace(parent, newProcess, stdin, stdout, stderr))
+	{
+		//Fehler
+		deleteContext(newProcess->Context);
+		free(newProcess->cmd);
+		free(newProcess);
+		return NULL;
+	}
+
 	//Mainthread erstellen
 	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false)->Status = READY;
 
 	//Prozess in Liste eintragen
-	list_push(ProcessList, newProcess);
+	bool res = LOCKED_RESULT(pm_lock, avl_add_s(&process_list, newProcess, pid_cmp, NULL));
+	assert(res && "Es gibt schon einen Task mit dieser PID!");
+
+	__sync_fetch_and_add(&numTasks, 1);
+	newProcess->lock = LOCK_UNLOCKED;
 
 	return newProcess;
 }
@@ -122,26 +166,31 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, bool newConsol
  */
 void pm_DestroyTask(process_t *process)
 {
-	uint64_t i = 0;
-	process_t *p;
-
-	while((p = list_get(ProcessList, i++)) != NULL)
+	if(LOCKED_RESULT(pm_lock, avl_remove_s(&process_list, process, pid_cmp, NULL)))
 	{
-		if(p == process)
-		{	//Wenn der richtige Prozess gefunden wurde, alle Datenstrukturen des Prozesses freigeben
-			list_remove(ProcessList, i);
-			//Alle Threads beenden
-			thread_t *thread;
-			while((thread = list_get(process->threads, 0)))
-				thread_destroy(thread);
-			deleteContext(process->Context);
-			free(process->cmd);
-			free(process);
-			numTasks--;
-			break;
+		//Wenn der richtige Prozess gefunden wurde, alle Datenstrukturen des Prozesses freigeben
+		//und alle Kindprozesse beenden
+		//TODO: Signal senden anstatt einfach zu killen
+		list_t childs = list_create();
+		void *a[2] = {process, childs};
+		LOCKED_TASK(pm_lock, avl_visit_s(process_list, avl_visiting_in_order, pid_visit, a));
+		process_t *child;
+		while((child = list_pop(childs)))
+		{
+			pm_DestroyTask(child);
 		}
-		i++;
+		list_destroy(childs);
+
+		//Alle Threads beenden
+		thread_t *thread;
+		while((thread = list_get(process->threads, 0)))
+			thread_destroy(thread);
+		deleteContext(process->Context);
+		free(process->cmd);
+		free(process);
+		numTasks--;
 	}
+	assert(!LOCKED_RESULT(pm_lock, avl_search_s(process_list, process, pid_cmp, NULL)));
 }
 
 /*
@@ -203,48 +252,14 @@ void pm_ActivateTask(process_t *process)
  */
 process_t *pm_getTask(pid_t PID)
 {
-	uint64_t i = 0;
-	process_t *Process;
+	process_t *Process = NULL;
+	process_t dummy = {0};
+	dummy.PID = PID;
 
-	while((Process = list_get(ProcessList, i++)) != NULL)
-	{
-		if(Process->PID == PID)
-			return Process;
-	}
+	LOCKED_TASK(pm_lock, avl_search_s(process_list, &dummy, pid_cmp, &Process));
+	assert(!Process || Process->PID == PID);
 
-	return NULL;
-}
-
-/*
- * Gibt die Konsole des aktuell ausgeführten Tasks zurück
- */
-console_t *pm_getConsole()
-{
-	if(currentProcess && currentProcess->console)
-	{
-		/*if(currentProcess->console == NULL)
-		{
-			//Neue Konsole anlegen
-			if(currentProcess->PPID > 0)
-			{
-				process_t *parent = pm_getTask(currentProcess->PPID);
-				if(parent)
-				{
-					currentProcess->console = console_createChild(parent->console);
-				}
-				else
-				{
-					currentProcess->console = console_createChild(&initConsole);
-				}
-			}
-			else
-			{
-				currentProcess->console = console_createChild(&initConsole);
-			}
-		}*/
-		return currentProcess->console;
-	}
-	return &initConsole;
+	return Process;
 }
 
 /*

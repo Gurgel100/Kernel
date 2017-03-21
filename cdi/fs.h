@@ -29,6 +29,34 @@ struct cdi_fs_driver {
     struct cdi_driver drv;
 
     /**
+     * \german
+     * Prüfen, ob sich ein gültiges Dateisystem auf dem Gerät befindet. Falls
+     * das der Fall ist und das Dateisystem einen Namen hat, wird der Name
+     * in einem per malloc() neu allozierten String zurückgegeben.
+     *
+     * @fs ist kein vollständig initialisiertes Dateisystem; es kann nur
+     * verwendet werden, um auf das Gerät zuzugreifen.
+     *
+     * Diese Funktion ist für Dateisystemtreiber optional.
+     *
+     * @return Wenn das Dateisystem gültig ist 1, sonst 0.
+     * \endgerman
+     * \english
+     * Check whether there is a valid file system on the device. If so, and the
+     * file system has a name, the name is returned in a string newly allocated
+     * with malloc().
+     *
+     * @fs isn't a fully initialised file system; it can only be used to access
+     * the storage device.
+     *
+     * This function is optional for file system drivers.
+     *
+     * @return If the file system is valid 1, otherwise 0.
+     * \endenglish
+     */
+    int (*fs_probe)(struct cdi_fs_filesystem* fs, char** volname);
+
+    /**
      * Neues Dateisystem initialisieren; Diese Funktion muss das root_object in
      * der Dateisystemstruktur eintragen.
      *

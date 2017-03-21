@@ -27,9 +27,18 @@
 #include "vfs.h"
 #include "pit.h"
 #include "sound.h"
-
+#include "version.h"
+#include "loader.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "scheduler.h"
+#include "apic.h"
+#include "tss.h"
+#include "pci.h"
+#include "devicemng.h"
+#include "console.h"
+#include "syscalls.h"
+#include "string.h"
 
 static multiboot_structure static_MBS;
 
@@ -38,16 +47,16 @@ void Init(void);
 void __attribute__((noreturn)) main(void *mbsAdresse)
 {
 	MBS = mbsAdresse;
-	initLib();	//Library initialisieren
 	Init();		//Initialisiere System
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 	sound_Play(10000, 1000);
+	printf("Kernel version: %i.%i.%i - %s %s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, BUILD_DATE, BUILD_TIME);
 	if(vfs_MountRoot())
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
 	{
-		loader_load("/mount/0/bin", "init", true);
+		loader_load("/mount/0/bin", "init", "/dev/tty01", "/dev/tty01", "/dev/tty01");
 		scheduler_activate();
 	}
 
@@ -70,7 +79,6 @@ void Init()
 	pit_Init(1000);		//PIT initialisieren mit 1kHz
 	pic_Init();			//PIC initialisieren
 	cmos_Init();		//CMOS initialisieren
-	keyboard_Init();	//Tastatur(treiber) initialisieren
 	syscall_Init();		//Syscall initialisieren
 	#ifdef DEBUGMODE
 	Debug_Init();
@@ -81,11 +89,11 @@ void Init()
 	asm volatile("int $0x1");
 	#endif
 	//isr_Init();
+	keyboard_Init();	//Tastatur(treiber) initialisieren
 	apic_Init();
 	vfs_Init();			//VFS initialisieren
 	pci_Init();			//PCI-Treiber initialisieren
 	dmng_Init();
-	cdi_init();			//CDI und -Treiber initialisieren
 	pm_Init();			//Tasks initialisieren
 	console_Init();
 
@@ -98,6 +106,7 @@ void Init()
 	printf("Aktiviere Interrupts\n\r");
 	#endif
 	asm volatile("sti");	//Interrupts aktivieren
+	cdi_init();			//CDI und -Treiber initialisieren
 }
 
 #endif

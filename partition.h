@@ -16,6 +16,7 @@
 
 typedef enum{
 	PART_TYPE_NONE = 0x00,
+	PART_TYPE_LINUX = 0x83,
 	PART_TYPE_ISO9660 = 0xCD,
 	PART_TYPE_LAST = 0xFF
 }__attribute__((packed))part_type_t;
@@ -29,7 +30,7 @@ typedef struct{
 		uint8_t CylinderLo;
 		part_type_t Type;
 		uint8_t lastHead;
-		uint8_t lastSector : 5;
+		uint8_t lastSector : 6;
 		uint8_t lastCylinderHi : 2;
 		uint8_t lastCylinderLo;
 		uint32_t firstLBA;

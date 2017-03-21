@@ -7,6 +7,7 @@
 _start:
 #Initialisiere Stack
 mov $(stack),%rsp
+xor %rbp, %rbp
 
 #Lege Multiboot-Struktur-Adresse auf den Stack
 #push %rbx
@@ -19,6 +20,7 @@ hlt
 jmp _stop
 
 .section .bss
+.align 0x10
 .space 0x10000		#64KB Platz für den Kernelstack
 stack:
 .endif

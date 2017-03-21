@@ -7,6 +7,8 @@
 
 #include "misc.h"
 #include "isr.h"
+#include "stdlib.h"
+#include "util.h"
 
 typedef struct{
 		uint8_t IRQ;
@@ -49,6 +51,7 @@ void cdi_register_irq(uint8_t irq, void (*handler)(struct cdi_device*), struct c
 	Handler_t *Handler;
 	Handler = malloc(sizeof(Handler_t));
 	*Handler = (Handler_t){
+			.IRQ = irq,
 			.Handler = handler,
 			.Device = device
 	};

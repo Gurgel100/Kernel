@@ -9,6 +9,7 @@
 #include "cpu.h"
 #include "memory.h"
 #include "vmm.h"
+#include "pmm.h"
 
 #define APIC_BASE_MSR	0x1B
 
@@ -23,7 +24,7 @@
 #define APIC_REG_LVT_LINT1 0x360
 #define APIC_REG_LVT_ERROR 0x370
 
-static uintptr_t apic_base_phys;
+static paddr_t apic_base_phys;
 void *apic_base_virt;
 
 extern void *getFreePages(void *start, void *end, size_t pages);
@@ -40,8 +41,8 @@ void apic_Init()
 
 	//Speicherbereich mappen
 	apic_base_virt = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-	vmm_Map((uintptr_t)apic_base_virt, apic_base_phys,
-			VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+	vmm_Map(apic_base_virt, apic_base_phys,
+			VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_NO_CACHE, 0);
 
 	//APIC aktivieren
 	apic_Write(APIC_REG_SPIV, 1 << 8);
@@ -56,7 +57,7 @@ void apic_Init()
  */
 uint32_t apic_Read(uintptr_t offset)
 {
-	uint32_t *ptr = (uint32_t*)((uintptr_t)apic_base_virt + offset);
+	uint32_t *ptr = apic_base_virt + offset;
 	return *ptr;
 }
 
@@ -68,6 +69,6 @@ uint32_t apic_Read(uintptr_t offset)
  */
 void apic_Write(uintptr_t offset, uint32_t value)
 {
-	uint32_t *ptr = (uint32_t*)((uintptr_t)apic_base_virt + offset);
+	uint32_t *ptr = apic_base_virt + offset;
 	*ptr = value;
 }

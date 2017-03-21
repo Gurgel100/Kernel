@@ -155,10 +155,7 @@ typedef struct{
 
 extern context_t kernel_context;
 
-char elfCheck(elf_header *ELFHeader);	//Par.: Zeiger auf ELF-Header
-uint64_t getElfEntryAddress(elf_header *ElfHeader);
-
-char elfCheck(elf_header *ELFHeader)
+static char elfCheck(elf_header *ELFHeader)
 {
 	//zuerst überprüfen wir auf den Magic-String
 	if(ELFHeader->e_ident.ei_magic != ELF_MAGIC) return 2;
@@ -176,48 +173,48 @@ char elfCheck(elf_header *ELFHeader)
 	return -1;
 }
 
-uint64_t getElfEntryAddress(elf_header *ElfHeader)	//gibt die Einsprungsadresse zurück
+pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
 {
-	return ElfHeader->e_entry;
-}
-
-pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
-{
-	elf_header *Header;
+	elf_header Header;
 	char *Ziel;
 
 	//Zurücksetzen des Dateizeigers
 	fseek(fp, 0, SEEK_SET);
 
-	Header = malloc(sizeof(elf_header));
-	if(fread(Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
+	if(fread(&Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
 		return -1;
 
 	//Header überprüfen
-	if(elfCheck(Header) != -1)
+	if(elfCheck(&Header) != -1)
 		return -1;
 
-	if(Header->e_entry < USERSPACE_START)
+	if(Header.e_entry < USERSPACE_START)
 	{
-		free(Header);
+		return -1;
+	}
+
+	elf_program_header_entry *ProgramHeader = malloc(Header.e_phnum * sizeof(elf_program_header_entry));
+	if(ProgramHeader == NULL)
+	{
+		return -1;
+	}
+	fseek(fp, Header.e_phoff, SEEK_SET);
+	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header.e_phnum, fp) < Header.e_phnum)
+	{
+		free(ProgramHeader);
 		return -1;
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	process_t *task = pm_InitTask(currentProcess, (void*)Header->e_entry, (char*)cmd, newConsole);;
-
-	elf_program_header_entry *ProgramHeader = malloc(Header->e_phnum * sizeof(elf_program_header_entry));
-	fseek(fp, Header->e_phoff, SEEK_SET);
-	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header->e_phnum, fp) < Header->e_phnum)
+	process_t *task = pm_InitTask(currentProcess, (void*)Header.e_entry, (char*)cmd, stdin, stdout, stderr);
+	if(task == NULL)
 	{
-		free(Header);
 		free(ProgramHeader);
-		pm_DestroyTask(task);
 		return -1;
 	}
 
 	int i;
-	for(i = 0; i < Header->e_phnum; i++)
+	for(i = 0; i < Header.e_phnum; i++)
 	{
 		//Wenn kein ladbares Segment, dann Springe zum nächsten Segment
 		if(ProgramHeader[i].p_type != ELF_PT_LOAD) continue;
@@ -237,7 +234,6 @@ pid_t elfLoad(FILE *fp, const char *cmd, bool newConsole)
 
 	//Temporäre Daten wieder freigeben
 	free(ProgramHeader);
-	free(Header);
 
 	//Prozess aktivieren
 	pm_ActivateTask(task);

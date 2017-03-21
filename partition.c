@@ -25,7 +25,7 @@ struct cdi_fs_driver *getFSDriver(const char *name);
 /*
  * Liest Daten von einer Partition
  */
-static size_t partition_Read(partition_t *part, uint64_t start, size_t size, const void *buffer)
+static size_t partition_Read(partition_t *part, uint64_t start, size_t size, void *buffer)
 {
 	uint64_t corrected_start = MIN(start, part->size);
 	return dmng_Read(part->dev, part->lbaStart + corrected_start, MIN(part->size - corrected_start, size), buffer);
@@ -112,19 +112,31 @@ int partition_getPartitions(device_t *dev)
 struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 {
 	struct cdi_fs_filesystem *fs = malloc(sizeof(*fs));
-	struct cdi_fs_driver *driver;
+	char *path;
+	vfs_mode_t mode;
 
 	switch(part->type)
 	{
-		case PART_TYPE_ISO9660:
-			if(!(driver = getFSDriver("iso9660")))
+		case PART_TYPE_LINUX:
+			if(!(fs->driver = getFSDriver("ext2")))
 				goto exit_error;
-			fs->driver = driver;
-			vfs_mode_t mode = {
-					.read = true,
-					.write = true
+
+			mode = (vfs_mode_t){
+				.read = true,
+				.write = true
 			};
-			char *path;
+			asprintf(&path, "dev/%s", part->dev->device->name);
+			fs->osdep.fp = vfs_Open(path, mode);
+			free(path);
+		break;
+		case PART_TYPE_ISO9660:
+			if(!(fs->driver = getFSDriver("iso9660")))
+				goto exit_error;
+
+			mode = (vfs_mode_t){
+				.read = true,
+				.write = true
+			};
 			asprintf(&path, "dev/%s", part->dev->device->name);
 			fs->osdep.fp = vfs_Open(path, mode);
 			free(path);

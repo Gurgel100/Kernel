@@ -59,6 +59,7 @@ struct iso9660_fs_res {
 };
 
 // init.c
+int iso9660_fs_probe(struct cdi_fs_filesystem* cdi_fs, char** volname);
 int iso9660_fs_init(struct cdi_fs_filesystem *fs);
 int iso9660_fs_destroy(struct cdi_fs_filesystem *fs);
 

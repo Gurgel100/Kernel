@@ -17,6 +17,7 @@ extern thread_t *currentThread;
 extern process_t *currentProcess;
 
 void scheduler_Init();
+void scheduler_activate();
 void scheduler_add(thread_t *thread);
 void scheduler_remove(thread_t *thread);
 

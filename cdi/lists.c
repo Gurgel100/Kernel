@@ -6,6 +6,7 @@
  */
 
 #include "lists.h"
+#include "stdlib.h"
 
 struct cdi_list_node{
 		void *Value;
@@ -22,7 +23,7 @@ struct cdi_list_implementation{
  *
  * @return Neu erzeugte Liste oder NULL, falls kein Speicher reserviert werden
  * konnte
- *///FIXME
+ */
 cdi_list_t cdi_list_create(void)
 {
 	cdi_list_t list;

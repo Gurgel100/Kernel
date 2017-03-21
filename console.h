@@ -11,7 +11,6 @@
 #include "stddef.h"
 #include "stdint.h"
 #include "stdbool.h"
-#include "list.h"
 #include "lock.h"
 
 #define	CONSOLE_AUTOREFRESH	1
@@ -39,7 +38,8 @@ typedef struct{
 	uint8_t ansi_buf_ofs;
 	cursor_t saved_cursor;
 
-	list_t input;
+	char *inputBuffer;
+	size_t inputBufferSize, inputBufferStart, inputBufferEnd;
 }console_t;
 
 extern console_t initConsole;

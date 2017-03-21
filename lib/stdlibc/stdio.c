@@ -7,9 +7,6 @@
 
 #include "stdio.h"
 #include "stdlib.h"
-#include "stdint.h"
-#include "stdbool.h"
-#include "stdarg.h"
 #include "string.h"
 #include "userlib.h"
 #include "ctype.h"
@@ -19,6 +16,8 @@
 #else
 #include "syscall.h"
 #endif
+#include "math.h"
+#include "assert.h"
 
 #define ASPRINTF_INITIAL_BUFFER_SIZE 64
 
@@ -124,11 +123,11 @@ FILE *fopen(const char *filename, const char *mode)
 	file->mode.write = m.write;
 	file->mode.binary = binary;
 #ifdef BUILD_KERNEL
-	file->stream = vfs_Open(filename, m);
+	file->stream_id = vfs_Open(filename, m);
 #else
-	file->stream = syscall_fopen(filename, m);
+	file->stream_id = syscall_fopen(filename, m);
 #endif
-	if(file->stream == NULL)
+	if(file->stream_id == -1ul)
 	{
 		free(file);
 		return NULL;
@@ -154,9 +153,9 @@ int fclose(FILE *stream)
 		return EOF;
 
 #ifdef BUILD_KERNEL
-	vfs_Close(stream->stream);
+	vfs_Close(stream->stream_id);
 #else
-	syscall_fclose(stream->stream);
+	syscall_fclose(stream->stream_id);
 #endif
 	free(stream);
 
@@ -169,6 +168,10 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	size_t readData = 0;
 	//Überprüfen, ob erlaubt ist, diesen Stream zu lesen
 	if(!stream->mode.read)
+		return 0;
+
+	//Überprüfen, ob überhaupt etwas gelesen werden soll
+	if(length == 0)
 		return 0;
 
 	//Schauen, ob die angeforderten Daten im Cache sind
@@ -205,17 +208,12 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream, stream->posRead, tmpLength, tmp);
+			size = vfs_Read(stream->stream_id, stream->posRead, tmpLength, tmp);
 #else
-			size = syscall_fread(stream->stream, stream->posRead, tmpLength, tmp);
+			size = syscall_fread(stream->stream_id, stream->posRead, tmpLength, tmp);
 #endif
 
-			if(size < tmpLength)
-			{
-				stream->eof = true;
-				if(size == 0)
-					return EOF;
-			}
+			stream->eof = size < tmpLength;
 			memcpy(ptr + readData, tmp, size);
 			readData += size;
 
@@ -267,17 +265,12 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream, stream->posRead + readData, tmpLength, tmp);
+			size = vfs_Read(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
 #else
-			size = syscall_fread(stream->stream, stream->posRead + readData, tmpLength, tmp);
+			size = syscall_fread(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
 #endif
 
-			if(size < tmpLength)
-			{
-				stream->eof = true;
-				if(size == 0)
-					return EOF;
-			}
+			stream->eof = size < tmpLength;
 			memcpy(ptr + readData, tmp, size);
 			readData += size;
 
@@ -315,9 +308,9 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	else
 	{
 #ifdef BUILD_KERNEL
-		readData = vfs_Read(stream->stream, stream->posRead, length, ptr);
+		readData = vfs_Read(stream->stream_id, stream->posRead, length, ptr);
 #else
-		readData = syscall_fread(stream->stream, stream->posRead, length, ptr);
+		readData = syscall_fread(stream->stream_id, stream->posRead, length, ptr);
 #endif
 		stream->posRead += length;
 	}
@@ -338,12 +331,16 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	if(!stream->mode.write)
 		return 0;
 
+	//Überprüfen, ob überhaupt etwas geschrieben werden soll
+	if(length == 0)
+		return 0;
+
 	if(stream->bufMode == IO_MODE_NO_BUFFER)
 	{
 #ifdef BUILD_KERNEL
-		writeData = vfs_Write(stream->stream, stream->posWrite, length, ptr);
+		writeData = vfs_Write(stream->stream_id, stream->posWrite, length, ptr);
 #else
-		writeData = syscall_fwrite(stream->stream, stream->posWrite, length, ptr);
+		writeData = syscall_fwrite(stream->stream_id, stream->posWrite, length, ptr);
 #endif
 	}
 	else if(stream->bufMode == IO_MODE_LINE_BUFFER)
@@ -358,9 +355,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 			{
 				size_t size = 0;
 #ifdef BUILD_KERNEL
-				size = vfs_Write(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
+				size = vfs_Write(stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
 #else
-				size = syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
+				size = syscall_fwrite(stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
 #endif
 				stream->bufPos = 0;
 				stream->bufStart += size;
@@ -387,9 +384,9 @@ int fflush(FILE *stream)
 	if(stream->bufMode != IO_MODE_NO_BUFFER && stream->mode.write && stream->bufStart != EOF && stream->bufDirty)
 	{
 #ifdef BUILD_KERNEL
-		vfs_Write(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
+		vfs_Write(stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
 #else
-		syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
+		syscall_fwrite(stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
 #endif
 	}
 
@@ -478,9 +475,9 @@ int fseek(FILE *stream, long int offset, int whence)
 			{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
 				//Grösse der Datei ermitteln
 #ifdef BUILD_KERNEL
-				size_t filesize = vfs_getFileinfo(stream->stream, VFS_INFO_FILESIZE);
+				size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
 #else
-				size_t filesize = syscall_StreamInfo(stream->stream, VFS_INFO_FILESIZE);
+				size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
 #endif
 				stream->posRead = stream->posWrite = filesize - offset;
 			}
@@ -547,15 +544,18 @@ char *fgets(char *str, int n, FILE *stream)
 {
 	char c;
 	int i = 0;
-	if(stream == NULL || str == NULL)
+	if(stream == NULL || str == NULL || n <= 0)
 		return NULL;
 
-	while((c = fgetc(stream)) != '\n' && i < (n - 1) && !stream->eof)
+	while((c = fgetc(stream)) != EOF && i < (n - 1))
 	{
 		str[i++] = c;
+		if(c == '\n')
+			break;
 	}
-	if(i != 0)
-		str[i] = '\0';
+	str[i] = '\0';
+	if(c == EOF)
+		return NULL;
 	return str;
 }
 
@@ -602,17 +602,13 @@ int asprintf(char **str, const char *format, ...)
 }
 
 //Generelle vprintf-Funtkion mit Callbacks
-int jprintf_putc(jprintf_args *args, char c)
+static int jprintf_putc(jprintf_args *args, char c)
 {
-	if(args->putc != NULL)
-	{
-		return args->putc(args->arg, c);
-	}
-
-	return 1;
+	assert(args->putc != NULL);
+	return args->putc(args->arg, c);
 }
 
-int jprintf_putsn(jprintf_args *args, const char *str, int num)
+static int jprintf_putsn(jprintf_args *args, const char *str, int num)
 {
 	if(args->putsn != NULL)
 	{
@@ -633,21 +629,31 @@ int jprintf_putsn(jprintf_args *args, const char *str, int num)
 	}
 }
 
-int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
+static int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
-	bool minus = (x < 0) ? true : false;
+	bool minus = signbit(x);
+
+	int fptype = fpclassify(x);
 
 	//Herausfinden, wieviele Stellen vor dem Dezimalpunkt sind
 	size_t i = 0;
-	while(x >= 10)
+	switch(fptype)
 	{
-		i++;
-		x /= 10.0;
+		case FP_INFINITE:
+		case FP_NAN:
+			i = 3;
+		break;
+		default:
+			while(x >= 10)
+			{
+				i++;
+				x /= 10.0;
+			}
 	}
 
-	size_t length = i + ((x < 0 || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
-	if(x < 0) x = -x;
+	size_t length = i + ((minus || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
+	if(minus) x = -x;
 
 	while(width-- > length)
 		jprintf_putc(args, lpad);
@@ -673,39 +679,60 @@ int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_s
 	}
 
 	//Zahlen ausgeben
-	while(i-- + prec + 1)
+	switch(fptype)
 	{
-		jprintf_putc(args, ((uint64_t)x % 10) + '0');
-		n++;
-		x -= (uint64_t)x;
-		x *= 10.0;
-		if(i == (uint64_t)-1)
-		{
-			if(point || prec)
+		case FP_NAN:
+			n += jprintf_putsn(args, "nan", 4);
+		break;
+		case FP_INFINITE:
+			n += jprintf_putsn(args, "inf", 4);
+		break;
+		default:
+			while(i-- + prec + 1)
 			{
-				jprintf_putc(args, '.');
+				jprintf_putc(args, ((uint64_t)x % 10) + '0');
 				n++;
+				x -= (uint64_t)x;
+				x *= 10.0;
+				if(i == (uint64_t)-1)
+				{
+					if(point || prec)
+					{
+						jprintf_putc(args, '.');
+						n++;
+					}
+				}
 			}
-		}
 	}
+
 	return n;
 }
 
-int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
+static int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
-	bool minus = (x < 0) ? true : false;
+	bool minus = signbit(x);
+
+	int fptype = fpclassify(x);
 
 	//Herausfinden, wieviele Stellen vor dem Dezimalpunkt sind
 	size_t i = 0;
-	while(x >= 10)
+	switch(fptype)
 	{
-		i++;
-		x /= 10.0;
+		case FP_INFINITE:
+		case FP_NAN:
+			i = 3;
+		break;
+		default:
+			while(x >= 10)
+			{
+				i++;
+				x /= 10.0;
+			}
 	}
 
-	size_t length = i + ((x < 0 || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
-	if(x < 0) x = -x;
+	size_t length = i + ((minus || sign || space_sign) ? 2 : 1) + ((prec) ? prec + 1 : point);
+	if(minus) x = -x;
 
 	while(width-- > length)
 		jprintf_putc(args, lpad);
@@ -731,25 +758,36 @@ int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign, bool s
 	}
 
 	//Zahlen ausgeben
-	while(i-- + prec + 1)
+	switch(fptype)
 	{
-		jprintf_putc(args, ((uint64_t)x % 10) + '0');
-		n++;
-		x -= (uint64_t)x;
-		x *= 10.0;
-		if(i == (uint64_t)-1)
-		{
-			if(point || prec)
+		case FP_NAN:
+			n += jprintf_putsn(args, "nan", 4);
+		break;
+		case FP_INFINITE:
+			n += jprintf_putsn(args, "inf", 4);
+		break;
+		default:
+			while(i-- + prec + 1)
 			{
-				jprintf_putc(args, '.');
+				jprintf_putc(args, ((uint64_t)x % 10) + '0');
 				n++;
+				x -= (uint64_t)x;
+				x *= 10.0;
+				if(i == (uint64_t)-1)
+				{
+					if(point || prec)
+					{
+						jprintf_putc(args, '.');
+						n++;
+					}
+				}
 			}
-		}
 	}
+
 	return n;
 }
 
-int jvprintf(jprintf_args *args, const char *format, va_list arg)
+static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
 	uint64_t pos = 0;
 	char lpad;
@@ -1125,7 +1163,7 @@ typedef struct{
 	char *buffer;
 	size_t size, bytes_written;
 }vasprintf_t;
-int vasprintf_putc(void *arg, char c)
+static int vasprintf_putc(void *arg, char c)
 {
 	vasprintf_t *args = arg;
 	if(args->size == args->bytes_written)
@@ -1178,12 +1216,12 @@ int vasprintf(char **str, const char *format, va_list arg)
 	return retval;
 }
 //Callback-Funktionen
-int vfprintf_putc(void *arg, char c)
+static int vfprintf_putc(void *arg, char c)
 {
 	return fwrite(&c, 1, sizeof(char), arg);
 }
 
-int vfprintf_putsn(void *arg, const char *str, int n)
+static int vfprintf_putsn(void *arg, const char *str, int n)
 {
 	size_t len = strlen(str);
 	return fwrite(str, MIN(len, (uint64_t)n), sizeof(char), arg);
@@ -1201,13 +1239,13 @@ int vfprintf(FILE *stream, const char *format, va_list arg)
 }
 
 //Callback-Funktionen
-int vprintf_putc(void *arg, char c)
+static int vprintf_putc(void *arg, char c)
 {
 	putchar(c);
 	return 1;
 }
 
-int vprintf_putsn(void *arg, const char *str, int n)
+static int vprintf_putsn(void *arg, const char *str, int n)
 {
 	int len = strlen(str);
 
@@ -1240,7 +1278,7 @@ int vprintf(const char *format, va_list arg)
 
 #ifdef BUILD_KERNEL
 //Callback-Funktionen
-int vkprintf_putc(void *arg, char c)
+static int vkprintf_putc(void *arg, char c)
 {
 	console_ansi_write(&initConsole, c);
 	return 1;
@@ -1261,7 +1299,7 @@ typedef struct{
 	char *str;
 	size_t size;
 }vsprintf_t;
-int vsprintf_putc(void *arg, char c)
+static int vsprintf_putc(void *arg, char c)
 {
 	vsprintf_t *args = arg;
 
@@ -1289,22 +1327,22 @@ int vsprintf(char *str, const char *format, va_list arg)
 	return retval;
 }
 
-void jscanf_ungetc(jscanf_args *arg, int c)
+static void jscanf_ungetc(jscanf_args *arg, int c)
 {
 	arg->ungetc(arg->arg, c);
 }
 
-int jscanf_getc(jscanf_args *arg)
+static int jscanf_getc(jscanf_args *arg)
 {
 	return arg->getc(arg->arg);
 }
 
-int jscanf_tell(jscanf_args *arg)
+static int jscanf_tell(jscanf_args *arg)
 {
 	return arg->tell(arg->arg);
 }
 
-size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t base, int *eof)
+static size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t base, int *eof)
 {
 	size_t first_digit = 0;
 	size_t i;
@@ -1362,7 +1400,7 @@ size_t jscanf_readNumber(jscanf_args *args, char *buffer, size_t size, uint8_t b
 	return i;
 }
 
-void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
+static void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
 {
 	switch(size)
 	{
@@ -1381,7 +1419,7 @@ void jscanf_assignNumber(void *ptr, uint64_t value, int8_t size)
 	}
 }
 
-int jvscanf(jscanf_args *args, const char *format, va_list arg)
+static int jvscanf(jscanf_args *args, const char *format, va_list arg)
 {
 	int8_t length;
 	size_t width;
@@ -1616,19 +1654,19 @@ int sscanf(const char *str, const char *format, ...)
 	return pos;
 }
 
-int vfscanf_getc(void *ptr)
+static int vfscanf_getc(void *ptr)
 {
 	FILE *stream = ptr;
 	return fgetc(stream);
 }
 
-void vfscanf_ungetc(void *ptr, int c)
+static void vfscanf_ungetc(void *ptr, int c)
 {
 	FILE *stream = ptr;
 	ungetc(c, stream);
 }
 
-int vfscanf_tell(void *ptr)
+static int vfscanf_tell(void *ptr)
 {
 	FILE *stream = ptr;
 	return ftell(stream);
@@ -1656,7 +1694,7 @@ typedef struct{
 	size_t pos;
 }vsscanf_args;
 
-int vsscanf_getc(void *ptr)
+static int vsscanf_getc(void *ptr)
 {
 	vsscanf_args *arg = ptr;
 	if(arg->str[arg->pos])
@@ -1664,14 +1702,14 @@ int vsscanf_getc(void *ptr)
 	return EOF;
 }
 
-void vsscanf_ungetc(void *ptr, int c)
+static void vsscanf_ungetc(void *ptr, int c)
 {
 	vsscanf_args *arg = ptr;
 	if(arg->pos > 0)
 		arg->pos--;
 }
 
-int vsscanf_tell(void *ptr)
+static int vsscanf_tell(void *ptr)
 {
 	vsscanf_args *arg = ptr;
 	return arg->pos;
@@ -1709,16 +1747,10 @@ int ungetc(int c, FILE *stream)
 
 int getc(FILE *stream)
 {
-	if(stream == stdin)
-	{
-#ifdef BUILD_KERNEL
-		return (int)getch();
-#else
-		return (int)syscall_getch();
-#endif
-	}
-	else
+	unsigned char c;
+	if(fread(&c, sizeof(unsigned char), 1, stream) == 0)
 		return EOF;
+	return c;
 }
 
 int getchar(void)
@@ -1753,32 +1785,12 @@ char *gets(char *str)
 
 int putc(int zeichen, FILE *stream)
 {
-	if(stream == stdout)
-	{
-#ifdef BUILD_KERNEL
-		putch(zeichen);
-#else
-		syscall_putch(zeichen);
-#endif
-		return zeichen;
-	}
-	else
-		return EOF;
+	return fwrite(&zeichen, sizeof(unsigned char), 1, stream);
 }
 
 int putchar(int zeichen)
 {
-	if(stdout == NULL)
-	{
-#ifdef BUILD_KERNEL
-		putch(zeichen);
-#else
-		syscall_putch(zeichen);
-#endif
-		return zeichen;
-	}
-	else
-		return putc(zeichen, stdout);
+	return putc(zeichen, stdout);
 }
 
 int puts(const char *str)

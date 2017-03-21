@@ -31,13 +31,23 @@ typedef struct{
 		uint8_t Flags;		//Bit 0: Reserviert (1) oder Frei (0)
 							//(Flags): Alle ungeraden Bits 1 und alle geraden 0
 		int8_t balance;		//Höhe rechts - Höhe links
+		bool is_list_mbr;		//Gibt an, dass der Knoten eindeutig ist
 }heap_t;
 
 typedef struct{
 	heap_t heap_base;
-	void *parent;
-	void *smaller;
-	void *bigger;
+	union{
+		struct{
+			void *parent;
+			void *smaller;
+			void *bigger;
+			void *list;
+		};
+		struct{
+			void *prev;
+			void *next;
+		};
+	};
 }heap_empty_t;
 
 typedef struct{
@@ -47,8 +57,8 @@ typedef struct{
 
 atexit_list_t *Atexit_List_Base = NULL;
 
-heap_t *lastHeap = NULL;
-heap_empty_t *base_emptyHeap = NULL;
+static heap_t *lastHeap = NULL;
+static heap_empty_t *base_emptyHeap = NULL;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
@@ -316,10 +326,13 @@ static void rotate_left(heap_empty_t *node)
 	heap_empty_t *tmp = node->bigger;
 	heap_empty_t *parent = node->parent;
 
-	if(parent->smaller == node)
-		parent->smaller = tmp;
-	else
-		parent->bigger = tmp;
+	if(parent != NULL)
+	{
+		if(parent->smaller == node)
+			parent->smaller = tmp;
+		else
+			parent->bigger = tmp;
+	}
 	tmp->parent = parent;
 	node->parent = tmp;
 
@@ -336,10 +349,13 @@ static void rotate_right(heap_empty_t *node)
 	heap_empty_t *tmp = node->smaller;
 	heap_empty_t *parent = node->parent;
 
-	if(parent->smaller == node)
-		parent->smaller = tmp;
-	else
-		parent->bigger = tmp;
+	if(parent != NULL)
+	{
+		if(parent->smaller == node)
+			parent->smaller = tmp;
+		else
+			parent->bigger = tmp;
+	}
 	tmp->parent = parent;
 	node->parent = tmp;
 
@@ -504,8 +520,10 @@ static void add_empty_heap(heap_empty_t *node)
 	if(node == NULL)
 		return;
 	node->heap_base.balance = 0;
+	node->heap_base.is_list_mbr = false;
 	node->smaller = NULL;
 	node->bigger = NULL;
+	node->list = NULL;
 	if(base_emptyHeap == NULL)
 	{
 		base_emptyHeap = node;
@@ -516,7 +534,7 @@ static void add_empty_heap(heap_empty_t *node)
 		heap_empty_t *root = base_emptyHeap;
 		while(true)
 		{
-			if(node->heap_base.Length <= root->heap_base.Length && root->smaller != NULL)
+			if(node->heap_base.Length < root->heap_base.Length && root->smaller != NULL)
 				root = root->smaller;
 			else if(node->heap_base.Length > root->heap_base.Length && root->bigger != NULL)
 				root = root->bigger;
@@ -524,20 +542,33 @@ static void add_empty_heap(heap_empty_t *node)
 				break;
 		}
 
-		if(node->heap_base.Length <= root->heap_base.Length)
+		if(node->heap_base.Length == root->heap_base.Length)
 		{
-			root->smaller = node;
-			root->heap_base.balance--;
+			//Knoten in die Liste einfügen
+			node->heap_base.is_list_mbr = true;
+			node->next = root->list;
+			node->prev = root;
+			root->list = node;
+			if(node->next != NULL)
+				((heap_empty_t*)node->next)->prev = node;
 		}
 		else
 		{
-			root->bigger = node;
-			root->heap_base.balance++;
-		}
-		node->parent = root;
+			if(node->heap_base.Length < root->heap_base.Length)
+			{
+				root->smaller = node;
+				root->heap_base.balance--;
+			}
+			else
+			{
+				root->bigger = node;
+				root->heap_base.balance++;
+			}
+			node->parent = root;
 
-		if(root->heap_base.balance != 0)
-			upin(root);
+			if(root->heap_base.balance != 0)
+				upin(root);
+		}
 	}
 }
 
@@ -551,108 +582,155 @@ static heap_empty_t *search_empty_heap(size_t size)
 			if(node->smaller != NULL)
 				node = node->smaller;
 			else
-				return node;
+				return node->list ? : node;
 		}
 		else if(size > node->heap_base.Length)
 			node = node->bigger;
 		else
-			return node;
+			return node->list ? : node;
 	}
 	return NULL;
 }
 
-static void remove_empty_heap(heap_empty_t *node)
+static void remove_empty_heap(heap_empty_t *node, bool with_list)
 {
 	if(node == NULL)
 		return;
-	heap_empty_t *parent = node->parent;
-	if(node->smaller == NULL && node->bigger == NULL)	//Knoten hat keine Kinder
+	if(node->heap_base.is_list_mbr)
 	{
-		if(parent == NULL)
+		if(node->next != NULL)
+			((heap_empty_t*)node->next)->prev = node->prev;
+		if(node->prev != NULL)
 		{
-			base_emptyHeap = NULL;
+			if(((heap_empty_t*)node->prev)->heap_base.is_list_mbr)
+				((heap_empty_t*)node->prev)->next = node->next;
+			else
+				((heap_empty_t*)node->prev)->list = node->next;
+		}
+	}
+	else
+	{
+		heap_empty_t *parent = node->parent;
+		if(node->list != NULL && !with_list)
+		{
+			//Ersetze den Knoten durch den nächsten Knoten in der Liste
+			heap_empty_t *new_node = node->list;
+			heap_empty_t *tmp_next = new_node->next;
+
+			new_node->heap_base.balance = node->heap_base.balance;
+			new_node->heap_base.is_list_mbr = false;
+			new_node->parent = parent;
+			new_node->smaller = node->smaller;
+			new_node->bigger = node->bigger;
+			new_node->list = tmp_next;
+
+			if(parent != NULL)
+			{
+				if(parent->smaller == node)
+					parent->smaller = new_node;
+				else
+					parent->bigger = new_node;
+			}
+			else
+				base_emptyHeap = new_node;
+
+			if(new_node->smaller != NULL)
+				((heap_empty_t*)new_node->smaller)->parent = new_node;
+			if(new_node->bigger != NULL)
+				((heap_empty_t*)new_node->bigger)->parent = new_node;
 		}
 		else
 		{
-			if(parent->smaller == node)	//Knoten ist linkes Kind
+			if(node->smaller == NULL && node->bigger == NULL)	//Knoten hat keine Kinder
 			{
-				if(parent->heap_base.balance == 1)
+				if(parent == NULL)
 				{
-					upout(node);
-					parent->smaller = NULL;
+					base_emptyHeap = NULL;
 				}
 				else
 				{
-					parent->smaller = NULL;
-					parent->heap_base.balance++;
-					if(parent->heap_base.balance == 0)
-						upout(parent);
+					if(parent->smaller == node)	//Knoten ist linkes Kind
+					{
+						if(parent->heap_base.balance == 1)
+						{
+							upout(node);
+							((heap_empty_t*)node->parent)->smaller = NULL;
+						}
+						else
+						{
+							parent->smaller = NULL;
+							parent->heap_base.balance++;
+							if(parent->heap_base.balance == 0)
+								upout(parent);
+						}
+					}
+					else	//Knoten ist rechtes Kind
+					{
+						if(parent->heap_base.balance == -1)
+						{
+							upout(node);
+							((heap_empty_t*)node->parent)->bigger = NULL;
+						}
+						else
+						{
+							parent->bigger = NULL;
+							parent->heap_base.balance--;
+							if(parent->heap_base.balance == 0)
+								upout(parent);
+						}
+					}
 				}
 			}
-			else	//Knoten ist rechtes Kind
+			else if(!node->smaller != !node->bigger)	//Knoten hat nur ein Kind
 			{
-				if(parent->heap_base.balance == -1)
+				heap_empty_t *child;
+				if(node->smaller != NULL)
+					child = node->smaller;
+				else
+					child = node->bigger;
+				child->parent = node->parent;
+				if(parent != NULL)
 				{
-					upout(node);
-					parent->bigger = NULL;
+					if(parent->smaller == node)
+						parent->smaller = child;
+					else
+						parent->bigger = child;
+					upout(child);
 				}
 				else
+					base_emptyHeap = child;
+			}
+			else	//Knoten hat zwei Kinder
+			{
+				//Suche symmetrischer Vorgänger
+				heap_empty_t *tmp = node->smaller;
+				while(tmp->bigger != NULL)
+					tmp = tmp->bigger;
+
+				remove_empty_heap(tmp, true);
+
+				parent = node->parent;
+
+				//Ersetzen des aktuellen Knotens mit dem symmetrischen Vorgänger
+				tmp->bigger = node->bigger;
+				if(tmp->bigger != NULL)
+					((heap_empty_t*)tmp->bigger)->parent = tmp;
+				tmp->smaller = node->smaller;
+				if(tmp->smaller != NULL)
+					((heap_empty_t*)tmp->smaller)->parent = tmp;
+				tmp->parent = node->parent;
+				tmp->heap_base.balance = node->heap_base.balance;
+				if(parent != NULL)
 				{
-					parent->bigger = NULL;
-					parent->heap_base.balance--;
-					if(parent->heap_base.balance == 0)
-						upout(parent);
+					if(parent->smaller == node)
+						parent->smaller = tmp;
+					else
+						parent->bigger = tmp;
 				}
+				else
+					base_emptyHeap = tmp;
 			}
 		}
-	}
-	else if((node->smaller != NULL && node->bigger == NULL) || (node->smaller == NULL && node->bigger != NULL))	//Knoten hat nur ein Kind
-	{
-		heap_empty_t *child;
-		if(node->smaller != NULL)
-			child = node->smaller;
-		else
-			child = node->bigger;
-		child->parent = node->parent;
-		if(parent != NULL)
-		{
-			if(parent->smaller == node)
-				parent->smaller = child;
-			else
-				parent->bigger = child;
-			upout(child);
-		}
-		else
-			base_emptyHeap = child;
-	}
-	else	//Knoten hat zwei Kinder
-	{
-		//Suche symmetrischer Vorgänger
-		heap_empty_t *tmp = node->smaller;
-		while(tmp->bigger != NULL)
-			tmp = tmp->bigger;
-
-		remove_empty_heap(tmp);
-		parent = node->parent;
-
-		//Ersetzen des aktuellen Knotens mit dem symmetrischen Vorgänger
-		tmp->bigger = node->bigger;
-		if(tmp->bigger != NULL)
-			((heap_empty_t*)tmp->bigger)->parent = tmp;
-		tmp->smaller = node->smaller;
-		if(tmp->smaller != NULL)
-			((heap_empty_t*)tmp->smaller)->parent = tmp;
-		tmp->parent = node->parent;
-		tmp->heap_base.balance = node->heap_base.balance;
-		if(parent != NULL)
-		{
-			if(parent->smaller == node)
-				parent->smaller = tmp;
-			else
-				parent->bigger = tmp;
-		}
-		else
-			base_emptyHeap = tmp;
 	}
 }
 
@@ -680,7 +758,7 @@ void free(void *ptr)
 					&& !(tmpheap->Flags & HEAP_RESERVED))	//Wenn der Speicherbereich vornedran frei ist, dann mit diesem fusionieren
 			{
 				//Aus AVL-Baum entfernen
-				remove_empty_heap((heap_empty_t*)tmpheap);
+				remove_empty_heap((heap_empty_t*)tmpheap, false);
 				tmpheap->Next = heap->Next;
 				tmpheap->Length += heap->Length + sizeof(heap_t);
 				heap = tmpheap;
@@ -700,7 +778,7 @@ void free(void *ptr)
 					&& !(tmpheap->Flags & HEAP_RESERVED))	//Wenn der Speicherbereich hintendran frei ist, dann mit diesem fusionieren
 			{
 				//Aus AVL-Baum entfernen
-				remove_empty_heap((heap_empty_t*)tmpheap);
+				remove_empty_heap((heap_empty_t*)tmpheap, false);
 				heap->Next = tmpheap->Next;
 				heap->Length += tmpheap->Length + sizeof(heap_t);
 
@@ -709,6 +787,10 @@ void free(void *ptr)
 				{
 					tmpheap = heap->Next;
 					tmpheap->Prev = heap;
+				}
+				else if(tmpheap == lastHeap)
+				{
+					lastHeap = heap;
 				}
 			}
 		}
@@ -769,13 +851,13 @@ void *malloc(size_t size)
 		{
 			node->heap_base.Prev = lastHeap;
 			lastHeap->Next = node;
-			lastHeap = (heap_t*)node;
 		}
+		lastHeap = (heap_t*)node;
 		node->heap_base.Length = pages * 4096 - sizeof(heap_t);
 		node->heap_base.Flags = HEAP_FLAGS;
 	}
 	else
-		remove_empty_heap((heap_empty_t*)node);
+		remove_empty_heap((heap_empty_t*)node, false);
 
 	//Eintrag anpassen
 	heap = (heap_t*)node;
@@ -789,7 +871,8 @@ void *malloc(size_t size)
 
 		//Eintragen in AVL-Baum
 		add_empty_heap((heap_empty_t*)tmp_heap);
-		lastHeap = tmp_heap;
+		if(tmp_heap->Next == NULL)
+			lastHeap = tmp_heap;
 	}
 	heap->Flags |= HEAP_RESERVED;		//Als reserviert markieren
 
@@ -810,6 +893,9 @@ void *realloc(void *ptr, size_t size)
 	heap_t *Heap, *tmpHeap;
 	void *Address = NULL;
 	Heap = ptr - sizeof(heap_t);
+
+	//Size sollte ein Vielfaches von 8 sein und mindestens gross genug für die Erweiterung des Baumes
+	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + 7) & ~7));
 	//Ist dieser Heap gültig?
 	if(Heap->Flags == (HEAP_FLAGS | HEAP_RESERVED))
 	{
@@ -826,9 +912,9 @@ void *realloc(void *ptr, size_t size)
 				if(!(tmpHeap->Flags & HEAP_RESERVED) && Heap->Length + tmpHeap->Length + sizeof(heap_t) >= size)
 				{
 					//Aus AVL-Baum entfernen
-					remove_empty_heap((heap_empty_t*)tmpHeap);
+					remove_empty_heap((heap_empty_t*)tmpHeap, false);
 					//Müssen wir den Header auch noch nehmen?
-					if(tmpHeap->Length < (size - Heap->Length))
+					if(tmpHeap->Length < (size - Heap->Length) || tmpHeap->Length <= sizeof(heap_empty_t) - sizeof(heap_t))
 					{
 						Heap->Next = tmpHeap->Next;
 						if(tmpHeap->Next != NULL)
@@ -836,10 +922,13 @@ void *realloc(void *ptr, size_t size)
 							((heap_t*)tmpHeap->Next)->Prev = Heap;
 						}
 						Heap->Length += tmpHeap->Length + sizeof(heap_t);
+						if(lastHeap == tmpHeap)
+							lastHeap = Heap;
 					}
 					//Ansonsten verschieben wir den Header des nächsten Eintrags einfach
 					else
 					{
+						heap_t *oldHeap = tmpHeap;
 						tmpHeap = memmove((void*)Heap + sizeof(heap_t) + size, tmpHeap, sizeof(heap_t));
 						Heap->Next = tmpHeap;
 						tmpHeap->Length -= size - Heap->Length;
@@ -849,6 +938,8 @@ void *realloc(void *ptr, size_t size)
 							((heap_t*)tmpHeap->Next)->Prev = tmpHeap;
 						}
 						Heap->Length = size;
+						if(lastHeap == oldHeap)
+							lastHeap = tmpHeap;
 						//Wieder in den AVL-Baum eintragen
 						add_empty_heap((heap_empty_t*)tmpHeap);
 					}
@@ -889,6 +980,29 @@ int abs(int x)
 	return (x < 0) ? -x : x;
 }
 
+long labs(long x)
+{
+	return (x < 0) ? -x : x;
+}
+
+div_t div(int numer, int denom)
+{
+	div_t res = {
+		.quot = numer / denom,
+		.rem = numer % denom
+	};
+	return res;
+}
+
+ldiv_t ldiv(long int numer, long int denom)
+{
+	ldiv_t res = {
+		.quot = numer / denom,
+		.rem = numer % denom
+	};
+	return res;
+}
+
 int32_t rand()
 {
 	uint32_t Number = 0;
@@ -927,4 +1041,97 @@ void setupNewHeapEntry(heap_t *old, heap_t *new)
 		((heap_t*)new->Next)->Prev = new;
 	old->Next = new;
 	new->Flags = HEAP_FLAGS;
+}
+
+static int cmph(const void* a, const void* b, int (*cmp)(const void*, const void*)) {
+	return cmp(a, b);
+}
+
+static size_t getPivotIndex(void* base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void* context) {
+	if (cmp(base,base + (n - 1) * size, context) < 0) {
+		if (cmp(base,base + n / 2 * size, context) < 0) {
+			if (cmp(base + n / 2 * size,base + (n - 1) * size, context) < 0) return n / 2;
+			else return n - 1;
+		}
+	} else {
+		if (cmp(base,base + n / 2 * size, context) > 0) {
+			if (cmp(base + n / 2 * size,base + (n - 1) * size, context) < 0) return n - 1;
+			else return n / 2;
+		}
+	}
+	return 0;
+}
+
+static void swap(void* base, size_t size, size_t i, size_t j) {
+	if (i == j) return;
+	char tmp[size];
+	memcpy(tmp, base + (size * i), size);
+	memcpy(base + (size * i), base + (size * j), size);
+	memcpy(base + (size * j), tmp, size);
+}
+
+void qsort_s(void* base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void* context) {
+	size_t count = n;
+	size_t largestPivotIndex = 0;
+	while (n > 2) {
+		size_t pivotIndex = getPivotIndex(base, count, size, cmp, context);
+		swap(base, size, 0, pivotIndex);
+		size_t i = 1;
+		size_t j = count - 1;
+		while (i < j) {
+			while (i < j && cmp(base + (i * size), base, context) <= 0) i++;
+			while (i < j && cmp(base + (j * size), base, context) > 0) j--;
+			swap(base, size, i, j);
+		}
+		if (count == 1) pivotIndex = 0;
+		else if (cmp(base + (i * size), base, context) <= 0) pivotIndex = i;
+		else pivotIndex = i - 1;
+		swap(base, size, 0, pivotIndex);
+
+		if (count < n) swap(base, size, pivotIndex + 1, count);
+		else largestPivotIndex = pivotIndex;
+		count = pivotIndex;
+		while (count <= 2 && n > 2) {
+			if (count == 2 && cmp(base, base + size, context) > 0) swap(base, size, 0, 1);
+			base += size * (count + 1);
+			n -= count + 1;
+			largestPivotIndex -= count + 1;
+			if (largestPivotIndex) {
+				for (count = 0; (cmp(base, base + ((count + 1) * size), context) >= 0) && (count + 1 < n) && (count + 1 < largestPivotIndex); count++) ;
+				swap(base, size, 0, count);
+			} else {
+				base += size;
+				count = --n;
+			}
+		}
+	}
+	if (n == 2 && cmp(base, base + size, context) > 0) swap(base, size, 0, 1);
+}
+
+void* bsearch_s(const void* key, const void* base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void* context) {
+	if (!n) return NULL;
+	size_t min = 0;
+	size_t max = n - 1;
+	size_t i = (min + max) / 2;
+	while (1) {
+		int r = cmp(base + (size * i), key, context);
+		if (r && min + 1 >= max) return NULL;
+		if (r < 0) {
+			min = i;
+			i = (min + max + 1) / 2;
+		} else if (r > 0) {
+			max = i;
+			i = (min + max) / 2;
+		} else {
+			return (void*)base + (size * i);
+		}
+	}
+}
+
+void qsort(void* base, size_t n, size_t size, int (*cmp)(const void*, const void*)) {
+	qsort_s(base, n, size, (int (*)(const void*, const void*, void*))cmph, cmp);
+}
+
+void* bsearch(const void* key, const void* base, size_t n, size_t size, int (*cmp)(const void*, const void*)) {
+	return bsearch_s(key, base, n, size, (int (*)(const void*, const void*, void*))cmph, cmp);
 }

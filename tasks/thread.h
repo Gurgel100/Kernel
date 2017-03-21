@@ -12,6 +12,7 @@
 #include "isr.h"
 #include "pm.h"
 #include "stdbool.h"
+#include "pmm.h"
 
 typedef uint64_t tid_t;
 
@@ -22,7 +23,8 @@ typedef struct{
 	void *fpuState;
 	pm_status_t Status;
 	void *kernelStackBottom, *kernelStack;
-	void *userStackBottom, *userStackPhys;
+	void *userStackBottom;
+	paddr_t userStackPhys;
 	bool isMainThread;
 }thread_t;
 

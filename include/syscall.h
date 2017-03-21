@@ -15,7 +15,7 @@
 #include "stdbool.h"
 
 typedef struct{
-	bool read, write, append, empty, create;
+	bool read, write, append, empty, create, directory;
 }vfs_mode_t;
 
 typedef enum{
@@ -29,10 +29,7 @@ inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
 inline void syscall_unusePage(void *Address, size_t Pages);
 
-inline char syscall_getch();
-inline void syscall_putch(unsigned char c);
-
-inline pid_t syscall_createProcess(const char *path, const char *cmd, bool newConsole);
+inline pid_t syscall_createProcess(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr);
 inline void syscall_exit(int status);
 inline tid_t syscall_createThread(void *entry);
 inline void syscall_exitThread(int status);

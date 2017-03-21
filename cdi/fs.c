@@ -6,6 +6,7 @@
  */
 
 #include "fs.h"
+#include "vfs.h"
 
 /**
  * Dateisystemtreiber-Struktur initialisieren
@@ -42,6 +43,22 @@ void cdi_fs_driver_destroy(struct cdi_fs_driver* driver)
 size_t cdi_fs_data_read(struct cdi_fs_filesystem* fs, uint64_t start,
     size_t size, void* buffer)
 {
-	vfs_Read(fs->osdep.fp, start, size, buffer);
-	return size;
+	return vfs_Read(fs->osdep.fp, start, size, buffer);
+}
+
+/**
+ * Quellmedium eines Dateisystems beschreiben
+ * XXX Brauchen wir hier auch noch irgendwas errno-Maessiges?
+ *
+ * @param fs Pointer auf die FS-Struktur des Dateisystems
+ * @param start Position an die geschrieben werden soll
+ * @param size Groesse des zu schreibenden Datenblocks
+ * @param buffer Puffer aus dem die Daten gelesen werden sollen
+ *
+ * @return die Anzahl der geschriebenen Bytes
+ */
+size_t cdi_fs_data_write(struct cdi_fs_filesystem* fs, uint64_t start,
+    size_t size, const void* buffer)
+{
+	return vfs_Write(fs->osdep.fp, start, size, buffer);
 }

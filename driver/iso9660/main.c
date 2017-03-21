@@ -76,6 +76,7 @@ static struct cdi_fs_driver iso9660_driver = {
     },
     .fs_init            = iso9660_fs_init,
     .fs_destroy         = iso9660_fs_destroy,
+    .fs_probe           = iso9660_fs_probe,
 };
 
 CDI_DRIVER(DRIVER_NAME, iso9660_driver)

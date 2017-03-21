@@ -7,6 +7,8 @@
 
 #include "storage.h"
 #include "vfs.h"
+#include "stdlib.h"
+#include "devicemng.h"
 
 /**
  * \german

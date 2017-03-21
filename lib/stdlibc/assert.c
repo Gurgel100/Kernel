@@ -16,10 +16,10 @@
 void _assert(const char *assertion, const char *file, unsigned int line, const char *function)
 {
 #ifdef BUILD_KERNEL
-	printf("Assertion %s failed at line %u in %s:%s\n", assertion, line, file, function);
+	printf("Assertion '%s' failed at line %u in %s:%s\n", assertion, line, file, function);
 	Panic("KERNEL", "Assertion failure");
 #else
-	fprintf(stderr, "Assertion %s failed at line %u in %s:%s\n", assertion, line, file, function);
+	fprintf(stderr, "Assertion '%s' failed at line %u in %s:%s\n", assertion, line, file, function);
 	abort();
 #endif
 }

@@ -63,6 +63,27 @@ typedef struct
 
 /**
  * \german
+ * OS-spezifische Daten zu USB-Geräten.
+ * \endgerman
+ * \english
+ * OS-specific USB device data.
+ * \endenglish
+ * \thuringiansaxonian
+ * Vonnä jäwailschn Bedriebssysdääm abhängsche Dåhdn, nu für so USB-Geräide.
+ * \endthuringiansaxonian
+ * \french
+ * Des données tributaires du système d'exploitation pour des périphériques
+ * USB.
+ * \endfrench
+ * \japanese
+ * USB機器を記述するとあるOSの依存のデータ。
+ * \endjapanese
+ */
+typedef struct {
+} cdi_usb_device_osdep;
+
+/**
+ * \german
  * OS-spezifische Daten fuer einen ISA-DMA-Zugriff
  * \endgerman
  * \english

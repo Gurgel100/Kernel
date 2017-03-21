@@ -126,6 +126,9 @@ void* ring_remove(ring_t* ring, void* element)
 	val = entry->value;
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
+	if(ring->base == entry)
+		ring->base = entry->next;
+
 	free(entry);
 
 	return val;

@@ -60,8 +60,6 @@ void cmos_Init()
 	Time_t Time;
 	cmos_GetTime(&Time);
 	cmos_GetDate(&Date);
-	printf("Aktuelle Zeit:   %02u:%02u:%02u\n", Time.Hour, Time.Minute, Time.Second);
-	printf("Aktuelles Datum: %02u.%02u.%02u\n", Date.DayOfMonth, Date.Month, Date.Year);
 }
 
 /*

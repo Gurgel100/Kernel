@@ -12,6 +12,7 @@
 #include "string.h"
 #include "console.h"
 #include "pm.h"
+#include "stdio.h"
 
 #define GRAFIKSPEICHER 0xB8000
 
@@ -33,34 +34,9 @@ void display_refresh()
 	setCursor(activeConsole->cursor.x, activeConsole->cursor.y);
 }
 
-void setColor(uint8_t Color)
+void __attribute__((deprecated)) setColor(uint8_t Color)
 {
-	console_changeColor(pm_getConsole(), Color);
-}
-
-/*
- * Schreibt das Zeichen c auf den Bildschirm
- * Parameter:	c = ASCII-Zeichen, das geschrieben werden soll
- */
-void putch(unsigned char c)
-{
-	console_ansi_write(pm_getConsole(), c);
-}
-
-/*
- * Scrollt den Bildschirm um eine Zeile nach unten.
- */
-void scrollScreenDown()
-{
-	int zeile, spalte;
-	uint16_t *gs = (uint16_t*)GRAFIKSPEICHER;
-	for(zeile = 0; zeile < 24; zeile++)
-		for(spalte = 0; spalte < 80; spalte++)
-			gs[zeile * 80 + spalte] = gs[(zeile + 1) * 80 + spalte];
-	//Letzte Zeile löschen
-	zeile = 24;
-	for(spalte = 0; spalte < 80; spalte++)
-		gs[zeile * 80 + spalte] = 0;
+	//console_changeColor(pm_getConsole(), Color);
 }
 
 void setCursor(uint8_t x, uint8_t y)
@@ -79,27 +55,12 @@ void setCursor(uint8_t x, uint8_t y)
 
 void SysLog(char *Device, char *Text)
 {
-	setColor(BG_BLACK | CL_WHITE);
-	printf("[ ");
-	setColor(BG_BLACK | CL_GREEN);
-	printf(Device);
-	setColor(BG_BLACK | CL_WHITE);
-	printf(" ]");
-	setCursor(30, Zeile);
-	printf("%s\n\r", Text);
+	printf("[ \e[32m%s\e[37m ] %s\n", Device, Text);
 }
 
 void SysLogError(char *Device, char *Text)
 {
-	setColor(BG_BLACK | CL_WHITE);
-	printf("[ ");
-	setColor(BG_BLACK | CL_RED);
-	printf(Device);
-	setColor(BG_BLACK | CL_WHITE);
-	printf(" ]");
-	setCursor(30, Zeile);
-	setColor(BG_BLACK | CL_RED);
-	printf("%s\n", Text);
+	printf("[ \e[31m%s\e[37m ] \e[31m%s\e[37m\n", Device, Text);
 }
 
 /*
@@ -119,10 +80,8 @@ void Display_Clear()
  */
 void Panic(char *Device, char *Text)
 {
-	setColor(BG_RED | CL_WHITE);
-	printf("[ %s ]", Device);
-	setCursor(30, Zeile);
-	printf(Text);
+	printf("\e[41;37m[ %s ] %s", Device, Text);
+	console_switch(0);
 	asm("cli;hlt");
 }
 
@@ -136,32 +95,6 @@ void showCursor()
 {
 	outb(0x3D4, 10);
 	outb(0x3D5, 0x64);	//Cursor aktiviert
-}
-
-size_t Display_FileHandler(char *name, uint64_t start, size_t length, const void *buffer)
-{
-	size_t size = 0;
-	char *str = (char*)buffer;
-
-	if(strcmp(name, "stdout") == 0)
-	{
-		while(length-- && *str != '\0')
-		{
-			putch(*str++);
-			size++;
-		}
-	}
-	else if(strcmp(name, "stderr") == 0)
-	{
-		setColor(BG_RED | CL_BLACK);
-		while(length-- && *str != '\0')
-		{
-			putch(*str++);
-			size++;
-		}
-	}
-
-	return size;
 }
 
 #endif

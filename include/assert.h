@@ -11,7 +11,7 @@
 #ifdef NDEBUG
 #define assert(condition) ((void)0)
 #else
-extern void _assert(const char *assertion, const char *file, unsigned int line, const char *function);
+extern void _assert(const char *assertion, const char *file, unsigned int line, const char *function) __attribute__((noreturn));
 
 #define assert(condition) ((condition) ? ((void)0) : _assert(#condition, __FILE__, __LINE__, ""))
 #endif
