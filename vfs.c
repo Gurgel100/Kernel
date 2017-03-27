@@ -84,11 +84,6 @@ typedef struct{
 	vfs_mode_t mode;
 }vfs_userspace_stream_t;
 
-typedef struct{
-	size_t size;
-	char name[];
-}vfs_userspace_direntry_t;
-
 static vfs_node_t root;
 static uint8_t nextPartID = 0;
 static list_t res_list;
