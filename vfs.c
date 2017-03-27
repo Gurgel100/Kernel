@@ -101,7 +101,10 @@ static size_t getDirs(char ***Dirs, const char *Path)
 	if(!*Dirs)
 		*Dirs = malloc(sizeof(char*));
 
-	(*Dirs)[0] = strdup(strtok_s(&tmpPath, VFS_ROOT));
+	char *first_token = strtok_s(&tmpPath, VFS_ROOT);
+	if(first_token == NULL) return 0;
+
+	(*Dirs)[0] = strdup(first_token);
 	for(i = 1; ; i++)
 	{
 		if((tmp = strtok_s(&tmpPath, VFS_ROOT)) == NULL)
