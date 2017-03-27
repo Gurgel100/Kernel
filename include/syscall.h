@@ -22,6 +22,16 @@ typedef enum{
 	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
 }vfs_fileinfo_t;
 
+typedef enum{
+	UDT_UNKNOWN, UDT_DIR, UDT_FILE, UDT_LINK, UDT_DEV
+}vfs_userspace_direntry_type_t;
+
+typedef struct{
+	size_t size;
+	vfs_userspace_direntry_type_t type;
+	char name[];
+}vfs_userspace_direntry_t;
+
 typedef uint64_t pid_t;
 typedef uint64_t tid_t;
 
