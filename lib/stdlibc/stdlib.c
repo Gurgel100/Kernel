@@ -1047,7 +1047,7 @@ static int cmph(const void* a, const void* b, int (*cmp)(const void*, const void
 	return cmp(a, b);
 }
 
-static size_t getPivotIndex(void* base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void* context) {
+static size_t pivot(void* base, size_t n, size_t size, int (*cmp)(const void*, const void*, void*), void* context) {
 	if (cmp(base,base + (n - 1) * size, context) < 0) {
 		if (cmp(base,base + n / 2 * size, context) < 0) {
 			if (cmp(base + n / 2 * size,base + (n - 1) * size, context) < 0) return n / 2;
