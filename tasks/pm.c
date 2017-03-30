@@ -212,7 +212,7 @@ void pm_BlockTask(process_t *process)
 {
 	if(process != NULL)
 	{
-		process->Status = BLOCKED;
+		process->Status = PM_BLOCKED;
 
 		//Alle Threads deaktivieren
 		thread_t *thread;
@@ -232,7 +232,7 @@ void pm_ActivateTask(process_t *process)
 {
 	if(process != NULL)
 	{
-		process->Status = READY;
+		process->Status = PM_RUNNING;
 
 		//Alle Threads aktivieren
 		thread_t *thread;

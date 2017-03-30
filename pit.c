@@ -78,11 +78,13 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 		unlock(&Timerlist_lock);
 
 		//Entsprechenden Thread schlafen legen
-		thread_block(thread);
+		thread_block_self(NULL, NULL);
 	}
-
-	//Thread switchen
-	yield();
+	else
+	{
+		//Thread switchen
+		yield();
+	}
 }
 
 void pit_Handler(void)
@@ -92,13 +94,19 @@ void pit_Handler(void)
 	Uptime++;
 	if(Timerlist)
 	{
-		while((Timer = list_get(Timerlist, i)))
+		if(try_lock(&Timerlist_lock))
 		{
-			if(Timer->timeout > Uptime)
-				break;
-			thread_unblock(Timer->thread);
-			free(list_remove(Timerlist, i));
-			i++;
+			while((Timer = list_get(Timerlist, i)))
+			{
+				if(Timer->timeout > Uptime)
+					break;
+				if(thread_try_unblock(Timer->thread))
+					free(list_remove(Timerlist, i));
+				else
+					break;
+				i++;
+			}
+			unlock(&Timerlist_lock);
 		}
 	}
 }

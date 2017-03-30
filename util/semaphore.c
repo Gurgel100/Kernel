@@ -40,13 +40,13 @@ void semaphore_acquire(semaphore_t *sem)
 	if(sem == NULL)
 		return;
 
-	int64_t val = get_and_add(&sem->count, -1);
-	if(val <= 0)
+retry:
+	if(get_and_add(&sem->count, -1) <= 0)
 	{
 		lock(&sem->lock);
 		queue_enqueue(sem->waiting, currentThread);
 		unlock(&sem->lock);
-		thread_block(currentThread);
+		if(!thread_block_self(semaphore_release, sem)) goto retry;
 		yield();
 	}
 }
