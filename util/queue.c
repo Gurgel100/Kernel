@@ -58,7 +58,7 @@ void *queue_enqueue(queue_t *queue, void *value)
 		return NULL;
 
 	entry->value = value;
-	if(queue->size == 0)
+	if(queue->size != 0)
 		queue->begin->next = entry;
 	queue->begin = entry;
 	if(queue->end == NULL)
