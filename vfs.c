@@ -928,6 +928,7 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 			assert(false);
 		break;
 	}
+	assert(sizeRead <= length);
 	return sizeRead;
 }
 
