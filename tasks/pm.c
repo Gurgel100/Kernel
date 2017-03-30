@@ -148,7 +148,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *st
 	}
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false)->Status = READY;
+	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false);
 
 	//Prozess in Liste eintragen
 	bool res = LOCKED_RESULT(pm_lock, avl_add_s(&process_list, newProcess, pid_cmp, NULL));
@@ -239,8 +239,7 @@ void pm_ActivateTask(process_t *process)
 		size_t i = 0;
 		while((thread = list_get(process->threads, i++)))
 		{
-			if(thread->Status != BLOCKED)
-				scheduler_add(thread);
+			thread_unblock(thread);
 		}
 	}
 }
