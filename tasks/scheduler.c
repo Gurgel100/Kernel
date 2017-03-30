@@ -88,10 +88,8 @@ thread_t *scheduler_schedule(ihs_t *state)
 		currentThread->State = state;
 	}
 
-	if(!locked((&schedule_lock)))
+	if(try_lock((&schedule_lock)))
 	{
-
-		lock(&schedule_lock);
 		newThread = ring_getNext(scheduleList);
 		if(newThread == NULL)
 			newThread = idleThread;
