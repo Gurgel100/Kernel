@@ -775,6 +775,55 @@ void vfs_Close(vfs_file_t streamid)
 	REFCOUNT_RELEASE(stream);
 }
 
+static size_t readNodeChilds(vfs_node_t *node, uint64_t start, size_t size, vfs_userspace_direntry_t *buffer)
+{
+	assert(node != NULL);
+	assert(node->type == TYPE_DIR || node->type == TYPE_MOUNT);
+	size_t sizeRead = 0;
+	vfs_node_t *tmp = node->childs;
+	size_t i = 0;
+	//Überspringe die nicht benötigten Einträge
+	while(tmp != NULL && i < start)
+	{
+		tmp = tmp->next;
+		i++;
+	}
+	while(tmp != NULL)
+	{
+		size_t name_length = strlen(tmp->name);
+		size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
+		if(sizeRead + entry_size > size)
+			break;
+		vfs_userspace_direntry_t *entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
+		entry->size = entry_size;
+
+		switch(tmp->type)
+		{
+			case TYPE_DIR:
+			case TYPE_MOUNT:
+				entry->type = UDT_DIR;
+			break;
+			case TYPE_FILE:
+				entry->type = UDT_FILE;
+			break;
+			case TYPE_LINK:
+				entry->type = UDT_LINK;
+			break;
+			case TYPE_DEV:
+				entry->type = UDT_DEV;
+			break;
+			default:
+				entry->type = UDT_UNKNOWN;
+			break;
+		}
+
+		strcpy((char*)&entry->name, tmp->name);
+		sizeRead += entry_size;
+		tmp = tmp->next;
+	}
+	return sizeRead;
+}
+
 /*
  * Einträge aus einem Ordner lesen
  * Parameter:	streamid = Id des Streams, der den Ordner repräsentiert
@@ -799,81 +848,41 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
-		{
-			cdi_list_t childs;
-			struct cdi_fs_res *child_res;
-			vfs_userspace_direntry_t *entry;
-			childs = stream->stream.res->dir->list(&stream->stream);
-			if(childs == NULL || cdi_list_size(childs) == 0)
-				return 0;
-			size_t i = start;
-			while((child_res = cdi_list_get(childs, i++)))
+			sizeRead = readNodeChilds(node, start, size, buffer);
+			if(sizeRead < size)
 			{
-				size_t name_length = strlen(child_res->name);
-				size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
-				if(sizeRead + entry_size > size)
-					break;
-				entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
-				entry->size = entry_size;
+				cdi_list_t childs;
+				struct cdi_fs_res *child_res;
+				vfs_userspace_direntry_t *entry;
+				childs = stream->stream.res->dir->list(&stream->stream);
+				if(childs == NULL || cdi_list_size(childs) == 0)
+					return 0;
+				size_t i = start;
+				while((child_res = cdi_list_get(childs, i++)))
+				{
+					size_t name_length = strlen(child_res->name);
+					size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
+					if(sizeRead + entry_size > size)
+						break;
+					entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
+					entry->size = entry_size;
 
-				if(child_res->dir != NULL)
-					entry->type = UDT_DIR;
-				else if(child_res->file != NULL)
-					entry->type = UDT_FILE;
-				else if(child_res->link != NULL)
-					entry->type = UDT_LINK;
-				else
-					entry->type = UDT_UNKNOWN;
+					if(child_res->dir != NULL)
+						entry->type = UDT_DIR;
+					else if(child_res->file != NULL)
+						entry->type = UDT_FILE;
+					else if(child_res->link != NULL)
+						entry->type = UDT_LINK;
+					else
+						entry->type = UDT_UNKNOWN;
 
-				strcpy((char*)&entry->name, child_res->name);
-				sizeRead += entry_size;
+					strcpy((char*)&entry->name, child_res->name);
+					sizeRead += entry_size;
+				}
 			}
-		}
 		break;
 		case TYPE_DIR:
-		{
-			vfs_node_t *tmp = node->childs;
-			size_t i = 0;
-			//Überspringe die nicht benötigten Einträge
-			while(tmp != NULL && i < start)
-			{
-				tmp = tmp->next;
-				i++;
-			}
-			while(tmp != NULL)
-			{
-				size_t name_length = strlen(tmp->name);
-				size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
-				if(sizeRead + entry_size > size)
-					break;
-				vfs_userspace_direntry_t *entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
-				entry->size = entry_size;
-
-				switch(tmp->type)
-				{
-					case TYPE_DIR:
-					case TYPE_MOUNT:
-						entry->type = UDT_DIR;
-					break;
-					case TYPE_FILE:
-						entry->type = UDT_FILE;
-					break;
-					case TYPE_LINK:
-						entry->type = UDT_LINK;
-					break;
-					case TYPE_DEV:
-						entry->type = UDT_DEV;
-					break;
-					default:
-						entry->type = UDT_UNKNOWN;
-					break;
-				}
-
-				strcpy((char*)&entry->name, tmp->name);
-				sizeRead += entry_size;
-				tmp = tmp->next;
-			}
-		}
+			sizeRead = readNodeChilds(node, start, size, buffer);
 		break;
 		default:
 			assert(false);
