@@ -671,7 +671,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 			}
 		break;
 		case TYPE_DIR:
-			if(!mode.directory)
+			if(!mode.directory || remPath != NULL)
 			{
 				free(stream);
 				if(remPath)
