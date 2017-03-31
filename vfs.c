@@ -1278,4 +1278,20 @@ uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 		return 0;
 	return vfs_getFileinfo(stream->stream, info);
 }
+
+int vfs_syscall_mount(const char *mountpoint, const char *device)
+{
+	if(!vmm_userspacePointerValid(mountpoint, strlen(mountpoint)))
+		return -1;
+	if(!vmm_userspacePointerValid(device, strlen(device)))
+		return -1;
+	return vfs_Mount(mountpoint, device);
+}
+
+int vfs_syscall_unmount(const char *mountpoint)
+{
+	if(!vmm_userspacePointerValid(mountpoint, strlen(mountpoint)))
+		return -1;
+	return vfs_Unmount(mountpoint);
+}
 #endif

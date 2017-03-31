@@ -116,6 +116,8 @@ void vfs_syscall_close(vfs_file_t streamid);
 size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
 size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
 uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
+int vfs_syscall_mount(const char *mountpoint, const char *device);
+int vfs_syscall_unmount(const char *mountpoint);
 
 #endif /* VFS_H_ */
 
