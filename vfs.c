@@ -677,6 +677,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 					free(remPath);
 				return -1;
 			}
+			assert(remPath == NULL);
 		break;
 		case TYPE_DEV:
 			if(mode.directory)
@@ -689,6 +690,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 			stream->mode.empty = false;
 			stream->mode.append = false;
 			stream->mode.create = false;
+			assert(remPath == NULL);
 		break;
 		case TYPE_LINK:
 			assert(false);
