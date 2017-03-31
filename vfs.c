@@ -85,7 +85,6 @@ typedef struct{
 }vfs_userspace_stream_t;
 
 static vfs_node_t root;
-static uint8_t nextPartID = 0;
 static list_t res_list;
 static hashmap_t *streams = NULL;	//geöffnete Streams
 static lock_t vfs_lock = LOCK_LOCKED;
@@ -1100,7 +1099,6 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 {
 	vfs_node_t *mount;
 	vfs_node_t *devNode;
-	char *name;
 
 	if((devNode = getNode(Dev)) == NULL)
 		return 1;
@@ -1118,13 +1116,15 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if(fs == NULL)
 		return 5;
 
-	asprintf(&name, "%u", nextPartID++);
-	createMountNode(mount, name, fs);
-	free(name);
+	if(mount->type == TYPE_MOUNT)
+		return 6;
 
 	//Dateisystem initialisieren
 	if(!fs->driver->fs_init(fs))
 		return 4;
+
+	mount->fs = fs;
+	mount->type = TYPE_MOUNT;
 
 	return 0;
 }
@@ -1143,7 +1143,7 @@ int vfs_Unmount(const char *Mount)
 	//FS deinitialisieren
 	mount->fs->driver->fs_destroy(mount->fs);
 
-	deleteNode(mount);
+	mount->type = TYPE_DIR;
 
 	return 0;
 }
@@ -1162,19 +1162,18 @@ int vfs_MountRoot(void)
 	{
 		if(node->type == TYPE_DEV)
 		{
-			nextPartID = 0;
 			asprintf(&DevPath, "dev/%s", node->name);
-			status = vfs_Mount("/mount", DevPath);
+			status = vfs_Mount("/", DevPath);
 			free(DevPath);
 			if(status == 0)
 			{
-				FILE *fp = fopen("/mount/0/kernel", "r");
+				FILE *fp = fopen("/kernel", "r");
 				if(fp != NULL)
 				{
 					fclose(fp);
 					break;
 				}
-				vfs_Unmount("mount/0");
+				vfs_Unmount("/");
 			}
 		}
 	}
