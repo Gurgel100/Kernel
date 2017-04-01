@@ -56,27 +56,6 @@ uint64_t inq(uint16_t Port)
 	return Data;
 }
 
-//Formatierungen
-/*
- * Wandelt eine dezimale Zahl in eine hexadezimale Zahl um
- * Parameter:	Value = Zahl, die formatiert werden soll
- * 				Destination = Zeiger auf den String, in dem die hexadezimale Zahl gespeichert
- * 							  werden soll
- * 				Length = Die Länge der hexadezimalen Zahl
- */
-void IntToHex(uint64_t Value, char *Destination)
-{
-	const uint8_t Length = 16;
-	char *Temp = &Destination[Length];
-	while(Temp > Destination)
-	{
-		char x = Value & 0xF;
-		Value >>= 4;
-		*--Temp = x + ((x > 9) ? 'A' - 10 : '0');
-	}
-	Destination[Length] = '\0';
-}
-
 void Sleep(uint64_t msec)
 {
 	uint64_t start = Uptime;
