@@ -8,12 +8,11 @@
 #include "semaphore.h"
 #include "thread.h"
 #include "scheduler.h"
+#include "assert.h"
 
 void semaphore_init(semaphore_t *sem, int64_t count)
 {
-	if(sem == NULL)
-		return;
-
+	assert(sem != NULL);
 	sem->lock = LOCK_UNLOCKED;
 	sem->count = count;
 	sem->waiting = queue_create();
@@ -21,18 +20,14 @@ void semaphore_init(semaphore_t *sem, int64_t count)
 
 void semaphore_destroy(semaphore_t *sem)
 {
-	if(sem == NULL)
-		return;
-
+	assert(sem != NULL);
 	lock(&sem->lock);
 	queue_destroy(sem->waiting);
 }
 
 void semaphore_acquire(semaphore_t *sem)
 {
-	if(sem == NULL)
-		return;
-
+	assert(sem != NULL);
 retry:
 	if(__sync_fetch_and_add(&sem->count, -1) <= 0)
 	{
@@ -46,9 +41,7 @@ retry:
 
 void semaphore_release(semaphore_t *sem)
 {
-	if(sem == NULL)
-		return;
-
+	assert(sem != NULL);
 	__sync_add_and_fetch(&sem->count, 1);
 	if(queue_size(sem->waiting) > 0)
 	{

@@ -7,6 +7,7 @@
 
 #include "ring.h"
 #include "stdlib.h"
+#include "assert.h"
 
 /*
  * Erstellt einen neuen Ring
@@ -27,8 +28,7 @@ ring_t *ring_create()
  */
 void ring_destroy(ring_t *ring)
 {
-	if(ring == NULL)
-		return;
+	assert(ring != NULL);
 
 	while(ring->size--)
 	{
@@ -47,9 +47,8 @@ void ring_destroy(ring_t *ring)
  */
 size_t ring_size(ring_t* ring)
 {
-	if(ring != NULL)
-		return ring->size;
-	return 0;
+	assert(ring != NULL);
+	return ring->size;
 }
 
 /*
@@ -61,8 +60,7 @@ size_t ring_size(ring_t* ring)
  */
 void* ring_add(ring_t* ring, void* value)
 {
-	if(ring == NULL)
-		return NULL;
+	assert(ring != NULL);
 
 	ring_entry_t *entry = malloc(sizeof(ring_entry_t));
 	if(entry == NULL)
@@ -97,7 +95,9 @@ void* ring_getNext(ring_t* ring)
 {
 	ring_entry_t* entry;
 
-	if(ring == NULL || ring->size == 0)
+	assert(ring != NULL);
+
+	if(ring->size == 0)
 		return NULL;
 
 	entry = ring->base;
@@ -118,7 +118,9 @@ void* ring_remove(ring_t* ring, void* element)
 	void *val;
 	ring_entry_t *entry = element;
 
-	if(ring == NULL || ring->size == 0 || entry == NULL)
+	assert(ring != NULL);
+
+	if(ring->size == 0 || entry == NULL)
 		return NULL;
 
 	ring->size--;
@@ -146,7 +148,9 @@ void* ring_find(ring_t* ring, void* value)
 {
 	ring_entry_t* entry;
 
-	if(ring == NULL || ring->size == 0)
+	assert(ring != NULL);
+
+	if(ring->size == 0)
 		return NULL;
 
 	entry = ring->base;
