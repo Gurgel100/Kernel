@@ -27,8 +27,9 @@ struct cdi_fs_driver *getFSDriver(const char *name);
  */
 static size_t partition_Read(partition_t *part, uint64_t start, size_t size, void *buffer)
 {
-	uint64_t corrected_start = MIN(start, part->size);
-	return dmng_Read(part->dev, part->lbaStart + corrected_start, MIN(part->size - corrected_start, size), buffer);
+	size_t block_size = dmng_getBlockSize(part->dev);
+	uint64_t corrected_start = MIN(start, part->lbaSize * block_size);
+	return dmng_Read(part->dev, part->lbaStart * block_size + corrected_start, MIN(part->lbaSize * block_size - corrected_start, size), buffer);
 }
 
 /*
@@ -86,7 +87,7 @@ int partition_getPartitions(device_t *dev)
 			part->id = i + 1;
 			asprintf(&part->name, "%s_%hhu", dev->device->name, i);
 			part->lbaStart = ptable->entry[i].firstLBA;
-			part->size = ptable->entry[i].Length;
+			part->lbaSize = ptable->entry[i].Length;
 			part->type = ptable->entry[i].Type;
 			part->dev = dev;
 			part->fs = getFilesystem(part);
@@ -99,6 +100,15 @@ int partition_getPartitions(device_t *dev)
 			vfs_dev->getValue = (vfs_device_getValue_handler_t*)partition_getValue;
 			vfs_dev->opaque = part;
 			vfs_RegisterDevice(vfs_dev);
+
+			vfs_mode_t mode = (vfs_mode_t){
+				.read = true,
+				.write = true
+			};
+			char *path;
+			asprintf(&path, "dev/%s", part->name);
+			part->fs->osdep.fp = vfs_Open(path, mode);
+			free(path);
 		}
 	}
 	return 0;
@@ -112,34 +122,21 @@ int partition_getPartitions(device_t *dev)
 struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 {
 	struct cdi_fs_filesystem *fs = malloc(sizeof(*fs));
-	char *path;
-	vfs_mode_t mode;
 
 	switch(part->type)
 	{
 		case PART_TYPE_LINUX:
 			if(!(fs->driver = getFSDriver("ext2")))
 				goto exit_error;
-
-			mode = (vfs_mode_t){
-				.read = true,
-				.write = true
-			};
-			asprintf(&path, "dev/%s", part->dev->device->name);
-			fs->osdep.fp = vfs_Open(path, mode);
-			free(path);
 		break;
 		case PART_TYPE_ISO9660:
 			if(!(fs->driver = getFSDriver("iso9660")))
 				goto exit_error;
 
-			mode = (vfs_mode_t){
-				.read = true,
-				.write = true
-			};
-			asprintf(&path, "dev/%s", part->dev->device->name);
-			fs->osdep.fp = vfs_Open(path, mode);
-			free(path);
+			//Korigiere Start und Grösse der Partition, weil das Dateisystem selber korrigiert
+			//XXX: Vielleicht gibt es einen anderen Weg es besser zu machen
+			part->lbaStart = 0;
+			part->lbaSize = -1ul;
 			//asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
 		break;
 		default:

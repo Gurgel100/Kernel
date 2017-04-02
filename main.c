@@ -56,7 +56,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
 	{
-		loader_load("/mount/0/bin", "init", "/dev/tty01", "/dev/tty01", "/dev/tty01");
+		loader_load("/bin", "init", "/dev/tty01", "/dev/tty01", "/dev/tty01");
 		scheduler_activate();
 	}
 

@@ -50,11 +50,25 @@ void scheduler_activate()
  *
  * Parameter:	thread = Thread, der hinzugefügt werden soll
  */
+bool scheduler_try_add(thread_t *thread)
+{
+	if(try_lock(&schedule_lock))
+	{
+		ring_add(scheduleList, thread);
+		unlock(&schedule_lock);
+		return true;
+	}
+	return false;
+}
+
+/*
+ * Fügt einen Thread der Schedulingliste hinzu
+ *
+ * Parameter:	thread = Thread, der hinzugefügt werden soll
+ */
 void scheduler_add(thread_t *thread)
 {
-	lock(&schedule_lock);
-	ring_add(scheduleList, thread);
-	unlock(&schedule_lock);
+	while(!scheduler_try_add(thread));
 }
 
 /*
@@ -83,15 +97,11 @@ thread_t *scheduler_schedule(ihs_t *state)
 
 	if(currentThread != NULL)
 	{
-		if(currentThread->Status == RUNNING)
-			currentThread->Status = READY;
 		currentThread->State = state;
 	}
 
-	if(!locked((&schedule_lock)))
+	if(try_lock((&schedule_lock)))
 	{
-
-		lock(&schedule_lock);
 		newThread = ring_getNext(scheduleList);
 		if(newThread == NULL)
 			newThread = idleThread;
@@ -119,8 +129,6 @@ thread_t *scheduler_schedule(ihs_t *state)
 			}
 		}
 	}
-
-	currentThread->Status = RUNNING;
 
 	return currentThread;
 }

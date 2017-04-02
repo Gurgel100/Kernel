@@ -73,6 +73,16 @@ uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info)
 	return _syscall(44, stream, info);
 }
 
+int syscall_mount(const char *mountpoint, const char *device)
+{
+	return _syscall(45, mountpoint, device);
+}
+
+int syscall_unmount(const char *mountpoint)
+{
+	return _syscall(46, mountpoint);
+}
+
 void syscall_sleep(uint64_t msec)
 {
 	_syscall(52, msec);

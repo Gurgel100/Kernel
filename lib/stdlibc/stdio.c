@@ -261,7 +261,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 		//Daten hinter dem Cache laden
 		if(stream->bufStart + stream->bufPos < stream->posRead + length)
 		{
-			tmpLength = stream->posRead + length - (stream->bufStart + stream->bufPos);
+			tmpLength = MIN(stream->posRead + length - (stream->bufStart + stream->bufPos), length);
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
@@ -319,6 +319,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	if(!stream->mode.binary)
 		((char*)ptr)[size] = '\0';
 
+	assert(readData <= size * nmemb);
 	return readData / size;
 }
 

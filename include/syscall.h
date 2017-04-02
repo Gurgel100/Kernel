@@ -49,6 +49,8 @@ inline void syscall_fclose(void *stream);
 inline size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer);
 inline size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer);
 inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
+inline int syscall_mount(const char *mountpoint, const char *device);
+inline int syscall_unmount(const char *mountpoint);
 
 inline void syscall_sleep(uint64_t msec);
 

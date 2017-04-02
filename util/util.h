@@ -22,8 +22,6 @@ uint32_t ind(uint16_t Port);
 void outq(uint16_t Port, uint64_t Data);
 uint64_t inq(uint16_t Port);
 
-void IntToHex(uint64_t Value, char *Destination);
-
 void Sleep(uint64_t msec);
 
 #endif /* UTIL_H_ */

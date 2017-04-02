@@ -14,6 +14,7 @@
 #include "scsi.h"
 #include "stdlib.h"
 #include "string.h"
+#include "assert.h"
 
 #define GET_BYTE(value, offset) (value >> offset) & 0xFF
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
@@ -134,6 +135,20 @@ void *dmng_getValue(device_t *dev, vfs_device_function_t function)
 		default:
 			return NULL;
 	}
+}
+
+size_t dmng_getBlockSize(device_t *dev)
+{
+	assert(dev != NULL);
+	if(dev->device->bus_data->bus_type == CDI_STORAGE)
+	{
+		struct cdi_storage_device *device = (struct cdi_storage_device*)dev->device;
+		return device->block_size;
+	}
+	else if(dev->device->bus_data->bus_type == CDI_SCSI)
+		return 2048;
+	else
+		return 0;
 }
 
 #endif

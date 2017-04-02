@@ -7,6 +7,7 @@
 
 #include "queue.h"
 #include "stdlib.h"
+#include "assert.h"
 
 /*
  * Erstellt eine neue Queue.
@@ -25,8 +26,7 @@ queue_t *queue_create()
  */
 void queue_destroy(queue_t *queue)
 {
-	if(queue == NULL)
-		return;
+	assert(queue != NULL);
 
 	while(queue->size)
 		queue_dequeue(queue);
@@ -35,8 +35,7 @@ void queue_destroy(queue_t *queue)
 
 size_t queue_size(queue_t* queue)
 {
-	if(queue == NULL)
-		return 0;
+	assert(queue != NULL);
 
 	return queue->size;
 }
@@ -50,15 +49,14 @@ size_t queue_size(queue_t* queue)
  */
 void *queue_enqueue(queue_t *queue, void *value)
 {
-	if(queue == NULL)
-		return NULL;
+	assert(queue != NULL);
 
 	queue_entry_t *entry = malloc(sizeof(queue_entry_t));
 	if(entry == NULL)
 		return NULL;
 
 	entry->value = value;
-	if(queue->size == 0)
+	if(queue->size != 0)
 		queue->begin->next = entry;
 	queue->begin = entry;
 	if(queue->end == NULL)
@@ -75,7 +73,8 @@ void *queue_enqueue(queue_t *queue, void *value)
  */
 void *queue_dequeue(queue_t *queue)
 {
-	if(queue == NULL || queue->size == 0)
+	assert(queue != NULL);
+	if(queue->size == 0)
 		return NULL;
 
 	queue_entry_t *entry = queue->end;

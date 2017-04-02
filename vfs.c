@@ -85,7 +85,6 @@ typedef struct{
 }vfs_userspace_stream_t;
 
 static vfs_node_t root;
-static uint8_t nextPartID = 0;
 static list_t res_list;
 static hashmap_t *streams = NULL;	//geöffnete Streams
 static lock_t vfs_lock = LOCK_LOCKED;
@@ -671,13 +670,14 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 			}
 		break;
 		case TYPE_DIR:
-			if(!mode.directory)
+			if(!mode.directory || remPath != NULL)
 			{
 				free(stream);
 				if(remPath)
 					free(remPath);
 				return -1;
 			}
+			assert(remPath == NULL);
 		break;
 		case TYPE_DEV:
 			if(mode.directory)
@@ -690,6 +690,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 			stream->mode.empty = false;
 			stream->mode.append = false;
 			stream->mode.create = false;
+			assert(remPath == NULL);
 		break;
 		case TYPE_LINK:
 			assert(false);
@@ -776,6 +777,55 @@ void vfs_Close(vfs_file_t streamid)
 	REFCOUNT_RELEASE(stream);
 }
 
+static size_t readNodeChilds(vfs_node_t *node, uint64_t start, size_t size, vfs_userspace_direntry_t *buffer)
+{
+	assert(node != NULL);
+	assert(node->type == TYPE_DIR || node->type == TYPE_MOUNT);
+	size_t sizeRead = 0;
+	vfs_node_t *tmp = node->childs;
+	size_t i = 0;
+	//Überspringe die nicht benötigten Einträge
+	while(tmp != NULL && i < start)
+	{
+		tmp = tmp->next;
+		i++;
+	}
+	while(tmp != NULL)
+	{
+		size_t name_length = strlen(tmp->name);
+		size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
+		if(sizeRead + entry_size > size)
+			break;
+		vfs_userspace_direntry_t *entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
+		entry->size = entry_size;
+
+		switch(tmp->type)
+		{
+			case TYPE_DIR:
+			case TYPE_MOUNT:
+				entry->type = UDT_DIR;
+			break;
+			case TYPE_FILE:
+				entry->type = UDT_FILE;
+			break;
+			case TYPE_LINK:
+				entry->type = UDT_LINK;
+			break;
+			case TYPE_DEV:
+				entry->type = UDT_DEV;
+			break;
+			default:
+				entry->type = UDT_UNKNOWN;
+			break;
+		}
+
+		strcpy((char*)&entry->name, tmp->name);
+		sizeRead += entry_size;
+		tmp = tmp->next;
+	}
+	return sizeRead;
+}
+
 /*
  * Einträge aus einem Ordner lesen
  * Parameter:	streamid = Id des Streams, der den Ordner repräsentiert
@@ -800,81 +850,41 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
-		{
-			cdi_list_t childs;
-			struct cdi_fs_res *child_res;
-			vfs_userspace_direntry_t *entry;
-			childs = stream->stream.res->dir->list(&stream->stream);
-			if(childs == NULL || cdi_list_size(childs) == 0)
-				return 0;
-			size_t i = start;
-			while((child_res = cdi_list_get(childs, i++)))
+			sizeRead = readNodeChilds(node, start, size, buffer);
+			if(sizeRead < size)
 			{
-				size_t name_length = strlen(child_res->name);
-				size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
-				if(sizeRead + entry_size > size)
-					break;
-				entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
-				entry->size = entry_size;
+				cdi_list_t childs;
+				struct cdi_fs_res *child_res;
+				vfs_userspace_direntry_t *entry;
+				childs = stream->stream.res->dir->list(&stream->stream);
+				if(childs == NULL || cdi_list_size(childs) == 0)
+					return 0;
+				size_t i = start;
+				while((child_res = cdi_list_get(childs, i++)))
+				{
+					size_t name_length = strlen(child_res->name);
+					size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
+					if(sizeRead + entry_size > size)
+						break;
+					entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
+					entry->size = entry_size;
 
-				if(child_res->dir != NULL)
-					entry->type = UDT_DIR;
-				else if(child_res->file != NULL)
-					entry->type = UDT_FILE;
-				else if(child_res->link != NULL)
-					entry->type = UDT_LINK;
-				else
-					entry->type = UDT_UNKNOWN;
+					if(child_res->dir != NULL)
+						entry->type = UDT_DIR;
+					else if(child_res->file != NULL)
+						entry->type = UDT_FILE;
+					else if(child_res->link != NULL)
+						entry->type = UDT_LINK;
+					else
+						entry->type = UDT_UNKNOWN;
 
-				strcpy((char*)&entry->name, child_res->name);
-				sizeRead += entry_size;
+					strcpy((char*)&entry->name, child_res->name);
+					sizeRead += entry_size;
+				}
 			}
-		}
 		break;
 		case TYPE_DIR:
-		{
-			vfs_node_t *tmp = node->childs;
-			size_t i = 0;
-			//Überspringe die nicht benötigten Einträge
-			while(tmp != NULL && i < start)
-			{
-				tmp = tmp->next;
-				i++;
-			}
-			while(tmp != NULL)
-			{
-				size_t name_length = strlen(tmp->name);
-				size_t entry_size = sizeof(vfs_userspace_direntry_t) + name_length + 1;
-				if(sizeRead + entry_size > size)
-					break;
-				vfs_userspace_direntry_t *entry = (vfs_userspace_direntry_t*)((char*)buffer + sizeRead);
-				entry->size = entry_size;
-
-				switch(tmp->type)
-				{
-					case TYPE_DIR:
-					case TYPE_MOUNT:
-						entry->type = UDT_DIR;
-					break;
-					case TYPE_FILE:
-						entry->type = UDT_FILE;
-					break;
-					case TYPE_LINK:
-						entry->type = UDT_LINK;
-					break;
-					case TYPE_DEV:
-						entry->type = UDT_DEV;
-					break;
-					default:
-						entry->type = UDT_UNKNOWN;
-					break;
-				}
-
-				strcpy((char*)&entry->name, tmp->name);
-				sizeRead += entry_size;
-				tmp = tmp->next;
-			}
-		}
+			sizeRead = readNodeChilds(node, start, size, buffer);
 		break;
 		default:
 			assert(false);
@@ -928,6 +938,7 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 			assert(false);
 		break;
 	}
+	assert(sizeRead <= length);
 	return sizeRead;
 }
 
@@ -1099,7 +1110,6 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 {
 	vfs_node_t *mount;
 	vfs_node_t *devNode;
-	char *name;
 
 	if((devNode = getNode(Dev)) == NULL)
 		return 1;
@@ -1117,13 +1127,15 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if(fs == NULL)
 		return 5;
 
-	asprintf(&name, "%u", nextPartID++);
-	createMountNode(mount, name, fs);
-	free(name);
+	if(mount->type == TYPE_MOUNT)
+		return 6;
 
 	//Dateisystem initialisieren
 	if(!fs->driver->fs_init(fs))
 		return 4;
+
+	mount->fs = fs;
+	mount->type = TYPE_MOUNT;
 
 	return 0;
 }
@@ -1142,7 +1154,7 @@ int vfs_Unmount(const char *Mount)
 	//FS deinitialisieren
 	mount->fs->driver->fs_destroy(mount->fs);
 
-	deleteNode(mount);
+	mount->type = TYPE_DIR;
 
 	return 0;
 }
@@ -1161,19 +1173,18 @@ int vfs_MountRoot(void)
 	{
 		if(node->type == TYPE_DEV)
 		{
-			nextPartID = 0;
 			asprintf(&DevPath, "dev/%s", node->name);
-			status = vfs_Mount("/mount", DevPath);
+			status = vfs_Mount("/", DevPath);
 			free(DevPath);
 			if(status == 0)
 			{
-				FILE *fp = fopen("/mount/0/kernel", "r");
+				FILE *fp = fopen("/kernel", "r");
 				if(fp != NULL)
 				{
 					fclose(fp);
 					break;
 				}
-				vfs_Unmount("mount/0");
+				vfs_Unmount("/");
 			}
 		}
 	}
@@ -1266,5 +1277,21 @@ uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
 	return vfs_getFileinfo(stream->stream, info);
+}
+
+int vfs_syscall_mount(const char *mountpoint, const char *device)
+{
+	if(!vmm_userspacePointerValid(mountpoint, strlen(mountpoint)))
+		return -1;
+	if(!vmm_userspacePointerValid(device, strlen(device)))
+		return -1;
+	return vfs_Mount(mountpoint, device);
+}
+
+int vfs_syscall_unmount(const char *mountpoint)
+{
+	if(!vmm_userspacePointerValid(mountpoint, strlen(mountpoint)))
+		return -1;
+	return vfs_Unmount(mountpoint);
 }
 #endif
