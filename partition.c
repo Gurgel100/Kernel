@@ -141,6 +141,10 @@ struct cdi_fs_filesystem *getFilesystem(partition_t *part)
 			asprintf(&path, "dev/%s", part->dev->device->name);
 			fs->osdep.fp = vfs_Open(path, mode);
 			free(path);
+			//Korigiere Start und Grösse der Partition, weil das Dateisystem selber korrigiert
+			//XXX: Vielleicht gibt es einen anderen Weg es besser zu machen
+			part->lbaStart = 0;
+			part->lbaSize = -1ul;
 			//asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
 		break;
 		default:
