@@ -27,8 +27,9 @@ struct cdi_fs_driver *getFSDriver(const char *name);
  */
 static size_t partition_Read(partition_t *part, uint64_t start, size_t size, void *buffer)
 {
-	uint64_t corrected_start = MIN(start, part->size);
-	return dmng_Read(part->dev, part->lbaStart + corrected_start, MIN(part->size - corrected_start, size), buffer);
+	size_t block_size = dmng_getBlockSize(part->dev);
+	uint64_t corrected_start = MIN(start, part->lbaSize * block_size);
+	return dmng_Read(part->dev, part->lbaStart * block_size + corrected_start, MIN(part->lbaSize * block_size - corrected_start, size), buffer);
 }
 
 /*
@@ -86,7 +87,7 @@ int partition_getPartitions(device_t *dev)
 			part->id = i + 1;
 			asprintf(&part->name, "%s_%hhu", dev->device->name, i);
 			part->lbaStart = ptable->entry[i].firstLBA;
-			part->size = ptable->entry[i].Length;
+			part->lbaSize = ptable->entry[i].Length;
 			part->type = ptable->entry[i].Type;
 			part->dev = dev;
 			part->fs = getFilesystem(part);

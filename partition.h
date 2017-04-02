@@ -49,8 +49,7 @@ typedef struct{
 	char *name;
 	device_t *dev;
 	struct cdi_fs_filesystem *fs;
-	size_t lbaStart;
-	size_t size;
+	size_t lbaStart, lbaSize;
 	part_type_t type;
 }partition_t;
 
