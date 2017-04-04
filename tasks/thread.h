@@ -13,6 +13,7 @@
 #include "pm.h"
 #include "stdbool.h"
 #include "pmm.h"
+#include "ring.h"
 
 typedef uint64_t tid_t;
 
@@ -21,6 +22,7 @@ typedef enum{
 }thread_status_t;
 
 typedef struct{
+	ring_entry_t ring_entry;
 	tid_t tid;
 	process_t *process;
 	ihs_t *State;
