@@ -35,6 +35,7 @@
 #include "apic.h"
 #include "tss.h"
 #include "pci.h"
+#include "drivermanager.h"
 #include "devicemng.h"
 #include "console.h"
 #include "syscalls.h"
@@ -93,6 +94,7 @@ void Init()
 	apic_Init();
 	vfs_Init();			//VFS initialisieren
 	pci_Init();			//PCI-Treiber initialisieren
+	drivermanager_init();
 	dmng_Init();
 	pm_Init();			//Tasks initialisieren
 	console_Init();

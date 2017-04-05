@@ -157,18 +157,7 @@ struct cdi_fs_filesystem *getFilesystem(partition_t *part)
  */
 struct cdi_fs_driver *getFSDriver(const char *name)
 {
-	struct cdi_driver *driver;
-
-	size_t i = 0;
-	extern cdi_list_t drivers;
-	while((driver = cdi_list_get(drivers, i)))
-	{
-		if(driver->type == CDI_FILESYSTEM && strcmp(name, driver->name) == 0)
-			return (struct cdi_fs_driver*)driver;
-		i++;
-	}
-
-	return NULL;
+	return drivermanager_getDriver(name);
 }
 
 #endif
