@@ -1153,6 +1153,7 @@ int vfs_Unmount(const char *Mount)
 
 	//FS deinitialisieren
 	mount->fs->driver->fs_destroy(mount->fs);
+	free(mount->fs);
 
 	mount->type = TYPE_DIR;
 

@@ -48,7 +48,7 @@ typedef struct{
 	uint64_t id;
 	char *name;
 	device_t *dev;
-	struct cdi_fs_filesystem *fs;
+	struct cdi_fs_driver *fs_driver;
 	size_t lbaStart, lbaSize;
 	part_type_t type;
 }partition_t;

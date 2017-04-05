@@ -16,11 +16,39 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "drivermanager.h"
 
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
 
-struct cdi_fs_filesystem *getFilesystem(partition_t *part);
-struct cdi_fs_driver *getFSDriver(const char *name);
+static const char *fs_drivers[] = {
+[PART_TYPE_LINUX]	"ext2",
+[PART_TYPE_ISO9660]	"iso9660",
+};
+
+/*
+ * Erzeugt die Dateisystemstruktur und füllt diese mit dem richtigen Treiber.
+ * Parameter:	part = Partition, für die das Dateisystem gesucht werden soll
+ * Rückgabe:	Zeiger auf Dateisystemstruktur oder NULL wenn kein passendes Dateisystem gefunden
+ */
+static struct cdi_fs_filesystem *getFilesystem(partition_t *part)
+{
+	struct cdi_fs_filesystem *fs = calloc(1, sizeof(*fs));
+	if(fs == NULL)
+		return NULL;
+
+	fs->driver = part->fs_driver;
+
+	vfs_mode_t mode = (vfs_mode_t){
+		.read = true,
+		.write = true
+	};
+	char *path;
+	asprintf(&path, "dev/%s", part->name);
+	fs->osdep.fp = vfs_Open(path, mode);
+	free(path);
+
+	return fs;
+}
 
 /*
  * Liest Daten von einer Partition
@@ -52,7 +80,7 @@ static void *partition_getValue(partition_t *part, vfs_device_function_t functio
 		case FUNC_NAME:
 			return part->name;
 		case FUNC_DATA:
-			return part->fs;
+			return getFilesystem(part);
 		default:
 			return NULL;
 	}
@@ -90,8 +118,28 @@ int partition_getPartitions(device_t *dev)
 			part->lbaSize = ptable->entry[i].Length;
 			part->type = ptable->entry[i].Type;
 			part->dev = dev;
-			part->fs = getFilesystem(part);
+			if(fs_drivers[part->type] == NULL)
+			{
+				free(part->name);
+				free(part);
+				continue;
+			}
+			part->fs_driver = (struct cdi_fs_driver*)drivermanager_getDriver(fs_drivers[part->type]);
+			if(part->fs_driver == NULL)
+			{
+				free(part->name);
+				free(part);
+				continue;
+			}
 			list_push(dev->partitions, part);
+
+			if(part->type == PART_TYPE_ISO9660)
+			{
+				//Korigiere Start und Grösse der Partition, weil das Dateisystem selber korrigiert
+				//XXX: Vielleicht gibt es einen anderen Weg es besser zu machen
+				part->lbaStart = 0;
+				part->lbaSize = -1ul;
+			}
 
 			//Partition beim VFS anmelden
 			vfs_device_t* vfs_dev = malloc(sizeof(vfs_device_t));
@@ -100,64 +148,9 @@ int partition_getPartitions(device_t *dev)
 			vfs_dev->getValue = (vfs_device_getValue_handler_t*)partition_getValue;
 			vfs_dev->opaque = part;
 			vfs_RegisterDevice(vfs_dev);
-
-			vfs_mode_t mode = (vfs_mode_t){
-				.read = true,
-				.write = true
-			};
-			char *path;
-			asprintf(&path, "dev/%s", part->name);
-			part->fs->osdep.fp = vfs_Open(path, mode);
-			free(path);
 		}
 	}
 	return 0;
-}
-
-/*
- * Erzeugt die Dateisystemstruktur und füllt diese mit dem richtigen Treiber.
- * Parameter:	part = Partition, für die das Dateisystem gesucht werden soll
- * Rückgabe:	Zeiger auf Dateisystemstruktur oder NULL wenn kein passendes Dateisystem gefunden
- */
-struct cdi_fs_filesystem *getFilesystem(partition_t *part)
-{
-	struct cdi_fs_filesystem *fs = malloc(sizeof(*fs));
-
-	switch(part->type)
-	{
-		case PART_TYPE_LINUX:
-			if(!(fs->driver = getFSDriver("ext2")))
-				goto exit_error;
-		break;
-		case PART_TYPE_ISO9660:
-			if(!(fs->driver = getFSDriver("iso9660")))
-				goto exit_error;
-
-			//Korigiere Start und Grösse der Partition, weil das Dateisystem selber korrigiert
-			//XXX: Vielleicht gibt es einen anderen Weg es besser zu machen
-			part->lbaStart = 0;
-			part->lbaSize = -1ul;
-			//asprintf(&fs->osdep.devPath, "dev/%s", part->dev->name);
-		break;
-		default:
-			goto exit_error;
-	}
-
-	return fs;
-
-	exit_error:
-	free(fs);
-	return NULL;
-}
-
-/*
- * Sucht den Dateisystemtreiber mit dem angebenen Namen
- * Parameter:	name = Name des Dateisystemtreibers, nach dem gesucht werden soll
- * Rückgabe:	Zeiger auf Dateisystemtreiberstruktur oder NULL falls kein passender Treiber gefunden wurde
- */
-struct cdi_fs_driver *getFSDriver(const char *name)
-{
-	return drivermanager_getDriver(name);
 }
 
 #endif
