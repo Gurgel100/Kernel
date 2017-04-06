@@ -1201,15 +1201,6 @@ int vfs_MountRoot(void)
 }
 
 /*
- * Unmountet root
- * Rückgabe:	!0 bei Fehler
- */
-int vfs_UnmountRoot(void)
-{
-	return vfs_Unmount("/mount/0");
-}
-
-/*
  * Registriert ein Gerät. Dazu wird eine Gerätedatei im Verzeichniss /dev angelegt.
  * Parameter:	dev = Gerätestruktur
  */

@@ -176,7 +176,6 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
 int vfs_Mount(const char *Mountpath, const char *Dev);
 int vfs_Unmount(const char *Mount);
 int vfs_MountRoot(void);
-int vfs_UnmountRoot(void);
 
 /*
  * Gerät anmelden
