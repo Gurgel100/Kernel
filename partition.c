@@ -97,8 +97,8 @@ static size_t partition_Read(void *p, uint64_t start, size_t size, void *buffer)
 static size_t partition_Write(void *p, uint64_t start, size_t size, const void *buffer)
 {
 	partition_t *part = p;
-
-	return 0;
+	uint64_t corrected_start = MIN(start, part->lbaSize * part->blocksize);
+	return vfs_Write(part->dev_stream, part->lbaStart * part->blocksize + corrected_start, MIN(part->lbaSize * part->blocksize - corrected_start, size), buffer);
 }
 
 /*
