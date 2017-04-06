@@ -131,7 +131,7 @@ static void *partition_function(void *p, vfs_device_function_t function, ...)
 	return val;
 }
 
-static vfs_device_capabilities_t partition_getCapabilities(void *p)
+static vfs_device_capabilities_t partition_getCapabilities(void *p __attribute__((unused)))
 {
 	return VFS_DEV_CAP_MOUNTABLE;
 }
