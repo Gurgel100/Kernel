@@ -5,6 +5,11 @@
  *      Author: pascal
  */
 
+/**
+ * @file
+ * @brief virtual filesystem
+ */
+
 #ifdef BUILD_KERNEL
 
 #ifndef VFS_H_
@@ -14,39 +19,106 @@
 #include "cdi.h"
 #include "stdbool.h"
 #include "pm.h"
+#include "refcount.h"
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
-
-#define VFS_DEVICE_STORAGE		"STORAGE"
-#define VFS_DEVICE_PARTITION	"PARTITION"
-#define VFS_DEVICE_VIRTUAL		"VIRTUAL"
 
 #ifndef EOF
 #define EOF -1
 #endif
 
-/*
- * FUNC_TYPE:	Gibt den Typ des Gerätes zurück
- * FUNC_NAME:	Gibt den Namen des Gerätes zurück
- * FUNC_DATA:	Gibt Gerätespezifische Daten zurück
+/**
+ * @brief Type of device functions which can be called through vfs_device_t->function.
  */
 typedef enum{
-	FUNC_TYPE, FUNC_NAME, FUNC_DATA
+	/**
+	 * Function which returns the type of the device. Must always be able to be called.
+	 */
+	VFS_DEV_FUNC_TYPE,
+
+	/**
+	 * Function to get the name of the device. Must always be able to be called.
+	 */
+	VFS_DEV_FUNC_NAME,
+
+	/**
+	 * Function to get the blocksize of a device. Only available if #VFS_DEV_CAP_BLOCKSIZE is set in the capabilities flags of the device.
+	 */
+	VFS_DEV_FUNC_BLOCKSIZE,
+
+	/**
+	 * Function to scan the device for partitions. Gets an open file id as first parameter. Only available if #VFS_DEV_CAP_PARTITIONS is set in the capabilities flags of the device.
+	 */
+	VFS_DEV_FUNC_SCAN_PARTITIONS,
+
+	/**
+	 * Function to mount a device. Returns a vfs_filesyste_t structure. Only available if #VFS_DEV_CAP_MOUNTABLE is set in the capabilities flags of the device.
+	 */
+	VFS_DEV_FUNC_MOUNT,
+
+	/**
+	 * Function to unmount a device. Only available if #VFS_DEV_CAP_MOUNTABLE is set in the capabilities flags of the device.
+	 */
+	VFS_DEV_FUNC_UMOUNT
 }vfs_device_function_t;
 
+/**
+ * @brief Type of device
+ */
+typedef enum{
+	/**
+	 * Device is a storage device.
+	 */
+	VFS_DEVICE_STORAGE,
+
+	/**
+	 * Device is a partition.
+	 */
+	VFS_DEVICE_PARTITION,
+
+	/**
+	 * Device is a virtual device.
+	 */
+	VFS_DEVICE_VIRTUAL,
+}vfs_device_type_t;
+
+/**
+ * @brief Capabilities of a device
+ *
+ * Capabilities are flags returned in a bitmask from the getCapabilities function in the vfs_device_t structure.
+ */
+typedef enum{
+	/**
+	 * Device supports the VFS_DEV_FUNC_BLOCKSIZE function.
+	 */
+	VFS_DEV_CAP_BLOCKSIZE	= 0x1,
+
+	/**
+	 * Device supports the VFS_DEV_FUNC_SCAN_PARTITIONS function.
+	 */
+	VFS_DEV_CAP_PARTITIONS	= 0x2,
+
+	/**
+	 * Device supports the VFS_DEV_FUNC_MOUNT and VFS_DEV_FUNC_UMOUNT functions.
+	 */
+	VFS_DEV_CAP_MOUNTABLE	= 0x4
+}vfs_device_capabilities_t;
+
 //Handler für Geräte
-typedef size_t (vfs_device_read_handler_t)(void *opaque, uint64_t start, size_t size, void *buffer);
-typedef size_t (vfs_device_write_handler_t)(void *opaque, uint64_t start, size_t size, const void *buffer);
-typedef void *(vfs_device_getValue_handler_t)(void *opaque, vfs_device_function_t function);
+typedef size_t (*vfs_device_read_handler_t)(void *opaque, uint64_t start, size_t size, void *buffer);
+typedef size_t (*vfs_device_write_handler_t)(void *opaque, uint64_t start, size_t size, const void *buffer);
+typedef void *(*vfs_device_function_handler_t)(void *opaque, vfs_device_function_t function, ...);
+typedef vfs_device_capabilities_t (*vfs_device_getCapabilities_handler_t)(void *opaque);
 
 typedef struct{
 	//Functionen zum Lesen und Schreiben
-	vfs_device_read_handler_t *read;
-	vfs_device_write_handler_t *write;
+	vfs_device_read_handler_t read;
+	vfs_device_write_handler_t write;
 
 	//Hiermit können verschiedene Werte ausgelesen werden
-	vfs_device_getValue_handler_t *getValue;
+	vfs_device_function_handler_t function;
+	vfs_device_getCapabilities_handler_t getCapabilities;
 	void *opaque;
 }vfs_device_t;
 
@@ -69,6 +141,13 @@ typedef struct{
 	vfs_userspace_direntry_type_t type;
 	char name[];
 }vfs_userspace_direntry_t;
+
+typedef struct{
+	struct cdi_fs_filesystem fs;
+	REFCOUNT_FIELD;
+	vfs_device_t *device;
+	void *opaque;
+}vfs_filesystem_t;
 
 void vfs_Init(void);
 

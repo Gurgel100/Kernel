@@ -69,7 +69,8 @@ static char *console_names[CONSOLE_NUM] = {
 static void console_scrollDown();
 static size_t console_readHandler(void *c, uint64_t start, size_t length, void *buffer);
 static size_t console_writeHandler(void *c, uint64_t start, size_t length, const void *buffer);
-static void *console_getValue(void *c, vfs_device_function_t function);
+static void *console_functionHandler(void *c, vfs_device_function_t function, ...);
+static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c);
 
 static void handler_charPress(void *opaque, char c)
 {
@@ -148,7 +149,8 @@ void console_Init()
 		tty->opaque = console;
 		tty->read = console_readHandler;
 		tty->write = console_writeHandler;
-		tty->getValue = console_getValue;
+		tty->function = console_functionHandler;
+		tty->getCapabilities = console_getCapabilitiesHandler;
 		vfs_RegisterDevice(tty);
 	}
 
@@ -620,16 +622,23 @@ static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) star
 	return size;
 }
 
-static void *console_getValue(void *c, vfs_device_function_t function)
+static void *console_functionHandler(void *c, vfs_device_function_t function, ...)
 {
 	console_t *console = c;
 	switch (function)
 	{
-		case FUNC_TYPE:
-			return VFS_DEVICE_VIRTUAL;
-		case FUNC_NAME:
+		case VFS_DEV_FUNC_TYPE:
+			return (void*)VFS_DEVICE_VIRTUAL;
+		case VFS_DEV_FUNC_NAME:
 			return console->name;
 		default:
 			return NULL;
 	}
+}
+
+static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c)
+{
+	console_t *console = c;
+
+	return 0;
 }

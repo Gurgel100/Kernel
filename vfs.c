@@ -19,7 +19,6 @@
 #include "assert.h"
 #include "pm.h"
 #include "hashmap.h"
-#include "refcount.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
@@ -62,7 +61,7 @@ typedef struct vfs_node{
 		struct vfs_node *next;
 		union{
 			vfs_device_t *dev;			//TYPE_DEVICE
-			struct cdi_fs_filesystem *fs;	//TYPE_MOUNT
+			vfs_filesystem_t *fs;		//TYPE_MOUNT
 			size_t (*handler)(char *name, uint64_t start, size_t length, const void *buffer);
 		};
 		struct vfs_stream *stream;	//Stream, in dem die Node geöffnet ist
@@ -515,7 +514,7 @@ static vfs_node_t *createFileNode(vfs_node_t *parent, const char *name, size_t (
  * 				fs = Dateisystem, welches gemounted wurde
  * Rückgabe:	Pointer zur neuen Node
  */
-static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, struct cdi_fs_filesystem *fs)
+static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, vfs_filesystem_t *fs)
 {
 	lock(&vfs_lock);
 
@@ -652,7 +651,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
-			stream->stream.fs = node->fs;
+			stream->stream.fs = &node->fs->fs;
 			stream->stream.res = getRes(&stream->stream, remPath);
 			//Löse symlinks auf
 			while(stream->stream.res != NULL && stream->stream.res->link != NULL)
@@ -1095,6 +1094,20 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 			break;
 		}
 	}
+	else if(stream->node->type == TYPE_DEV)
+	{
+		switch(info)
+		{
+			case VFS_INFO_BLOCKSIZE:
+				if(stream->node->dev->getCapabilities(stream->node->dev->opaque) & VFS_DEV_CAP_BLOCKSIZE)
+					return (uint64_t)stream->node->dev->function(stream->node->dev->opaque, VFS_DEV_FUNC_BLOCKSIZE);
+				else
+					return 0;
+			break;
+			default:
+				return 0;
+		}
+	}
 
 	return 0;
 }
@@ -1120,19 +1133,15 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if(devNode->type != TYPE_DEV)
 		return 3;
 
-	if(devNode->dev->getValue == NULL || strcmp(VFS_DEVICE_PARTITION, (char*)devNode->dev->getValue(devNode->dev->opaque, FUNC_TYPE)) != 0)
+	if((vfs_device_type_t)devNode->dev->function(devNode->dev->opaque, VFS_DEV_FUNC_TYPE) != VFS_DEVICE_PARTITION)
 		return 7;
 
-	struct cdi_fs_filesystem *fs = devNode->dev->getValue(devNode->dev->opaque, FUNC_DATA);
+	vfs_filesystem_t *fs = devNode->dev->function(devNode->dev->opaque, VFS_DEV_FUNC_MOUNT);
 	if(fs == NULL)
 		return 5;
 
 	if(mount->type == TYPE_MOUNT)
 		return 6;
-
-	//Dateisystem initialisieren
-	if(!fs->driver->fs_init(fs))
-		return 4;
 
 	mount->fs = fs;
 	mount->type = TYPE_MOUNT;
@@ -1151,9 +1160,7 @@ int vfs_Unmount(const char *Mount)
 	if(!mount || mount->type != TYPE_MOUNT)
 		return 1;
 
-	//FS deinitialisieren
-	mount->fs->driver->fs_destroy(mount->fs);
-	free(mount->fs);
+	mount->fs->device->function(mount->fs->device->opaque, VFS_DEV_FUNC_UMOUNT);
 
 	mount->type = TYPE_DIR;
 
@@ -1210,11 +1217,29 @@ void vfs_RegisterDevice(vfs_device_t *dev)
 {
 	const char *Path = "/dev";	//Pfad zu den Gerätendateien
 	vfs_node_t *tmp;
+
+	assert(dev != NULL);
+	assert(dev->function != NULL);
+	assert(dev->getCapabilities != NULL);
+
 	//ist der Ordner schon vorhanden?
 	if(!(tmp = getNode(Path))) return;	//Fehler
 
 	//Gerätedatei anlegen
-	createDeviceNode(tmp, dev->getValue(dev->opaque, FUNC_NAME), dev);
+	vfs_node_t *dev_node = createDeviceNode(tmp, dev->function(dev->opaque, VFS_DEV_FUNC_NAME), dev);
+	if(dev_node != NULL && (dev->getCapabilities(dev->opaque) & VFS_DEV_CAP_PARTITIONS))
+	{
+		char *dev_path = malloc(strlen(Path) + strlen(dev_node->name) + 2);
+		sprintf(dev_path, "%s/%s", Path, dev_node->name);
+		vfs_mode_t dev_mode = (vfs_mode_t){
+			.read = dev->read != NULL,
+			.write = dev->write != NULL
+		};
+		vfs_file_t dev_stream = vfs_Open(dev_path, dev_mode);
+		free(dev_path);
+
+		dev->function(dev->opaque, VFS_DEV_FUNC_SCAN_PARTITIONS, dev_stream);
+	}
 }
 
 //Syscalls

@@ -25,65 +25,115 @@ static const char *fs_drivers[] = {
 [PART_TYPE_ISO9660]	"iso9660",
 };
 
+static void freeFilesystem(const void *fs_p)
+{
+	vfs_filesystem_t *fs = (vfs_filesystem_t*)fs_p;
+	fs->fs.driver->fs_destroy(&fs->fs);
+	vfs_Close(fs->fs.osdep.fp);
+	free(fs);
+}
+
 /*
  * Erzeugt die Dateisystemstruktur und füllt diese mit dem richtigen Treiber.
  * Parameter:	part = Partition, für die das Dateisystem gesucht werden soll
  * Rückgabe:	Zeiger auf Dateisystemstruktur oder NULL wenn kein passendes Dateisystem gefunden
  */
-static struct cdi_fs_filesystem *getFilesystem(partition_t *part)
+static vfs_filesystem_t *getFilesystem(partition_t *part)
 {
-	struct cdi_fs_filesystem *fs = calloc(1, sizeof(*fs));
-	if(fs == NULL)
-		return NULL;
+	int retry_count = 0;
+retry:
+	if(part->fs == NULL)
+	{
+		vfs_filesystem_t *fs = calloc(1, sizeof(*fs));
+		if(fs == NULL)
+			return NULL;
 
-	fs->driver = part->fs_driver;
+		REFCOUNT_INIT(fs, freeFilesystem);
 
-	vfs_mode_t mode = (vfs_mode_t){
-		.read = true,
-		.write = true
-	};
-	char *path;
-	asprintf(&path, "dev/%s", part->name);
-	fs->osdep.fp = vfs_Open(path, mode);
-	free(path);
+		fs->device = part->vfs_dev;
+		fs->fs.driver = part->fs_driver;
 
-	return fs;
+		vfs_mode_t mode = (vfs_mode_t){
+			.read = true,
+			.write = true
+		};
+		char *path;
+		asprintf(&path, "dev/%s", part->name);
+		fs->fs.osdep.fp = vfs_Open(path, mode);
+		free(path);
+
+		if(!fs->fs.driver->fs_init(&fs->fs))
+			return NULL;
+
+		part->fs = fs;
+	}
+	else
+	{
+		if((part->fs = REFCOUNT_RETAIN(part->fs)) == NULL)
+		{
+			if(retry_count++ < 3)
+				goto retry;
+			else
+				return NULL;
+		}
+	}
+
+	return part->fs;
 }
 
 /*
  * Liest Daten von einer Partition
  */
-static size_t partition_Read(partition_t *part, uint64_t start, size_t size, void *buffer)
+static size_t partition_Read(void *p, uint64_t start, size_t size, void *buffer)
 {
-	size_t block_size = dmng_getBlockSize(part->dev);
-	uint64_t corrected_start = MIN(start, part->lbaSize * block_size);
-	return dmng_Read(part->dev, part->lbaStart * block_size + corrected_start, MIN(part->lbaSize * block_size - corrected_start, size), buffer);
+	partition_t *part = p;
+	uint64_t corrected_start = MIN(start, part->lbaSize * part->blocksize);
+	return vfs_Read(part->dev_stream, part->lbaStart * part->blocksize + corrected_start, MIN(part->lbaSize * part->blocksize - corrected_start, size), buffer);
 }
 
 /*
  * Schreibt Daten auf eine Partition
  */
-static size_t partition_Write(partition_t *part, uint64_t start, size_t size, const void *buffer)
+static size_t partition_Write(void *p, uint64_t start, size_t size, const void *buffer)
 {
+	partition_t *part = p;
+
 	return 0;
 }
 
 /*
  * Gibt bestimmte Werte zurück, welche vom VFS verwendet werden
  */
-static void *partition_getValue(partition_t *part, vfs_device_function_t function)
+static void *partition_function(void *p, vfs_device_function_t function, ...)
 {
+	void *val;
+	partition_t *part = p;
+
 	switch(function)
 	{
-		case FUNC_TYPE:
-			return VFS_DEVICE_PARTITION;
-		case FUNC_NAME:
-			return part->name;
-		case FUNC_DATA:
-			return getFilesystem(part);
+		case VFS_DEV_FUNC_TYPE:
+			val = (void*)VFS_DEVICE_PARTITION;
+		break;
+		case VFS_DEV_FUNC_NAME:
+			val = part->name;
+		break;
+		case VFS_DEV_FUNC_MOUNT:
+			val = getFilesystem(part);
+		break;
+		case VFS_DEV_FUNC_UMOUNT:
+			REFCOUNT_RELEASE(part->fs);
+			val = NULL;
+		break;
 		default:
-			return NULL;
+			val = NULL;
 	}
+
+	return val;
+}
+
+static vfs_device_capabilities_t partition_getCapabilities(void *p)
+{
+	return VFS_DEV_CAP_MOUNTABLE;
 }
 
 /*
@@ -91,11 +141,11 @@ static void *partition_getValue(partition_t *part, vfs_device_function_t functio
  * Parameter:	dev = CDI-Gerätestruktur, das das Gerät beschreibt
  * Rückgabe:	!0 bei Fehler
  */
-int partition_getPartitions(device_t *dev)
+int partition_getPartitions(const char *dev_name, vfs_file_t dev_stream, void(*partition_callback)(void *context, void*), void *context)
 {
 	//Ersten Sektor auslesen
 	void *buffer = malloc(512);
-	if(!dmng_Read(dev, 0, 512, buffer))
+	if(vfs_Read(dev_stream, 0, 512, buffer) == 0)
 		return 1;
 
 	//Gültige Partitionstabelle?
@@ -106,18 +156,19 @@ int partition_getPartitions(device_t *dev)
 	//Partitionstabelle durchsuchen
 	PartitionTable_t *ptable = buffer + 0x1BE;
 	uint8_t i;
-	dev->partitions = list_create();
 	for(i = 0; i < 4; i++)
 	{
 		if(ptable->entry[i].Type)
 		{
 			partition_t *part = malloc(sizeof(partition_t));
 			part->id = i + 1;
-			asprintf(&part->name, "%s_%hhu", dev->device->name, i);
+			asprintf(&part->name, "%s_%hhu", dev_name, i);
 			part->lbaStart = ptable->entry[i].firstLBA;
 			part->lbaSize = ptable->entry[i].Length;
 			part->type = ptable->entry[i].Type;
-			part->dev = dev;
+			part->dev_stream = dev_stream;
+			part->blocksize = vfs_getFileinfo(dev_stream, VFS_INFO_BLOCKSIZE);
+			part->fs = NULL;
 			if(fs_drivers[part->type] == NULL)
 			{
 				free(part->name);
@@ -131,7 +182,8 @@ int partition_getPartitions(device_t *dev)
 				free(part);
 				continue;
 			}
-			list_push(dev->partitions, part);
+			if(partition_callback != NULL)
+				partition_callback(context, part);
 
 			if(part->type == PART_TYPE_ISO9660)
 			{
@@ -142,12 +194,13 @@ int partition_getPartitions(device_t *dev)
 			}
 
 			//Partition beim VFS anmelden
-			vfs_device_t* vfs_dev = malloc(sizeof(vfs_device_t));
-			vfs_dev->read = (vfs_device_read_handler_t*)partition_Read;
-			vfs_dev->write = (vfs_device_write_handler_t*)partition_Write;
-			vfs_dev->getValue = (vfs_device_getValue_handler_t*)partition_getValue;
-			vfs_dev->opaque = part;
-			vfs_RegisterDevice(vfs_dev);
+			part->vfs_dev = malloc(sizeof(vfs_device_t));
+			part->vfs_dev->read = partition_Read;
+			part->vfs_dev->write = partition_Write;
+			part->vfs_dev->function = partition_function;
+			part->vfs_dev->getCapabilities = partition_getCapabilities;
+			part->vfs_dev->opaque = part;
+			vfs_RegisterDevice(part->vfs_dev);
 		}
 	}
 	return 0;
