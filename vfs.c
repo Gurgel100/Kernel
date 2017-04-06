@@ -1182,7 +1182,7 @@ int vfs_MountRoot(void)
 		if(node->type == TYPE_DEV)
 		{
 			asprintf(&DevPath, "dev/%s", node->name);
-			status = vfs_Mount("/", DevPath);
+			status = vfs_Mount(VFS_ROOT, DevPath);
 			free(DevPath);
 			if(status == 0)
 			{
@@ -1192,7 +1192,7 @@ int vfs_MountRoot(void)
 					fclose(fp);
 					break;
 				}
-				vfs_Unmount("/");
+				vfs_Unmount(VFS_ROOT);
 			}
 		}
 	}
