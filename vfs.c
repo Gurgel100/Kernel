@@ -22,31 +22,6 @@
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
-#define VFS_MODE_READ	0x1
-#define VFS_MODE_WRITE	0x2
-#define VFS_MODE_APPEND	0x4
-
-#define PT_VOID			0x00
-#define PT_FAT12		0x01
-#define PT_FAT16S		0x04
-#define PT_EXTENDED		0x05
-#define PT_FAT16B		0x06
-#define PT_NTFS			0x07
-#define PT_FAT32		0x0B
-#define PT_FAT32LBA		0x0C
-#define PT_FAT16BLBA	0x0E
-#define PT_EXTENDEDLBA	0x0F
-#define PT_OEM			0x12
-#define PT_DYNAMIC		0x42
-#define PT_SWAP			0x82
-#define PT_NATIVE		0x83
-#define PT_LVM			0x8E
-#define PT_FBSD			0xA5
-#define PT_OBSD			0XA6
-#define PT_NBSD			0xA9
-#define PT_LEGACY		0xEE
-#define PT_EFI			0xEF
-
 struct vfs_stream;
 
 typedef enum{
