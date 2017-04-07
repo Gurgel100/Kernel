@@ -170,6 +170,7 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
  * 				1: Fehler
  */
 int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr);
+void vfs_deinitUserspace(process_t *p);
 
 uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
 

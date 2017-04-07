@@ -1035,6 +1035,10 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	return 1;
 }
 
+void vfs_deinitUserspace(process_t *p)
+{
+}
+
 /*
  * Gibt die Metainformationen einer Datei zurück
  * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)

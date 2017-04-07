@@ -186,6 +186,7 @@ void pm_DestroyTask(process_t *process)
 		while((thread = list_get(process->threads, 0)))
 			thread_destroy(thread);
 		deleteContext(process->Context);
+		vfs_deinitUserspace(process);
 		free(process->cmd);
 		free(process);
 		numTasks--;
