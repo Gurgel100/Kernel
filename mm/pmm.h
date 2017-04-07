@@ -13,8 +13,6 @@
 #include "stdbool.h"
 #include "stddef.h"
 
-#define PMM_STACK_LENGTH_PER_BLOCK MM_BLOCK_SIZE	//Maximale Anzahl Bytes für die Stacklänge am Anfang
-
 //Eine Speicherstelle = 4kb
 
 typedef uintptr_t paddr_t;
