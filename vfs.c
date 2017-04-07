@@ -824,7 +824,9 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
-			sizeRead = readNodeChilds(node, start, size, buffer);
+			//FIXME: hack
+			if(stream->stream.res == node->fs->fs.root_res)
+				sizeRead = readNodeChilds(node, start, size, buffer);
 			if(sizeRead < size)
 			{
 				cdi_list_t childs;
