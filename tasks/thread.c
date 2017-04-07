@@ -7,7 +7,6 @@
 
 #include "thread.h"
 #include "list.h"
-#include "lock.h"
 #include "memory.h"
 #include "tss.h"
 #include "vmm.h"
@@ -19,20 +18,16 @@
 #include "assert.h"
 
 list_t threadList;
-tid_t nextTID = 1;
+
+static tid_t get_tid()
+{
+	static tid_t nextTID = 1;
+	return __sync_fetch_and_add(&nextTID, 1);
+}
 
 void thread_Init()
 {
 	threadList = list_create();
-}
-
-tid_t get_tid()
-{
-	static lock_t tid_lock = LOCK_UNLOCKED;
-	lock(&tid_lock);
-	tid_t tid = nextTID++;
-	unlock(&tid_lock);
-	return tid;
 }
 
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
