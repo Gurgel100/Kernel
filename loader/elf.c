@@ -221,7 +221,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, 
 
 		size_t pages = ProgramHeader[i].p_memsz / 4096;
 		pages += (ProgramHeader[i].p_memsz % 4096) ? 1 : 0;
-		Ziel = (char*)mm_SysAlloc(pages);
+		Ziel = mm_SysAlloc(pages);
 		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
 		fread(Ziel, 1, ProgramHeader[i].p_filesz, fp);
 

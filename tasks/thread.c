@@ -68,7 +68,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Kernelstack vorbereiten
 	if(!kernel)
 	{
-		thread->kernelStackBottom = (void*)mm_SysAlloc(1);
+		thread->kernelStackBottom = mm_SysAlloc(1);
 		thread->kernelStack = thread->kernelStackBottom + MM_BLOCK_SIZE;
 		thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
@@ -79,7 +79,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Stack mappen
 	if(!kernel)
 	{
-		void *stack = (void*)mm_SysAlloc(1);
+		void *stack = mm_SysAlloc(1);
 		thread->userStackBottom = process->nextThreadStack - MM_BLOCK_SIZE;
 		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
 		thread->userStackPhys = vmm_getPhysAddress(stack);
@@ -106,7 +106,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 void thread_destroy(thread_t *thread)
 {
-	mm_SysFree((uintptr_t)thread->kernelStackBottom, 1);
+	mm_SysFree(thread->kernelStackBottom, 1);
 
 	//Thread aus Listen entfernen
 	thread_t *t;
