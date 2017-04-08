@@ -6,48 +6,42 @@
  */
 
 #include "cleaner.h"
-#include "list.h"
-#include "lock.h"
+#include "stack.h"
 #include "stdlib.h"
 #include "scheduler.h"
 
 extern thread_t *cleanerThread;
 
-static list_t cleanList;
-static lock_t cleanLock = LOCK_UNLOCKED;
+static stack_t *cleanStack;
 
 void __attribute__((noreturn)) cleaner()
 {
 	while(1)
 	{
-		lock(&cleanLock);
-		if(list_size(cleanList) > 0)
+		clean_entry_t *entry;
+		while(stack_pop(cleanStack, (void**)&entry))
 		{
-			clean_entry_t *entry;
-			while((entry = list_pop(cleanList)))
+			switch(entry->type)
 			{
-				switch(entry->type)
-				{
-					case CL_PROCESS:
-						pm_DestroyTask(entry->data);
-					break;
-					case CL_THREAD:
-						thread_destroy(entry->data);
-				}
-				free(entry);
+				case CL_PROCESS:
+					pm_DestroyTask(entry->data);
+				break;
+				case CL_THREAD:
+					while(((thread_t*)entry->data)->Status != THREAD_BLOCKED) yield();
+					thread_destroy(entry->data);
 			}
+			free(entry);
 		}
-		unlock(&cleanLock);
-		thread_block(cleanerThread);
-		yield();
+		thread_block_self(NULL, NULL);
 	}
 }
 
 void cleaner_Init()
 {
-	cleanList = list_create();
+	cleanStack = stack_create();
 }
 
+//FIXME
 void cleaner_cleanProcess(process_t *process)
 {
 	clean_entry_t *entry = malloc(sizeof(clean_entry_t));
@@ -55,12 +49,7 @@ void cleaner_cleanProcess(process_t *process)
 	entry->type = CL_PROCESS;
 	entry->data = process;
 
-	//Prozess blockieren
-	pm_BlockTask(process);
-
-	lock(&cleanLock);
-	list_push(cleanList, entry);
-	unlock(&cleanLock);
+	stack_push(cleanStack, entry);
 	thread_unblock(cleanerThread);
 }
 
@@ -71,11 +60,7 @@ void cleaner_cleanThread(thread_t *thread)
 	entry->type = CL_THREAD;
 	entry->data = thread;
 
-	//Thread blockieren
-	thread_block(thread);
-
-	lock(&cleanLock);
-	list_push(cleanList, entry);
-	unlock(&cleanLock);
+	stack_push(cleanStack, entry);
 	thread_unblock(cleanerThread);
+	thread_block_self(NULL, NULL);
 }

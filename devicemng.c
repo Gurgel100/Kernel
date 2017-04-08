@@ -14,6 +14,8 @@
 #include "scsi.h"
 #include "stdlib.h"
 #include "string.h"
+#include "assert.h"
+#include "stdarg.h"
 
 #define GET_BYTE(value, offset) (value >> offset) & 0xFF
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
@@ -35,13 +37,12 @@ void dmng_registerDevice(struct cdi_device *dev)
 
 	vfs_device_t *vfs_dev = malloc(sizeof(vfs_device_t));
 	vfs_dev->opaque = device;
-	vfs_dev->read = (vfs_device_read_handler_t*)dmng_Read;
-	vfs_dev->write = (vfs_device_write_handler_t*)NULL;
-	vfs_dev->getValue = (vfs_device_getValue_handler_t*)dmng_getValue;
+	vfs_dev->read = dmng_Read;
+	vfs_dev->write = NULL;
+	vfs_dev->function = dmng_function;
+	vfs_dev->getCapabilities = dmng_getCapabilities;
 
 	vfs_RegisterDevice(vfs_dev);
-
-	partition_getPartitions(device);
 
 	list_push(devices, device);
 }
@@ -54,8 +55,9 @@ void dmng_registerDevice(struct cdi_device *dev)
  * 				buffer = Buffer in den die Daten geschrieben werden sollen
  * Rückgabe:	0 bei Fehler und sonst die gelesenen Bytes
  */
-size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
+size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 {
+	device_t *dev = d;
 	if(size == 0 || buffer == NULL) return 0;
 
 	if(dev->device->bus_data->bus_type == CDI_STORAGE)
@@ -123,17 +125,61 @@ size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer)
 	return size;
 }
 
-void *dmng_getValue(device_t *dev, vfs_device_function_t function)
+static void add_partition(void *d, void *p)
 {
+	device_t *dev = d;
+	list_push(dev->partitions, p);
+}
+
+void *dmng_function(void *d, vfs_device_function_t function, ...)
+{
+	void *val;
+	device_t *dev = d;
+
+	va_list arg;
+	va_start(arg, function);
+
 	switch(function)
 	{
-		case FUNC_TYPE:
-			return VFS_DEVICE_STORAGE;
-		case FUNC_NAME:
-			return (void*)dev->device->name;
+		case VFS_DEV_FUNC_TYPE:
+			val = (void*)VFS_DEVICE_STORAGE;
+		break;
+		case VFS_DEV_FUNC_NAME:
+			val = (void*)dev->device->name;
+		break;
+		case VFS_DEV_FUNC_SCAN_PARTITIONS:
+			dev->partitions = list_create();
+			partition_getPartitions(dev->device->name, va_arg(arg, vfs_file_t), add_partition, dev);
+			val = 0;
+		break;
+		case VFS_DEV_FUNC_BLOCKSIZE:
+			val = (void*)dmng_getBlockSize(dev);
+		break;
 		default:
-			return NULL;
+			val = NULL;
 	}
+
+	va_end(arg);
+	return val;
+}
+
+vfs_device_capabilities_t dmng_getCapabilities(void *d __attribute__((unused)))
+{
+	return VFS_DEV_CAP_BLOCKSIZE | VFS_DEV_CAP_PARTITIONS;
+}
+
+size_t dmng_getBlockSize(device_t *dev)
+{
+	assert(dev != NULL);
+	if(dev->device->bus_data->bus_type == CDI_STORAGE)
+	{
+		struct cdi_storage_device *device = (struct cdi_storage_device*)dev->device;
+		return device->block_size;
+	}
+	else if(dev->device->bus_data->bus_type == CDI_SCSI)
+		return 2048;
+	else
+		return 0;
 }
 
 #endif

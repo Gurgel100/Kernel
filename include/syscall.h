@@ -22,6 +22,16 @@ typedef enum{
 	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
 }vfs_fileinfo_t;
 
+typedef enum{
+	UDT_UNKNOWN, UDT_DIR, UDT_FILE, UDT_LINK, UDT_DEV
+}vfs_userspace_direntry_type_t;
+
+typedef struct{
+	size_t size;
+	vfs_userspace_direntry_type_t type;
+	char name[];
+}vfs_userspace_direntry_t;
+
 typedef uint64_t pid_t;
 typedef uint64_t tid_t;
 
@@ -39,6 +49,8 @@ inline void syscall_fclose(void *stream);
 inline size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer);
 inline size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer);
 inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
+inline int syscall_mount(const char *mountpoint, const char *device);
+inline int syscall_unmount(const char *mountpoint);
 
 inline void syscall_sleep(uint64_t msec);
 

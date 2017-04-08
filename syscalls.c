@@ -90,8 +90,8 @@ static syscall syscalls[] = {
 		(syscall)&vfs_syscall_read,		//42
 		(syscall)&vfs_syscall_write,	//43
 		(syscall)&vfs_syscall_getFileinfo,		//44
-		(syscall)&nop,
-		(syscall)&nop,
+		(syscall)&vfs_syscall_mount,	//45
+		(syscall)&vfs_syscall_unmount,	//46
 		(syscall)&nop,
 		(syscall)&nop,
 		(syscall)&nop,

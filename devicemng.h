@@ -25,10 +25,12 @@ typedef struct{
 
 void dmng_Init(void);
 void dmng_registerDevice(struct cdi_device *dev);
-size_t dmng_Read(device_t *dev, uint64_t start, size_t size, void *buffer);
-size_t dmng_Write(device_t *dev, uint64_t start, size_t size, const void *buffer);
+size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer);
+size_t dmng_Write(void *d, uint64_t start, size_t size, const void *buffer);
 
-void *dmng_getValue(device_t *dev, vfs_device_function_t function);
+void *dmng_function(void *d, vfs_device_function_t function, ...);
+vfs_device_capabilities_t dmng_getCapabilities(void *d);
+size_t dmng_getBlockSize(device_t *dev);
 
 #endif /* DEVICEMNG_H_ */
 

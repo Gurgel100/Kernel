@@ -7,6 +7,7 @@
 
 #include "list.h"
 #include "stdlib.h"
+#include "assert.h"
 
 struct list_node{
 		void *Value;
@@ -39,6 +40,7 @@ list_t list_create(void)
  */
 void list_destroy(list_t list)
 {
+	assert(list != NULL);
 	//Liste leeren (vorsichtshalber)
 	while(list_pop(list) != NULL);
 	//Speicher freigeben
@@ -56,8 +58,7 @@ void list_destroy(list_t list)
  */
 list_t list_push(list_t list, void* value)
 {
-	if(!list)
-		return NULL;
+	assert(list != NULL);
 
 	struct list_node *Node;
 	Node = malloc(sizeof(*Node));
@@ -79,7 +80,7 @@ list_t list_push(list_t list, void* value)
  */
 void* list_pop(list_t list)
 {
-	if(!list) return NULL;
+	assert(list != NULL);
 
 	struct list_node *oldNode;
 	void *Value;
@@ -104,8 +105,7 @@ void* list_pop(list_t list)
  */
 size_t list_empty(list_t list)
 {
-	if(!list) return 1;
-
+	assert(list != NULL);
 	return (list->Size == 0);
 }
 
@@ -122,7 +122,7 @@ void* list_get(list_t list, size_t index)
 {
 	struct list_node *Node;
 	size_t i;
-	if(!list) return NULL;
+	assert(list != NULL);
 	if(index >= list->Size)
 		return NULL;
 	Node = list->Anchor;
@@ -146,6 +146,7 @@ void* list_get(list_t list, size_t index)
 list_t list_insert(list_t list, size_t index, void* value)
 {
 	struct list_node *newNode;
+	assert(list != NULL);
 	if(index)
 	{
 		struct list_node *Node = NULL;
@@ -192,7 +193,7 @@ void* list_remove(list_t list, size_t index)
 	struct list_node *Node, *prevNode;
 	size_t i;
 	void *value;
-	if(!list) return NULL;
+	assert(list != NULL);
 	if(index >= list->Size)
 		return NULL;
 	Node = list->Anchor;
@@ -224,7 +225,6 @@ void* list_remove(list_t list, size_t index)
  */
 size_t list_size(list_t list)
 {
-	if(!list) return 0;
-
+	assert(list != NULL);
 	return list->Size;
 }

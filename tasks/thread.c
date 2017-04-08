@@ -7,7 +7,6 @@
 
 #include "thread.h"
 #include "list.h"
-#include "lock.h"
 #include "memory.h"
 #include "tss.h"
 #include "vmm.h"
@@ -16,22 +15,19 @@
 #include "cpu.h"
 #include "scheduler.h"
 #include "pmm.h"
+#include "assert.h"
 
 list_t threadList;
-tid_t nextTID = 1;
+
+static tid_t get_tid()
+{
+	static tid_t nextTID = 1;
+	return __sync_fetch_and_add(&nextTID, 1);
+}
 
 void thread_Init()
 {
 	threadList = list_create();
-}
-
-tid_t get_tid()
-{
-	static lock_t tid_lock = LOCK_UNLOCKED;
-	lock(&tid_lock);
-	tid_t tid = nextTID++;
-	unlock(&tid_lock);
-	return tid;
 }
 
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
@@ -46,7 +42,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 	thread->process = process;
 
-	thread->Status = BLOCKED;
+	thread->Status = THREAD_BLOCKED;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
 			.cs = (kernel) ? 0x8 : 0x20 + 3,	//Kernel- oder Userspace
@@ -105,8 +101,6 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Thread in Liste eintragen
 	list_push(threadList, thread);
 
-	thread->Status = BLOCKED;
-
 	return thread;
 }
 
@@ -151,30 +145,53 @@ void thread_prepare(thread_t *thread)
 	TSS_setStack(thread->kernelStack);
 }
 
-void thread_block(thread_t *thread)
+bool thread_block_self(thread_bail_out_t bail, void *context)
 {
-	if(thread != NULL && (thread->Status == RUNNING || thread->Status == READY))
+	assert(currentThread != NULL);
+	if(currentThread->Status == THREAD_RUNNING)
 	{
-		scheduler_remove(thread);
-		thread->Status = BLOCKED;
+		currentThread->Status = THREAD_BLOCKED;
+		scheduler_remove(currentThread);
+		while(currentThread->Status == THREAD_BLOCKED) yield();
 	}
+
+	if(currentProcess->Status != PM_RUNNING)
+	{
+		if(bail != NULL)
+			bail(context);
+		while((currentProcess->Status != PM_RUNNING)) yield();
+		return false;
+	}
+	return true;
+}
+
+bool thread_try_unblock(thread_t *thread)
+{
+	assert(thread != NULL);
+	if(thread->Status != THREAD_RUNNING)
+	{
+		thread->Status = THREAD_RUNNING;
+		if(!scheduler_try_add(thread))
+		{
+			thread->Status = THREAD_RUNNING;
+			return false;
+		}
+		return true;
+	}
+	return true;
 }
 
 void thread_unblock(thread_t *thread)
 {
-	if(thread != NULL && (thread->Status != RUNNING && thread->Status != READY))
+	assert(thread != NULL);
+	if(thread->Status != THREAD_RUNNING)
 	{
-		thread->Status = READY;
+		thread->Status = THREAD_RUNNING;
 		scheduler_add(thread);
 	}
 }
 
-void thread_waitUserIO(thread_t* thread)
+void thread_waitUserIO()
 {
-	if(thread != NULL && (thread->Status == RUNNING || thread->Status == READY))
-	{
-		thread->Status = WAITING_USERIO;
-		scheduler_remove(thread);
-		yield();
-	}
+	thread_block_self(NULL, NULL);
 }

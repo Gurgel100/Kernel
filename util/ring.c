@@ -7,12 +7,13 @@
 
 #include "ring.h"
 #include "stdlib.h"
+#include "assert.h"
 
-/*
- * Erstellt einen neuen Ring
- *
- * Rückgabewert:	Pointer auf den Ring
- */
+struct ring_s{
+	ring_entry_t* base;
+	size_t size;
+};
+
 ring_t *ring_create()
 {
 	ring_t *ring = calloc(1, sizeof(ring_t));
@@ -20,55 +21,22 @@ ring_t *ring_create()
 	return ring;
 }
 
-/*
- * Zerstört einen Ring
- *
- * Parameter:	ring = Der freizugebender Ring
- */
 void ring_destroy(ring_t *ring)
 {
-	if(ring == NULL)
-		return;
-
-	while(ring->size--)
-	{
-		ring_remove(ring, 0);
-	}
-
+	assert(ring != NULL);
 	free(ring);
 }
 
-/*
- * Gibt die Grösse des Rings zurück.
- *
- * Parameter:	Ring, dessen Grösse zurückgegeben werden soll
- *
- * Rückgabe:	Grösse des Rings
- */
-size_t ring_size(ring_t* ring)
+size_t ring_entries(ring_t *ring)
 {
-	if(ring != NULL)
-		return ring->size;
-	return 0;
+	assert(ring != NULL);
+	return ring->size;
 }
 
-/*
- * Fügt ein Element zu einem Ring hinzu.
- *
- * Parameter:	ring = Der Ring, in das das Element eingefügt werden soll
- * 				value = Wert des Elements
- * Rückgabe:	Wert des eingefügten Elements
- */
-void* ring_add(ring_t* ring, void* value)
+void ring_add(ring_t *ring, ring_entry_t *entry)
 {
-	if(ring == NULL)
-		return NULL;
-
-	ring_entry_t *entry = malloc(sizeof(ring_entry_t));
-	if(entry == NULL)
-		return NULL;
-
-	entry->value = value;
+	assert(ring != NULL);
+	assert(entry != NULL);
 
 	if(ring->size)
 	{
@@ -83,80 +51,59 @@ void* ring_add(ring_t* ring, void* value)
 		entry->next = entry->prev = entry;
 	}
 	ring->size++;
-
-	return (void*)entry;
 }
 
-/*
- * Gibt das nächste Element des Rings zurück.
- *
- * Parameter:	ring = Ring
- * Rückgabe:	Wert des Elements
- */
-void* ring_getNext(ring_t* ring)
+ring_entry_t *ring_getNext(ring_t* ring)
 {
 	ring_entry_t* entry;
 
-	if(ring == NULL || ring->size == 0)
+	assert(ring != NULL);
+
+	if(ring->size == 0)
 		return NULL;
 
 	entry = ring->base;
 	ring->base = ring->base->next;
 
-	return entry->value;
+	return entry;
 }
 
-/*
- * Entfernt das übergebene Element aus dem Ring.
- *
- * Parameter:		ring = Ring, in dem das Element ist
- * 					element = Element, das gelöscht werden soll
- * Rückgabe:	Wert des gelöschten Elements
- */
-void* ring_remove(ring_t* ring, void* element)
+void ring_remove(ring_t* ring, ring_entry_t *entry)
 {
-	void *val;
-	ring_entry_t *entry = element;
+	assert(ring != NULL);
+	assert(entry != NULL);
 
-	if(ring == NULL || ring->size == 0 || entry == NULL)
-		return NULL;
+	if(ring->size == 0)
+		return;
 
 	ring->size--;
 
-	val = entry->value;
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
-	if(ring->base == entry)
+	if(ring->size == 0)
+		ring->base = NULL;
+	else if(ring->base == entry)
 		ring->base = entry->next;
-
-	free(entry);
-
-	return val;
 }
 
 
-/*
- * Durchsucht den Ring nach dem ersten Element mit dem übergebenem Wert.
- *
- * Parameter:	ring = Ring, in dem das Element gesucht werden soll
- * 				value = Wert, nach dem gesucht werden soll
- * Rückgabe:	Das gesuchte Element oder NULL, wenn nichts gefunden wurde
- */
-void* ring_find(ring_t* ring, void* value)
+bool ring_contains(ring_t *ring, ring_entry_t *entry)
 {
-	ring_entry_t* entry;
+	assert(ring != NULL);
+	assert(entry != NULL);
 
-	if(ring == NULL || ring->size == 0)
-		return NULL;
+	if(ring->size == 0)
+		return false;
 
-	entry = ring->base;
+	ring_entry_t *e = ring->base;
 	do
 	{
-		if(entry->value == value)
-			return entry;
-		entry = entry->next;
+		assert(e != NULL);
+		if(e == entry)
+			return true;
+		e = e->next;
 	}
-	while(entry != ring->base);
+	while(e != ring->base);
 
-	return NULL;
+	return false;
 }

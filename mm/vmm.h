@@ -12,7 +12,6 @@
 #include "mm.h"
 #include "pmm.h"
 #include "stdbool.h"
-#include "multiboot.h"
 #include "stddef.h"
 #include "list.h"
 
@@ -39,9 +38,6 @@ void vmm_SysFree(void *vAddress, size_t Length);
 
 void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys);
 list_t vmm_getTables(context_t *context);
-
-void vmm_MapModule(mods *mod);
-void vmm_UnMapModule(mods *mod);
 
 uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
 
