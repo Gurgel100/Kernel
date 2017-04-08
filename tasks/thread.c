@@ -91,7 +91,8 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	}
 	else
 	{
-		new_state.rsp = (uintptr_t)mm_SysAlloc(1) + MM_BLOCK_SIZE;
+		thread->kernelStackBottom = mm_SysAlloc(1);
+		new_state.rsp = (uintptr_t)thread->kernelStackBottom + MM_BLOCK_SIZE;
 		thread->State = (ihs_t*)(new_state.rsp - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
