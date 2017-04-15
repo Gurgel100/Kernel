@@ -19,6 +19,7 @@
 #include "assert.h"
 #include "pm.h"
 #include "hashmap.h"
+#include "ctype.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
@@ -578,6 +579,22 @@ static vfs_node_t *resolveLink(vfs_node_t *node)
 	return node;
 }
 
+/*
+ * Überprüft den Pfad auf ungültige Zeichen
+ * Parameter:	path = Pfad, der überprüft werden soll
+ * Rückgabe:	Ob der Pfad gültig ist
+ */
+static bool check_path(const char *path)
+{
+	char c;
+	while((c = *path++) != '\0')
+	{
+		if(iscntrl(c) || c == '|' || c == '\\' || c == '*' || c == '\"' || c == '?')
+			return false;
+	}
+	return true;
+}
+
 void vfs_Init(void)
 {
 	res_list = list_create();
@@ -611,7 +628,7 @@ void vfs_Init(void)
  */
 vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 {
-	if(path == NULL || strlen(path) == 0 || (!mode.read && !mode.write) || (mode.write && mode.directory))
+	if(path == NULL || strlen(path) == 0 || !check_path(path) || (!mode.read && !mode.write) || (mode.write && mode.directory))
 		return -1;
 
 	char *remPath;

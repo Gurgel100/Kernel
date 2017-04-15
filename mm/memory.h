@@ -13,7 +13,7 @@
 #define KERNELSPACE_END		(0x8000000000 - 1)			//Kernelspace Ende (512GB)
 
 //Userspace
-#define USERSPACE_START		KERNELSPACE_END + 1			//Userspace Anfang
+#define USERSPACE_START		(KERNELSPACE_END + 1)	//Userspace Anfang
 #define USERSPACE_END		0xFFFFFF7FFFFFFFFF		//Userspace Ende
 #define MAX_ADDRESS			0xFFFFFFFFFFFFFFFF		//Maximale Adresse
 

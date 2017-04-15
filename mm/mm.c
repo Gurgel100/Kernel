@@ -22,14 +22,14 @@ bool mm_Init()
  * Reserviert Speicher für Pages Pages.
  * Parameter:	Pages = Anzahl Pages, die reserviert werden sollen
  */
-uintptr_t mm_Alloc(uint64_t Pages)
+void *mm_Alloc(uint64_t Pages)
 {
 	return vmm_Alloc(Pages);
 }
 
-void mm_Free(uintptr_t Address, uint64_t Pages)
+void mm_Free(void *Address, uint64_t Pages)
 {
-	if(Address < USERSPACE_START || Address > USERSPACE_END)	//Kontrolle ob richtiger Adress-
+	if(Address < (void*)USERSPACE_START || Address > (void*)USERSPACE_END)	//Kontrolle ob richtiger Adress-
 		Panic("MM", "Ungueltiger Adressbereich");			//bereich
 	vmm_Free(Address, Pages);
 }
@@ -40,13 +40,13 @@ void mm_Free(uintptr_t Address, uint64_t Pages)
  * Parameter:		Size = Grösse des Speicherbereichs, der reserviert werden soll in Bytes
  * Rückgabewert:	Adresse, an die der Speichblock reserviert wurde
  */
-uintptr_t mm_SysAlloc(uint64_t Size)
+void *mm_SysAlloc(uint64_t Size)
 {
-	uintptr_t Address;
+	void *Address;
 	Address = vmm_SysAlloc(Size);
-	if(Address == 1) Panic("MM", "Nicht genuegend physikalischer Speicher vorhanden");
-	if(Address == 2) Panic("MM", "Virtuelle Adresse ist schon belegt");
-	if(Address == 3) Panic("MM", "Nich genuegend virtueller Speicher vorhanden");
+	if(Address == (void*)1) Panic("MM", "Nicht genuegend physikalischer Speicher vorhanden");
+	if(Address == (void*)2) Panic("MM", "Virtuelle Adresse ist schon belegt");
+	if(Address == (void*)3) Panic("MM", "Nich genuegend virtueller Speicher vorhanden");
 	return Address;
 }
 
@@ -58,9 +58,9 @@ uintptr_t mm_SysAlloc(uint64_t Size)
  * Rückgabewert:	true = Speicherbereich erfolgreich freigegeben
  * 					false = Fehler beim Freigeben des Speicherbereichs
  */
-bool mm_SysFree(uintptr_t Address, uint64_t Size)
+bool mm_SysFree(void *Address, uint64_t Size)
 {
-	if(Address > KERNELSPACE_END) return false;
+	if(Address > (void*)KERNELSPACE_END) return false;
 	vmm_SysFree(Address, Size);
 	return true;
 }
