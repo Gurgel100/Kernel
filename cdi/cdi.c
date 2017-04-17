@@ -8,11 +8,10 @@
 #include "cdi.h"
 #include "isr.h"
 #include "pci.h"
+#include "drivermanager.h"
 
 extern struct cdi_driver *__start_cdi_drivers;
 extern struct cdi_driver *__stop_cdi_drivers;
-
-cdi_list_t drivers;
 
 /**
  * \german
@@ -43,8 +42,6 @@ void cdi_init()
 	extern cdi_list_t IRQHandlers;
 	IRQHandlers = cdi_list_create();
 
-	drivers = cdi_list_create();
-
 	// Alle in dieser Binary verfügbaren Treiber aufsammeln
 	for(pdrv = &__start_cdi_drivers; pdrv < &__stop_cdi_drivers; pdrv++)
 	{
@@ -73,16 +70,18 @@ void cdi_init()
 		device = NULL;
 
 		//Treiber suchen
-		size_t j;
-		for(j = 0; (driver = cdi_list_get(drivers, j)); j++)
+		struct cdi_driver *prev = NULL;
+		while((driver = drivermanager_getNextDeviceDriver(CDI_PCI, prev)) != NULL)
 		{
-			if(driver->bus == CDI_PCI && driver->init_device)
+			if(driver->init_device)
 			{
 				device = driver->init_device(&pci->bus_data);
-				break;
+				if(device != NULL)
+					break;
 			}
+			prev = driver;
 		}
-		if(device != NULL)
+		if(driver != NULL)
 		{
 			cdi_list_push(driver->devices, device);
 		}
@@ -137,8 +136,7 @@ void cdi_driver_destroy(struct cdi_driver* driver)
  */
 void cdi_driver_register(struct cdi_driver* driver)
 {
-	printf("Registered Driver: %s\n", driver->name);
-	cdi_list_push(drivers, driver);
+	drivermanager_registerDriver(driver);
 }
 
 /**

@@ -54,7 +54,7 @@ bool scheduler_try_add(thread_t *thread)
 {
 	if(try_lock(&schedule_lock))
 	{
-		ring_add(scheduleList, thread);
+		ring_add(scheduleList, &thread->ring_entry);
 		unlock(&schedule_lock);
 		return true;
 	}
@@ -68,7 +68,7 @@ bool scheduler_try_add(thread_t *thread)
  */
 void scheduler_add(thread_t *thread)
 {
-	while(!scheduler_try_add(thread));
+	while(!scheduler_try_add(thread)) asm volatile("pause");
 }
 
 /*
@@ -79,7 +79,8 @@ void scheduler_add(thread_t *thread)
 void scheduler_remove(thread_t *thread)
 {
 	lock(&schedule_lock);
-	ring_remove(scheduleList, ring_find(scheduleList, thread));
+	if(ring_contains(scheduleList, &thread->ring_entry))
+		ring_remove(scheduleList, &thread->ring_entry);
 	unlock(&schedule_lock);
 }
 
@@ -102,7 +103,7 @@ thread_t *scheduler_schedule(ihs_t *state)
 
 	if(try_lock((&schedule_lock)))
 	{
-		newThread = ring_getNext(scheduleList);
+		newThread = (thread_t*)ring_getNext(scheduleList);
 		if(newThread == NULL)
 			newThread = idleThread;
 		unlock(&schedule_lock);

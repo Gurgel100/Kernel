@@ -14,11 +14,10 @@
 
 //Speicherverwaltung
 bool mm_Init(void);
-uintptr_t mm_Alloc(uint64_t Size);
-void mm_Free(uintptr_t Address, uint64_t Size);
+void *mm_Alloc(uint64_t Size);
+void mm_Free(void *Address, uint64_t Size);
 
-uintptr_t mm_SysAlloc(uint64_t Size);
-bool mm_SysAllocAddr(uintptr_t Address, uint64_t Size);
-bool mm_SysFree(uintptr_t Address, uint64_t Size);
+void *mm_SysAlloc(uint64_t Size);
+bool mm_SysFree(void *Address, uint64_t Size);
 
 #endif /* MM_H_ */

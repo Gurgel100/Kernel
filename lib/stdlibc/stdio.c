@@ -593,6 +593,15 @@ int sprintf(char *str, const char *format, ...)
 	return pos;
 }
 
+int snprintf(char *str, int bufsz, const char *format, ...)
+{
+	va_list arg;
+	va_start(arg, format);
+	int pos = vsnprintf(str, bufsz, format, arg);
+	va_end(arg);
+	return pos;
+}
+
 int asprintf(char **str, const char *format, ...)
 {
 	va_list arg;
@@ -1324,6 +1333,48 @@ int vsprintf(char *str, const char *format, va_list arg)
 
 	//String null-terminieren
 	args.str[args.size] = '\0';
+
+	return retval;
+}
+
+
+typedef struct{
+	char *str;
+	size_t pos, size;
+}vsnprintf_t;
+
+static int vsnprintf_putc(void *arg, char c)
+{
+	vsnprintf_t *args = arg;
+
+	if(args->size == 0)
+		return 1;
+	if(args->pos < args->size - 1)
+	{
+		args->str[args->pos++] = c;
+		return 1;
+	}
+
+	return 0;
+}
+
+int vsnprintf(char *str, int bufsz, const char *format, va_list arg)
+{
+	vsnprintf_t args = {
+			.str = str,
+			.size = bufsz
+	};
+
+	jprintf_args handler = {
+			.putc = &vsnprintf_putc,
+			.arg = &args
+	};
+
+	int retval = jvprintf(&handler, format, arg);
+
+	//String null-terminieren
+	if(args.size > 0)
+		args.str[args.pos] = '\0';
 
 	return retval;
 }

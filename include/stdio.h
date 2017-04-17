@@ -94,11 +94,13 @@ extern char *fgets(char *str, int n, FILE *stream);
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int vprintf(const char *format, va_list arg);
 extern int vsprintf(char *str, const char *format, va_list arg);
+extern int vsnprintf(char *str, int bufsz, const char *format, va_list arg);
 extern int vasprintf(char **str, const char *format, va_list arg);
 
 extern int fprintf(FILE *stream, const char *format, ...);
 extern int printf(const char *format, ...);
 extern int sprintf(char *str, const char *format, ...);
+extern int snprintf(char *str, int bufsz, const char *format, ...);
 extern int asprintf(char **str, const char *format, ...);
 
 extern int vfscanf(FILE *stream, const char *format, va_list arg);

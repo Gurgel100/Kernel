@@ -61,29 +61,6 @@ static void pid_visit(const void *a, void *b)
 		list_push(childs, p);
 }
 
-static void pid_list(const void *a, void *b)
-{
-	process_info_t *process_info = *(process_info_t**)b;
-	size_t max_count = (size_t)((uintptr_t*)b)[1];
-	size_t *i = (size_t*)((uintptr_t*)b)[2];
-	process_t *p = (process_t*)a;
-
-	if(*i < max_count)
-	{
-		process_info[*i].pid = p->PID;
-		process_info[*i] = (process_info_t){
-			.pid = p->PID,
-			.ppid = (p->parent) ? p->parent->PID : 0,
-			.num_threads = list_size(p->threads),
-			.status = p->Status
-		};
-		memcpy(&process_info[*i].cmd, p->cmd, 19 * sizeof(char));
-		process_info[*i].cmd[19] = '\0';
-		(*i)++;
-	}
-}
-
-
 /*
  * Prozessverwaltung initialisieren
  */
@@ -186,6 +163,7 @@ void pm_DestroyTask(process_t *process)
 		while((thread = list_get(process->threads, 0)))
 			thread_destroy(thread);
 		deleteContext(process->Context);
+		vfs_deinitUserspace(process);
 		free(process->cmd);
 		free(process);
 		numTasks--;

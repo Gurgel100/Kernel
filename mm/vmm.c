@@ -252,28 +252,6 @@ void vmm_SysFree(void *vAddress, size_t Length)
 }
 
 /*
- * Mappt ein Modul an eine bestimmte Stelle
- * Params:	mod = Mod-Struktur
- */
-void __attribute__((deprecated)) vmm_MapModule(mods *mod)
-{
-	uintptr_t i;
-	for(i = (mod->mod_start & ~0xFFF); i <= (mod->mod_end & ~0xFFF) ; i += VMM_SIZE_PER_PAGE)
-		vmm_Map(i, i, 0, 0);
-}
-
-/*
- * Unmappt ein Modul
- * Params:	mod = Mod-Struktur
- */
-void __attribute__((deprecated)) vmm_UnMapModule(mods *mod)
-{
-	uintptr_t i;
-	for(i = (mod->mod_start & ~0xFFF); i <= (mod->mod_end & ~0xFFF) ; i += VMM_SIZE_PER_PAGE)
-		vmm_UnMap(i);
-}
-
-/*
  * Reserviert Speicher für DMA und mappt diesen
  * Params:	maxAddress = maximale physische Adresse für den Speicherbereich
  * 			size = Anzahl Pages des Speicherbereichs

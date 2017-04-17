@@ -19,34 +19,9 @@
 #include "assert.h"
 #include "pm.h"
 #include "hashmap.h"
-#include "refcount.h"
+#include "ctype.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
-
-#define VFS_MODE_READ	0x1
-#define VFS_MODE_WRITE	0x2
-#define VFS_MODE_APPEND	0x4
-
-#define PT_VOID			0x00
-#define PT_FAT12		0x01
-#define PT_FAT16S		0x04
-#define PT_EXTENDED		0x05
-#define PT_FAT16B		0x06
-#define PT_NTFS			0x07
-#define PT_FAT32		0x0B
-#define PT_FAT32LBA		0x0C
-#define PT_FAT16BLBA	0x0E
-#define PT_EXTENDEDLBA	0x0F
-#define PT_OEM			0x12
-#define PT_DYNAMIC		0x42
-#define PT_SWAP			0x82
-#define PT_NATIVE		0x83
-#define PT_LVM			0x8E
-#define PT_FBSD			0xA5
-#define PT_OBSD			0XA6
-#define PT_NBSD			0xA9
-#define PT_LEGACY		0xEE
-#define PT_EFI			0xEF
 
 struct vfs_stream;
 
@@ -62,7 +37,7 @@ typedef struct vfs_node{
 		struct vfs_node *next;
 		union{
 			vfs_device_t *dev;			//TYPE_DEVICE
-			struct cdi_fs_filesystem *fs;	//TYPE_MOUNT
+			vfs_filesystem_t *fs;		//TYPE_MOUNT
 			size_t (*handler)(char *name, uint64_t start, size_t length, const void *buffer);
 		};
 		struct vfs_stream *stream;	//Stream, in dem die Node geöffnet ist
@@ -515,7 +490,7 @@ static vfs_node_t *createFileNode(vfs_node_t *parent, const char *name, size_t (
  * 				fs = Dateisystem, welches gemounted wurde
  * Rückgabe:	Pointer zur neuen Node
  */
-static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, struct cdi_fs_filesystem *fs)
+static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, vfs_filesystem_t *fs)
 {
 	lock(&vfs_lock);
 
@@ -604,6 +579,22 @@ static vfs_node_t *resolveLink(vfs_node_t *node)
 	return node;
 }
 
+/*
+ * Überprüft den Pfad auf ungültige Zeichen
+ * Parameter:	path = Pfad, der überprüft werden soll
+ * Rückgabe:	Ob der Pfad gültig ist
+ */
+static bool check_path(const char *path)
+{
+	char c;
+	while((c = *path++) != '\0')
+	{
+		if(iscntrl(c) || c == '|' || c == '\\' || c == '*' || c == '\"' || c == '?')
+			return false;
+	}
+	return true;
+}
+
 void vfs_Init(void)
 {
 	res_list = list_create();
@@ -637,7 +628,7 @@ void vfs_Init(void)
  */
 vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 {
-	if(path == NULL || strlen(path) == 0 || (!mode.read && !mode.write) || (mode.write && mode.directory))
+	if(path == NULL || strlen(path) == 0 || !check_path(path) || (!mode.read && !mode.write) || (mode.write && mode.directory))
 		return -1;
 
 	char *remPath;
@@ -652,7 +643,7 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
-			stream->stream.fs = node->fs;
+			stream->stream.fs = &node->fs->fs;
 			stream->stream.res = getRes(&stream->stream, remPath);
 			//Löse symlinks auf
 			while(stream->stream.res != NULL && stream->stream.res->link != NULL)
@@ -850,7 +841,9 @@ static size_t ReadDir(vfs_stream_t *stream, uint64_t start, size_t size, vfs_use
 	switch(node->type)
 	{
 		case TYPE_MOUNT:
-			sizeRead = readNodeChilds(node, start, size, buffer);
+			//FIXME: hack
+			if(stream->stream.res == node->fs->fs.root_res)
+				sizeRead = readNodeChilds(node, start, size, buffer);
 			if(sizeRead < size)
 			{
 				cdi_list_t childs;
@@ -1059,6 +1052,10 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	return 1;
 }
 
+void vfs_deinitUserspace(process_t *p)
+{
+}
+
 /*
  * Gibt die Metainformationen einer Datei zurück
  * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)
@@ -1095,6 +1092,20 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 			break;
 		}
 	}
+	else if(stream->node->type == TYPE_DEV)
+	{
+		switch(info)
+		{
+			case VFS_INFO_BLOCKSIZE:
+				if(stream->node->dev->getCapabilities(stream->node->dev->opaque) & VFS_DEV_CAP_BLOCKSIZE)
+					return (uint64_t)stream->node->dev->function(stream->node->dev->opaque, VFS_DEV_FUNC_BLOCKSIZE);
+				else
+					return 0;
+			break;
+			default:
+				return 0;
+		}
+	}
 
 	return 0;
 }
@@ -1120,19 +1131,15 @@ int vfs_Mount(const char *Mountpath, const char *Dev)
 	if(devNode->type != TYPE_DEV)
 		return 3;
 
-	if(devNode->dev->getValue == NULL || strcmp(VFS_DEVICE_PARTITION, (char*)devNode->dev->getValue(devNode->dev->opaque, FUNC_TYPE)) != 0)
+	if((vfs_device_type_t)devNode->dev->function(devNode->dev->opaque, VFS_DEV_FUNC_TYPE) != VFS_DEVICE_PARTITION)
 		return 7;
 
-	struct cdi_fs_filesystem *fs = devNode->dev->getValue(devNode->dev->opaque, FUNC_DATA);
+	vfs_filesystem_t *fs = devNode->dev->function(devNode->dev->opaque, VFS_DEV_FUNC_MOUNT);
 	if(fs == NULL)
 		return 5;
 
 	if(mount->type == TYPE_MOUNT)
 		return 6;
-
-	//Dateisystem initialisieren
-	if(!fs->driver->fs_init(fs))
-		return 4;
 
 	mount->fs = fs;
 	mount->type = TYPE_MOUNT;
@@ -1151,8 +1158,7 @@ int vfs_Unmount(const char *Mount)
 	if(!mount || mount->type != TYPE_MOUNT)
 		return 1;
 
-	//FS deinitialisieren
-	mount->fs->driver->fs_destroy(mount->fs);
+	mount->fs->device->function(mount->fs->device->opaque, VFS_DEV_FUNC_UMOUNT);
 
 	mount->type = TYPE_DIR;
 
@@ -1174,7 +1180,7 @@ int vfs_MountRoot(void)
 		if(node->type == TYPE_DEV)
 		{
 			asprintf(&DevPath, "dev/%s", node->name);
-			status = vfs_Mount("/", DevPath);
+			status = vfs_Mount(VFS_ROOT, DevPath);
 			free(DevPath);
 			if(status == 0)
 			{
@@ -1184,21 +1190,12 @@ int vfs_MountRoot(void)
 					fclose(fp);
 					break;
 				}
-				vfs_Unmount("/");
+				vfs_Unmount(VFS_ROOT);
 			}
 		}
 	}
 	while((node = node->next) != NULL);
 	return status;
-}
-
-/*
- * Unmountet root
- * Rückgabe:	!0 bei Fehler
- */
-int vfs_UnmountRoot(void)
-{
-	return vfs_Unmount("/mount/0");
 }
 
 /*
@@ -1209,11 +1206,29 @@ void vfs_RegisterDevice(vfs_device_t *dev)
 {
 	const char *Path = "/dev";	//Pfad zu den Gerätendateien
 	vfs_node_t *tmp;
+
+	assert(dev != NULL);
+	assert(dev->function != NULL);
+	assert(dev->getCapabilities != NULL);
+
 	//ist der Ordner schon vorhanden?
 	if(!(tmp = getNode(Path))) return;	//Fehler
 
 	//Gerätedatei anlegen
-	createDeviceNode(tmp, dev->getValue(dev->opaque, FUNC_NAME), dev);
+	vfs_node_t *dev_node = createDeviceNode(tmp, dev->function(dev->opaque, VFS_DEV_FUNC_NAME), dev);
+	if(dev_node != NULL && (dev->getCapabilities(dev->opaque) & VFS_DEV_CAP_PARTITIONS))
+	{
+		char *dev_path = malloc(strlen(Path) + strlen(dev_node->name) + 2);
+		sprintf(dev_path, "%s/%s", Path, dev_node->name);
+		vfs_mode_t dev_mode = (vfs_mode_t){
+			.read = dev->read != NULL,
+			.write = dev->write != NULL
+		};
+		vfs_file_t dev_stream = vfs_Open(dev_path, dev_mode);
+		free(dev_path);
+
+		dev->function(dev->opaque, VFS_DEV_FUNC_SCAN_PARTITIONS, dev_stream);
+	}
 }
 
 //Syscalls

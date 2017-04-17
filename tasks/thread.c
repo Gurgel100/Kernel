@@ -7,7 +7,6 @@
 
 #include "thread.h"
 #include "list.h"
-#include "lock.h"
 #include "memory.h"
 #include "tss.h"
 #include "vmm.h"
@@ -19,20 +18,16 @@
 #include "assert.h"
 
 list_t threadList;
-tid_t nextTID = 1;
+
+static tid_t get_tid()
+{
+	static tid_t nextTID = 1;
+	return __sync_fetch_and_add(&nextTID, 1);
+}
 
 void thread_Init()
 {
 	threadList = list_create();
-}
-
-tid_t get_tid()
-{
-	static lock_t tid_lock = LOCK_UNLOCKED;
-	lock(&tid_lock);
-	tid_t tid = nextTID++;
-	unlock(&tid_lock);
-	return tid;
 }
 
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
@@ -73,7 +68,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Kernelstack vorbereiten
 	if(!kernel)
 	{
-		thread->kernelStackBottom = (void*)mm_SysAlloc(1);
+		thread->kernelStackBottom = mm_SysAlloc(1);
 		thread->kernelStack = thread->kernelStackBottom + MM_BLOCK_SIZE;
 		thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
@@ -84,7 +79,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Stack mappen
 	if(!kernel)
 	{
-		void *stack = (void*)mm_SysAlloc(1);
+		void *stack = mm_SysAlloc(1);
 		thread->userStackBottom = process->nextThreadStack - MM_BLOCK_SIZE;
 		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
 		thread->userStackPhys = vmm_getPhysAddress(stack);
@@ -96,7 +91,8 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	}
 	else
 	{
-		new_state.rsp = (uintptr_t)mm_SysAlloc(1) + MM_BLOCK_SIZE;
+		thread->kernelStackBottom = mm_SysAlloc(1);
+		new_state.rsp = (uintptr_t)thread->kernelStackBottom + MM_BLOCK_SIZE;
 		thread->State = (ihs_t*)(new_state.rsp - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
@@ -111,7 +107,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 void thread_destroy(thread_t *thread)
 {
-	mm_SysFree((uintptr_t)thread->kernelStackBottom, 1);
+	mm_SysFree(thread->kernelStackBottom, 1);
 
 	//Thread aus Listen entfernen
 	thread_t *t;

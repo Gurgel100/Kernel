@@ -101,9 +101,9 @@ typedef struct
 #define	ELF_PT_LOPROC	0x70000000	// reserved
 #define	ELF_PT_HIPROC	0x7FFFFFFF	// reserved
 
-#define	ELF_PF_X		0x00000001;	// ausführbares Segment
-#define	ELF_PF_W		0x00000002;	// schreibbares Segment
-#define	ELF_PF_R		0x00000004;	// lesbares Segment
+#define	ELF_PF_X		0x00000001	// ausführbares Segment
+#define	ELF_PF_W		0x00000002	// schreibbares Segment
+#define	ELF_PF_R		0x00000004	// lesbares Segment
 
 typedef struct
 {
@@ -176,7 +176,7 @@ static char elfCheck(elf_header *ELFHeader)
 pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
-	char *Ziel;
+	void *Ziel;
 
 	//Zurücksetzen des Dateizeigers
 	fseek(fp, 0, SEEK_SET);
@@ -221,15 +221,21 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, 
 
 		size_t pages = ProgramHeader[i].p_memsz / 4096;
 		pages += (ProgramHeader[i].p_memsz % 4096) ? 1 : 0;
-		Ziel = (char*)mm_SysAlloc(pages);
+		Ziel = mm_SysAlloc(pages);
 		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
 		fread(Ziel, 1, ProgramHeader[i].p_filesz, fp);
 
 		//Eventuell mit nullen auffüllen
 		memset(Ziel + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
 
+		uint16_t flags = VMM_FLAGS_USER;
+		if(ProgramHeader[i].p_flags & ELF_PF_W)
+			flags |= VMM_FLAGS_WRITE;
+		if(!(ProgramHeader[i].p_flags & ELF_PF_X))
+			flags |= VMM_FLAGS_NX;
+
 		//Speicherbereich an die richtige Addresse mappen
-		vmm_ReMap(&kernel_context, (uintptr_t)Ziel, task->Context, ProgramHeader[i].p_vaddr, pages, VMM_FLAGS_WRITE | VMM_FLAGS_USER, 0);
+		vmm_ReMap(&kernel_context, Ziel, task->Context, (void*)ProgramHeader[i].p_vaddr, pages, flags, 0);
 	}
 
 	//Temporäre Daten wieder freigeben

@@ -6,6 +6,7 @@
  */
 
 #include "refcount.h"
+#include "assert.h"
 
 void refcount_init(void *obj, size_t offset, void (*free)(const void*))
 {
@@ -18,6 +19,9 @@ void *refcount_retain(void *obj, size_t offset)
 {
 	refcount_t *o = (refcount_t*)((uintptr_t)obj + offset);
 	uint64_t val, oldval;
+
+	assert(o->ref_count > 0);
+
 	do
 	{
 		oldval = o->ref_count;

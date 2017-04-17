@@ -47,13 +47,15 @@ typedef struct{
 typedef struct{
 	uint64_t id;
 	char *name;
-	device_t *dev;
-	struct cdi_fs_filesystem *fs;
-	size_t lbaStart, lbaSize;
+	vfs_device_t *vfs_dev;
+	vfs_file_t dev_stream;
+	struct cdi_fs_driver *fs_driver;
+	vfs_filesystem_t *fs;
+	size_t lbaStart, lbaSize, blocksize;
 	part_type_t type;
 }partition_t;
 
-int partition_getPartitions(device_t *dev);
+int partition_getPartitions(const char *dev_name, vfs_file_t dev_stream, void(*partition_callback)(void *context, void*), void *context);
 
 #endif /* PARTITION_H_ */
 
