@@ -107,8 +107,18 @@ retry:
 		fs->fs.osdep.fp = vfs_Open(path, mode);
 		free(path);
 
-		if(!fs->fs.driver->fs_init(&fs->fs))
+		if(fs->fs.osdep.fp == (vfs_file_t)-1)
+		{
+			free(fs);
 			return NULL;
+		}
+
+		if(!fs->fs.driver->fs_init(&fs->fs))
+		{
+			vfs_Close(fs->fs.osdep.fp);
+			free(fs);
+			return NULL;
+		}
 
 		part->fs = fs;
 	}
