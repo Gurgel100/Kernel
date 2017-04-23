@@ -51,7 +51,13 @@ retry:
 		REFCOUNT_INIT(fs, freeFilesystem);
 
 		fs->device = part->vfs_dev;
-		fs->fs.driver = part->fs_driver;
+		fs->fs.driver = (struct cdi_fs_driver*)drivermanager_getDriver(fs_drivers[part->type]);
+
+		if(fs->fs.driver == NULL)
+		{
+			free(fs);
+			return NULL;
+		}
 
 		vfs_mode_t mode = (vfs_mode_t){
 			.read = true,
@@ -175,13 +181,7 @@ int partition_getPartitions(const char *dev_name, vfs_file_t dev_stream, void(*p
 				free(part);
 				continue;
 			}
-			part->fs_driver = (struct cdi_fs_driver*)drivermanager_getDriver(fs_drivers[part->type]);
-			if(part->fs_driver == NULL)
-			{
-				free(part->name);
-				free(part);
-				continue;
-			}
+
 			if(partition_callback != NULL)
 				partition_callback(context, part);
 
