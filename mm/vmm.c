@@ -937,9 +937,9 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 
 		//Eintrag in die PML4
 		if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
-			setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, Address);
+			setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
-			setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, 0, NX, Address);
+			setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		//PDP mappen
 		PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PDP, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
@@ -950,14 +950,6 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//PDP mappen
 		PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
-		if((PML4->PML4E[PML4i] & PG_US) < US)	//Wenn zu wenig Berechtigungen
-		{
-			//Eintrag der PML4 ändern
-			if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
-				setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, PML4->PML4E[PML4i] & PG_ADDRESS);
-			else
-				setPML4Entry(PML4i, PML4, 1, RW, US, 1, 0, 0, 0, NX, PML4->PML4E[PML4i] & PG_ADDRESS);
-		}
 	}
 
 	//PDP Tabelle bearbeiten
@@ -971,9 +963,9 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 
 		//Eintrag in die PDP
 		if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
-			setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, Address);
+			setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
-			setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, 0, NX, Address);
+			setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		//PD mappen
 		PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PD, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
@@ -984,14 +976,6 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//PD mappen
 		PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PD, PDP->PDPE[PDPi], VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
-		if((PDP->PDPE[PDPi] & PG_US) < US)		//Wenn zu wenig Berechtigungen
-		{
-			//Eintrag der PDP ändern
-			if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
-				setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, PDP->PDPE[PDPi] & PG_ADDRESS);
-			else
-				setPDPEntry(PDPi, PDP, 1, RW, US, 1, 0, 0, 0, NX, PDP->PDPE[PDPi] & PG_ADDRESS);
-		}
 	}
 
 	//PD Tabelle bearbeiten
@@ -1006,9 +990,9 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 
 		//Eintrag in die PDP
 		if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
-			setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, Address);
+			setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, Address);
 		else
-			setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, 0, NX, Address);
+			setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, Address);
 		//PT mappen
 		PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PT, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
@@ -1019,14 +1003,6 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//PT mappen
 		PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 		vmm_Map(PT, PD->PDE[PDi], VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_KERNELSPACE);
-		if((PD->PDE[PDi] & PG_US) < US)		//Wenn zu wenig Berechtigungen
-		{
-			//Eintrag der PD ändern
-			if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
-				setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, VMM_KERNELSPACE, NX, PD->PDE[PDi] & PG_ADDRESS);
-			else
-				setPDEntry(PDi, PD, 1, RW, US, 1, 0, 0, 0, NX, PD->PDE[PDi] & PG_ADDRESS);
-		}
 	}
 
 	//PT Tabelle bearbeiten
