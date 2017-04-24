@@ -427,19 +427,6 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 		InvalidateTLBEntry(PDP);
 		clearPage(PDP);
 	}
-	else
-	{
-		if((PML4->PML4E[PML4i] & PG_US) < US)	//Wenn zu wenig Berechtigungen
-		{
-			//Eintrag der PML4 ändern
-			if(PG_AVL(PML4->PML4E[PML4i]) == VMM_KERNELSPACE)
-				setPML4Entry(PML4i, PML4, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-			else
-				setPML4Entry(PML4i, PML4, 1, 1, 1, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-			//Könnte gecacht sein
-			InvalidateTLBEntry(PDP);
-		}
-	}
 
 	//PDP Tabelle bearbeiten
 	if((PDP->PDPE[PDPi] & PG_P) == 0)			//Eintrag in die PDP schon vorhanden?
@@ -456,19 +443,6 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 		InvalidateTLBEntry(PD);
 		clearPage(PD);
 	}
-	else
-	{
-		if((PDP->PDPE[PDPi] & PG_US) < US)		//Wenn zu wenig Berechtigungen
-		{
-			//Eintrag der PDP ändern
-			if(PG_AVL(PDP->PDPE[PDPi]) == VMM_KERNELSPACE)
-				setPDPEntry(PDPi, PDP, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-			else
-				setPDPEntry(PDPi, PDP, 1, 1, 1, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-			//Könnte gecacht sein
-			InvalidateTLBEntry(PD);
-		}
-	}
 
 	//PD Tabelle bearbeiten
 	if((PD->PDE[PDi] & PG_P) == 0)			//Eintrag in die PD schon vorhanden?
@@ -484,19 +458,6 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 		//Könnte gecacht sein
 		InvalidateTLBEntry(PT);
 		clearPage(PT);
-	}
-	else
-	{
-		if((PD->PDE[PDi] & PG_US) < US)		//Wenn zu wenig Berechtigungen
-		{
-			//Eintrag der PD ändern
-			if(PG_AVL(PD->PDE[PDi]) == VMM_KERNELSPACE)
-				setPDEntry(PDi, PD, 1, 1, 0, 1, 0, 0, VMM_KERNELSPACE, 0, PD->PDE[PDi] & PG_ADDRESS);
-			else
-				setPDEntry(PDi, PD, 1, 1, 1, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
-			//Könnte gecacht sein
-			InvalidateTLBEntry(PT);
-		}
 	}
 
 	//PT Tabelle bearbeiten
