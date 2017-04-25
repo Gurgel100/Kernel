@@ -65,6 +65,7 @@ size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 		struct cdi_storage_driver *driver = (struct cdi_storage_driver*)dev->device->driver;
 		struct cdi_storage_device *device = (struct cdi_storage_device*)dev->device;
 		uint64_t block_start = start / device->block_size;
+		uint64_t start_offset = start % device->block_size;
 		uint64_t block_count = size / device->block_size + ((size % device->block_size) ? 1 : 0);
 		if(block_start + block_count > device->block_count)
 			block_count = device->block_count - block_start;
@@ -79,7 +80,7 @@ size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 		}
 		semaphore_release(&dev->semaphore);
 
-		memcpy((void*)buffer, block_buffer + block_start % device->block_size, size);
+		memcpy(buffer, block_buffer + start_offset, size);
 		free(block_buffer);
 	}
 	else if(dev->device->bus_data->bus_type == CDI_SCSI)
@@ -88,6 +89,7 @@ size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 		struct cdi_scsi_device *device = (struct cdi_scsi_device*)dev->device;
 
 		uint32_t lba = start / 2048;
+		uint32_t start_offset = start % 2048;
 		uint64_t tmp_size = MIN(size, 2048);
 		uint64_t offset = 0;
 		void *tmp_buffer = malloc(2048);
@@ -112,7 +114,8 @@ size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 			}
 			semaphore_release(&dev->semaphore);
 
-			memcpy((void*)buffer + offset, tmp_buffer + start % 2048 + offset, tmp_size);
+			memcpy(buffer + offset, tmp_buffer + start_offset, tmp_size);
+			start_offset = 0;
 			offset += tmp_size;
 			tmp_size = MIN(size - offset, 2048);
 		}
