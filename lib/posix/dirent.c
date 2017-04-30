@@ -159,6 +159,8 @@ int readdir_r(DIR* dirp, struct dirent* entry, struct dirent** result)
 			strncpy(entry->d_name, entries->name, NAME_MAX);
 			entry->d_name[NAME_MAX] = '\0';
 
+			assert(strlen(entry->d_name) == entry->d_reclen - sizeof(struct dirent) - 1);
+
 			dirp->pos++;
 
 			*result = entry;
@@ -203,6 +205,8 @@ int readdir_r(DIR* dirp, struct dirent* entry, struct dirent** result)
 	}
 	strncpy(entry->d_name, entries->name, NAME_MAX);
 	entry->d_name[NAME_MAX] = '\0';
+
+	assert(strlen(entry->d_name) == entry->d_reclen - sizeof(struct dirent) - 1);
 
 	if(!internal_buffer)
 	{
