@@ -12,13 +12,52 @@
 #include "scsi.h"
 #include "fs.h"
 #include "lists.h"
-#include "vfs.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
 #include "drivermanager.h"
 
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
+
+typedef enum{
+	PART_TYPE_NONE = 0x00,
+	PART_TYPE_LINUX = 0x83,
+	PART_TYPE_ISO9660 = 0xCD,
+	PART_TYPE_LAST = 0xFF
+}__attribute__((packed))part_type_t;
+
+typedef struct{
+	struct{
+		uint8_t Bootflag;
+		uint8_t Head;
+		uint8_t Sector : 6;
+		uint8_t CylinderHi : 2;
+		uint8_t CylinderLo;
+		part_type_t Type;
+		uint8_t lastHead;
+		uint8_t lastSector : 6;
+		uint8_t lastCylinderHi : 2;
+		uint8_t lastCylinderLo;
+		uint32_t firstLBA;
+		uint32_t Length;
+	}__attribute__((packed))entry[4];
+}__attribute__((packed))PartitionTable_t;
+
+typedef struct{
+	uint8_t sector;
+	uint8_t head;
+	uint8_t cylinder;
+}chs_t;
+
+typedef struct{
+	uint64_t id;
+	char *name;
+	vfs_device_t *vfs_dev;
+	vfs_file_t dev_stream;
+	vfs_filesystem_t *fs;
+	size_t lbaStart, lbaSize, blocksize;
+	part_type_t type;
+}partition_t;
 
 static const char *fs_drivers[] = {
 [PART_TYPE_LINUX]	"ext2",
@@ -51,7 +90,13 @@ retry:
 		REFCOUNT_INIT(fs, freeFilesystem);
 
 		fs->device = part->vfs_dev;
-		fs->fs.driver = part->fs_driver;
+		fs->fs.driver = (struct cdi_fs_driver*)drivermanager_getDriver(fs_drivers[part->type]);
+
+		if(fs->fs.driver == NULL)
+		{
+			free(fs);
+			return NULL;
+		}
 
 		vfs_mode_t mode = (vfs_mode_t){
 			.read = true,
@@ -62,8 +107,18 @@ retry:
 		fs->fs.osdep.fp = vfs_Open(path, mode);
 		free(path);
 
-		if(!fs->fs.driver->fs_init(&fs->fs))
+		if(fs->fs.osdep.fp == (vfs_file_t)-1)
+		{
+			free(fs);
 			return NULL;
+		}
+
+		if(!fs->fs.driver->fs_init(&fs->fs))
+		{
+			vfs_Close(fs->fs.osdep.fp);
+			free(fs);
+			return NULL;
+		}
 
 		part->fs = fs;
 	}
@@ -175,13 +230,7 @@ int partition_getPartitions(const char *dev_name, vfs_file_t dev_stream, void(*p
 				free(part);
 				continue;
 			}
-			part->fs_driver = (struct cdi_fs_driver*)drivermanager_getDriver(fs_drivers[part->type]);
-			if(part->fs_driver == NULL)
-			{
-				free(part->name);
-				free(part);
-				continue;
-			}
+
 			if(partition_callback != NULL)
 				partition_callback(context, part);
 

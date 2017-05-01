@@ -49,7 +49,7 @@ kernel: $(OUTPUT_DIR)/kernel
 #Pull in dependency info for *existing* .o files
 -include $(DEPS)
 
-$(OUTPUT_DIR)/kernel: CFLAGS += -DBUILD_KERNEL
+$(OUTPUT_DIR)/kernel: CPPFLAGS += -DBUILD_KERNEL
 $(OUTPUT_DIR)/kernel: $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^
 
