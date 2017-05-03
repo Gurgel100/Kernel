@@ -94,6 +94,7 @@ FILE *fopen(const char *filename, const char *mode)
 				m.write = true;
 				break;
 			case 'b':	//ignore
+				break;
 			}
 		}
 		break;
@@ -109,6 +110,7 @@ FILE *fopen(const char *filename, const char *mode)
 				m.read = true;
 				break;
 			case 'b':	//ignore
+				break;
 			}
 		}
 		break;
@@ -124,6 +126,7 @@ FILE *fopen(const char *filename, const char *mode)
 				m.read = true;
 				break;
 			case 'b':	//ignore
+				break;
 			}
 		}
 		break;
