@@ -24,6 +24,24 @@
 #define MIN(x,y) ((x < y) ? x : y)
 #define MAX(x,y) ((x > y) ? x : y)
 
+struct filestream{
+	uint64_t stream_id;
+
+	char *buffer;
+	char *ungetch_buffer;
+	size_t ungetch_count;
+	size_t bufSize, bufStart, bufPos;
+	size_t posRead, posWrite;
+	bool bufDirty;
+	bufMode_t bufMode;
+	bool intBuf;
+	bool eof;
+	io_error_t error;
+	struct{
+		bool write, read;
+	} mode;
+};
+
 FILE* stderr = NULL;
 FILE* stdin = NULL;
 FILE* stdout = NULL;
