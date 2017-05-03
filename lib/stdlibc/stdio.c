@@ -315,10 +315,6 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 		stream->posRead += length;
 	}
 
-	//Wenn nicht im binary modus, dann letztes Zeichen durch '\0' ersetzen
-	if(!stream->mode.binary)
-		((char*)ptr)[size] = '\0';
-
 	assert(readData <= size * nmemb);
 	return readData / size;
 }
