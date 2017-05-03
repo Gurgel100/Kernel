@@ -73,6 +73,28 @@ char *utoa(uint64_t x, char *s);						//UInt nach String
 char *ftoa(float x, char *s);							//Float nach String
 char *i2hex(uint64_t val, char* dest, uint64_t len);	//Int nach Hexadezimal
 
+void init_stdio()
+{
+	//stdin
+	stdin = calloc(sizeof(FILE), 1);
+	stdin->error = IO_NO_ERROR;
+	stdin->mode.read = true;
+	stdin->stream_id = 0;
+	setvbuf(stdin, NULL, _IONBF, BUFSIZ);
+	//stdout
+	stdout = calloc(sizeof(FILE), 1);
+	stdout->error = IO_NO_ERROR;
+	stdout->mode.write = true;
+	stdout->stream_id = 1;
+	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+	//stderr
+	stderr = calloc(sizeof(FILE), 1);
+	stderr->error = IO_NO_ERROR;
+	stderr->mode.write = true;
+	stderr->stream_id = 2;
+	setvbuf(stderr, NULL, _IONBF, BUFSIZ);
+}
+
 //Dateifunktionen
 FILE *fopen(const char *filename, const char *mode)
 {
