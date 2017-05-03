@@ -470,6 +470,11 @@ int fseek(FILE *stream, long int offset, int whence)
 	if(!stream)
 		return -1;
 
+	//Undo ungetc
+	free(stream->ungetch_buffer);
+	stream->ungetch_buffer = NULL;
+	stream->ungetch_count = 0;
+
 	switch (whence)
 	{
 		case SEEK_CUR:
