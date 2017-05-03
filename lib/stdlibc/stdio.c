@@ -28,7 +28,7 @@ struct filestream{
 	uint64_t stream_id;
 
 	char *buffer;
-	char *ungetch_buffer;
+	unsigned char *ungetch_buffer;
 	size_t ungetch_count;
 	size_t bufSize, bufStart, bufPos;
 	size_t posRead, posWrite;
@@ -1838,14 +1838,15 @@ int vsscanf(const char *str, const char *format, va_list arg)
 //I/O-Funktionen
 int ungetc(int c, FILE *stream)
 {
-	if(stream == NULL)
+	if(stream == NULL || (unsigned char)c == EOF)
 		return EOF;
 
-	char *new_ptr = realloc(stream->ungetch_buffer, stream->ungetch_count + 1);
+	unsigned char *new_ptr = realloc(stream->ungetch_buffer, (stream->ungetch_count + 1) * sizeof(unsigned char));
 	if(new_ptr == NULL)
 		return EOF;
 	stream->ungetch_buffer = new_ptr;
-	stream->ungetch_buffer[stream->ungetch_count++] = (char)c;
+	stream->ungetch_buffer[stream->ungetch_count++] = (unsigned char)c;
+	stream->eof = false;
 	return c;
 }
 
