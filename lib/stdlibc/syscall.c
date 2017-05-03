@@ -38,9 +38,9 @@ void __attribute__((noreturn)) syscall_exit(int status)
 	while(1);
 }
 
-tid_t syscall_createThread(void *entry)
+tid_t syscall_createThread(void *entry, void *arg)
 {
-	return (tid_t)_syscall(12, entry);
+	return (tid_t)_syscall(12, entry, arg);
 }
 
 void __attribute__((noreturn)) syscall_exitThread(int status)
