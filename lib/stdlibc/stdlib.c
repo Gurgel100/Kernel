@@ -11,6 +11,7 @@
 #include "string.h"
 #include "ctype.h"
 #include "math.h"
+#include "assert.h"
 #ifdef BUILD_KERNEL
 #include "mm.h"
 #include "cpu.h"
@@ -64,9 +65,11 @@ inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
 void setupNewHeapEntry(heap_t *old, heap_t *new);
 
-void __attribute__((noexit)) abort()
+void abort()
 {
-#ifndef BUILD_KERNEL
+#ifdef BUILD_KERNEL
+	assert(false);
+#else
 	syscall_exit(-1);
 #endif
 }
@@ -92,9 +95,11 @@ int atexit(void (*func)(void))
 	return 0;
 }
 
-void __attribute__((noexit)) exit(int status)
+void exit(int status)
 {
-#ifndef BUILD_KERNEL
+#ifdef BUILD_KERNEL
+	assert(false && status);
+#else
 	//Erst registrierte Funktionen aufrufen
 	atexit_list_t *list = Atexit_List_Base;
 	for(; list && list->next; list = list->next)

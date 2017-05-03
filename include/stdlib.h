@@ -42,7 +42,7 @@ extern void *realloc(void *ptr, size_t size);
 
 extern void abort(void) __attribute__((noreturn));
 extern int atexit(void (*func)(void));
-extern void exit(int status);
+extern void exit(int status) __attribute__((noreturn));
 
 extern int abs(int x);
 extern long int labs(long int x);
