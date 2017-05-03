@@ -91,7 +91,7 @@ double exp(double x)
 	double Ergebnis;
 	asm volatile(
 			"fldl2e;"
-			"fmul;"
+			"fmulp;"
 			"f2xm1;"
 			:"=t"(Ergebnis) :"0"(x)
 	);
