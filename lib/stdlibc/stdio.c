@@ -1066,7 +1066,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						if(!precision_spec)
 							precision = 1;
 						itoa(value, buffer);
-						size_t len = len = strlen(buffer);
+						size_t len = strlen(buffer);
 						if(value < 0)
 						{
 							if(sign)
@@ -1187,8 +1187,9 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							precision = -1;
 
 						const char *str = va_arg(arg, char*);
+						size_t str_len = strlen(str);
 
-						for(; width > strlen(str); width--)
+						for(; width > str_len; width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
