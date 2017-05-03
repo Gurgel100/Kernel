@@ -51,23 +51,7 @@ typedef enum{
 }io_error_t;
 
 
-typedef struct{
-	uint64_t stream_id;
-
-	char *buffer;
-	char *ungetch_buffer;
-	size_t ungetch_count;
-	size_t bufSize, bufStart, bufPos;
-	size_t posRead, posWrite;
-	bool bufDirty;
-	bufMode_t bufMode;
-	bool intBuf;
-	bool eof;
-	io_error_t error;
-	struct{
-		bool write, read, binary;
-	} mode;
-} FILE;
+typedef struct filestream FILE;
 
 typedef size_t fpos_t;
 

@@ -24,6 +24,24 @@
 #define MIN(x,y) ((x < y) ? x : y)
 #define MAX(x,y) ((x > y) ? x : y)
 
+struct filestream{
+	uint64_t stream_id;
+
+	char *buffer;
+	unsigned char *ungetch_buffer;
+	size_t ungetch_count;
+	size_t bufSize, bufStart, bufPos;
+	size_t posRead, posWrite;
+	bool bufDirty;
+	bufMode_t bufMode;
+	bool intBuf;
+	bool eof;
+	io_error_t error;
+	struct{
+		bool write, read;
+	} mode;
+};
+
 FILE* stderr = NULL;
 FILE* stdin = NULL;
 FILE* stdout = NULL;
@@ -55,11 +73,32 @@ char *utoa(uint64_t x, char *s);						//UInt nach String
 char *ftoa(float x, char *s);							//Float nach String
 char *i2hex(uint64_t val, char* dest, uint64_t len);	//Int nach Hexadezimal
 
+void init_stdio()
+{
+	//stdin
+	stdin = calloc(sizeof(FILE), 1);
+	stdin->error = IO_NO_ERROR;
+	stdin->mode.read = true;
+	stdin->stream_id = 0;
+	setvbuf(stdin, NULL, _IONBF, BUFSIZ);
+	//stdout
+	stdout = calloc(sizeof(FILE), 1);
+	stdout->error = IO_NO_ERROR;
+	stdout->mode.write = true;
+	stdout->stream_id = 1;
+	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+	//stderr
+	stderr = calloc(sizeof(FILE), 1);
+	stderr->error = IO_NO_ERROR;
+	stderr->mode.write = true;
+	stderr->stream_id = 2;
+	setvbuf(stderr, NULL, _IONBF, BUFSIZ);
+}
+
 //Dateifunktionen
 FILE *fopen(const char *filename, const char *mode)
 {
 	vfs_mode_t m;
-	bool binary = false;
 
 	//m auf 0 setzen weil sonst können dort irgendwelche Werte drinnen stehen
 	memset(&m, false, sizeof(vfs_mode_t));
@@ -76,8 +115,8 @@ FILE *fopen(const char *filename, const char *mode)
 			case '+':
 				m.write = true;
 				break;
-			case 'b':
-				binary = true;
+			case 'b':	//ignore
+				break;
 			}
 		}
 		break;
@@ -92,8 +131,8 @@ FILE *fopen(const char *filename, const char *mode)
 			case '+':
 				m.read = true;
 				break;
-			case 'b':
-				binary = true;
+			case 'b':	//ignore
+				break;
 			}
 		}
 		break;
@@ -108,8 +147,8 @@ FILE *fopen(const char *filename, const char *mode)
 			case '+':
 				m.read = true;
 				break;
-			case 'b':
-				binary = true;
+			case 'b':	//ignore
+				break;
 			}
 		}
 		break;
@@ -121,7 +160,6 @@ FILE *fopen(const char *filename, const char *mode)
 	file->error = IO_NO_ERROR;
 	file->mode.read = m.read;
 	file->mode.write = m.write;
-	file->mode.binary = binary;
 #ifdef BUILD_KERNEL
 	file->stream_id = vfs_Open(filename, m);
 #else
@@ -173,6 +211,28 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	//Überprüfen, ob überhaupt etwas gelesen werden soll
 	if(length == 0)
 		return 0;
+
+	//First look into the ungetc buffer
+	if(stream->ungetch_count > 0)
+	{
+		size_t read = MIN(length, stream->ungetch_count);
+		assert(read <= stream->ungetch_count);
+		for(size_t i = 0; i < read; i++)
+		{
+			((unsigned char*)ptr)[i] = stream->ungetch_buffer[stream->ungetch_count - i - 1];
+		}
+		stream->ungetch_count -= read;
+		readData += read;
+
+		if(stream->ungetch_count == 0)
+		{
+			free(stream->ungetch_buffer);
+			stream->ungetch_buffer = NULL;
+		}
+
+		if(length == readData)
+			return 0;
+	}
 
 	//Schauen, ob die angeforderten Daten im Cache sind
 	if(stream->bufMode != IO_MODE_NO_BUFFER)
@@ -315,10 +375,6 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 		stream->posRead += length;
 	}
 
-	//Wenn nicht im binary modus, dann letztes Zeichen durch '\0' ersetzen
-	if(!stream->mode.binary)
-		((char*)ptr)[size] = '\0';
-
 	assert(readData <= size * nmemb);
 	return readData / size;
 }
@@ -413,9 +469,6 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 		stream->buffer = NULL;
 		stream->intBuf = false;
 		stream->bufSize = 0;
-		stream->posRead = 0;
-		stream->posWrite = 0;
-		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_NO_BUFFER;
 		break;
 	case _IOLBF:
@@ -424,13 +477,12 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 			stream->intBuf = true;
 			buffer = malloc(size);
 		}
+		else
+		{
+			stream->intBuf = false;
+		}
 		stream->buffer = buffer;
 		stream->bufSize = size;
-		stream->bufStart = EOF;
-		stream->bufPos = 0;
-		stream->posRead = 0;
-		stream->posWrite = 0;
-		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_LINE_BUFFER;
 		break;
 	case _IOFBF:
@@ -439,18 +491,23 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 			stream->intBuf = true;
 			buffer = malloc(size);
 		}
+		else
+		{
+			stream->intBuf = false;
+		}
 		stream->buffer = buffer;
 		stream->bufSize = size;
-		stream->bufStart = EOF;
-		stream->bufPos = 0;
-		stream->posRead = 0;
-		stream->posWrite = 0;
-		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_FULL_BUFFER;
 		break;
 	default:
 		return -1;
 	}
+
+	stream->bufStart = EOF;
+	stream->bufPos = 0;
+	stream->posRead = 0;
+	stream->posWrite = 0;
+	stream->bufDirty = false;
 
 	return 0;
 }
@@ -460,38 +517,32 @@ int fseek(FILE *stream, long int offset, int whence)
 	if(!stream)
 		return -1;
 
-	if(stream->mode.binary)
+	//Undo ungetc
+	free(stream->ungetch_buffer);
+	stream->ungetch_buffer = NULL;
+	stream->ungetch_count = 0;
+
+	switch (whence)
 	{
-		switch (whence)
-		{
-			case SEEK_CUR:
-				stream->posRead += offset;
-				stream->posWrite += offset;
-			break;
-			case SEEK_SET:
-				stream->posRead = offset;
-				stream->posWrite = offset;
-			break;
-			case SEEK_END:
-			{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
-				//Grösse der Datei ermitteln
-#ifdef BUILD_KERNEL
-				size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
-#else
-				size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
-#endif
-				stream->posRead = stream->posWrite = filesize - offset;
-			}
-			break;
-		}
-	}
-	else
-	{
-		if(whence == SEEK_SET && offset >= 0)
-		{
+		case SEEK_CUR:
+			stream->posRead += offset;
+			stream->posWrite += offset;
+		break;
+		case SEEK_SET:
 			stream->posRead = offset;
 			stream->posWrite = offset;
+		break;
+		case SEEK_END:
+		{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
+			//Grösse der Datei ermitteln
+#ifdef BUILD_KERNEL
+			size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
+#else
+			size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
+#endif
+			stream->posRead = stream->posWrite = filesize - offset;
 		}
+		break;
 	}
 
 	stream->eof = false;
@@ -1015,7 +1066,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						if(!precision_spec)
 							precision = 1;
 						itoa(value, buffer);
-						size_t len = len = strlen(buffer);
+						size_t len = strlen(buffer);
 						if(value < 0)
 						{
 							if(sign)
@@ -1136,8 +1187,9 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							precision = -1;
 
 						const char *str = va_arg(arg, char*);
+						size_t str_len = strlen(str);
 
-						for(; width > strlen(str); width--)
+						for(; width > str_len; width--)
 						{
 							pos += jprintf_putc(args, lpad);
 						}
@@ -1786,14 +1838,15 @@ int vsscanf(const char *str, const char *format, va_list arg)
 //I/O-Funktionen
 int ungetc(int c, FILE *stream)
 {
-	if(stream == NULL)
+	if(stream == NULL || (unsigned char)c == EOF)
 		return EOF;
 
-	char *new_ptr = realloc(stream->ungetch_buffer, stream->ungetch_count + 1);
+	unsigned char *new_ptr = realloc(stream->ungetch_buffer, (stream->ungetch_count + 1) * sizeof(unsigned char));
 	if(new_ptr == NULL)
 		return EOF;
 	stream->ungetch_buffer = new_ptr;
-	stream->ungetch_buffer[stream->ungetch_count++] = (char)c;
+	stream->ungetch_buffer[stream->ungetch_count++] = (unsigned char)c;
+	stream->eof = false;
 	return c;
 }
 
