@@ -422,9 +422,6 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 		stream->buffer = NULL;
 		stream->intBuf = false;
 		stream->bufSize = 0;
-		stream->posRead = 0;
-		stream->posWrite = 0;
-		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_NO_BUFFER;
 		break;
 	case _IOLBF:
@@ -433,13 +430,12 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 			stream->intBuf = true;
 			buffer = malloc(size);
 		}
+		else
+		{
+			stream->intBuf = false;
+		}
 		stream->buffer = buffer;
 		stream->bufSize = size;
-		stream->bufStart = EOF;
-		stream->bufPos = 0;
-		stream->posRead = 0;
-		stream->posWrite = 0;
-		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_LINE_BUFFER;
 		break;
 	case _IOFBF:
@@ -448,18 +444,23 @@ int setvbuf(FILE *stream, char *buffer, int mode, size_t size)
 			stream->intBuf = true;
 			buffer = malloc(size);
 		}
+		else
+		{
+			stream->intBuf = false;
+		}
 		stream->buffer = buffer;
 		stream->bufSize = size;
-		stream->bufStart = EOF;
-		stream->bufPos = 0;
-		stream->posRead = 0;
-		stream->posWrite = 0;
-		stream->bufDirty = false;
 		stream->bufMode = IO_MODE_FULL_BUFFER;
 		break;
 	default:
 		return -1;
 	}
+
+	stream->bufStart = EOF;
+	stream->bufPos = 0;
+	stream->posRead = 0;
+	stream->posWrite = 0;
+	stream->bufDirty = false;
 
 	return 0;
 }
