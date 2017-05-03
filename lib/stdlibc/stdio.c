@@ -212,6 +212,28 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	if(length == 0)
 		return 0;
 
+	//First look into the ungetc buffer
+	if(stream->ungetch_count > 0)
+	{
+		size_t read = MIN(length, stream->ungetch_count);
+		assert(read <= stream->ungetch_count);
+		for(size_t i = 0; i < read; i++)
+		{
+			((unsigned char*)ptr)[i] = stream->ungetch_buffer[stream->ungetch_count - i - 1];
+		}
+		stream->ungetch_count -= read;
+		readData += read;
+
+		if(stream->ungetch_count == 0)
+		{
+			free(stream->ungetch_buffer);
+			stream->ungetch_buffer = NULL;
+		}
+
+		if(length == readData)
+			return 0;
+	}
+
 	//Schauen, ob die angeforderten Daten im Cache sind
 	if(stream->bufMode != IO_MODE_NO_BUFFER)
 	{
