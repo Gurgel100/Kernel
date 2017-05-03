@@ -59,7 +59,6 @@ char *i2hex(uint64_t val, char* dest, uint64_t len);	//Int nach Hexadezimal
 FILE *fopen(const char *filename, const char *mode)
 {
 	vfs_mode_t m;
-	bool binary = false;
 
 	//m auf 0 setzen weil sonst können dort irgendwelche Werte drinnen stehen
 	memset(&m, false, sizeof(vfs_mode_t));
@@ -76,8 +75,7 @@ FILE *fopen(const char *filename, const char *mode)
 			case '+':
 				m.write = true;
 				break;
-			case 'b':
-				binary = true;
+			case 'b':	//ignore
 			}
 		}
 		break;
@@ -92,8 +90,7 @@ FILE *fopen(const char *filename, const char *mode)
 			case '+':
 				m.read = true;
 				break;
-			case 'b':
-				binary = true;
+			case 'b':	//ignore
 			}
 		}
 		break;
@@ -108,8 +105,7 @@ FILE *fopen(const char *filename, const char *mode)
 			case '+':
 				m.read = true;
 				break;
-			case 'b':
-				binary = true;
+			case 'b':	//ignore
 			}
 		}
 		break;
@@ -121,7 +117,6 @@ FILE *fopen(const char *filename, const char *mode)
 	file->error = IO_NO_ERROR;
 	file->mode.read = m.read;
 	file->mode.write = m.write;
-	file->mode.binary = binary;
 #ifdef BUILD_KERNEL
 	file->stream_id = vfs_Open(filename, m);
 #else
@@ -456,38 +451,27 @@ int fseek(FILE *stream, long int offset, int whence)
 	if(!stream)
 		return -1;
 
-	if(stream->mode.binary)
+	switch (whence)
 	{
-		switch (whence)
-		{
-			case SEEK_CUR:
-				stream->posRead += offset;
-				stream->posWrite += offset;
-			break;
-			case SEEK_SET:
-				stream->posRead = offset;
-				stream->posWrite = offset;
-			break;
-			case SEEK_END:
-			{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
-				//Grösse der Datei ermitteln
-#ifdef BUILD_KERNEL
-				size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
-#else
-				size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
-#endif
-				stream->posRead = stream->posWrite = filesize - offset;
-			}
-			break;
-		}
-	}
-	else
-	{
-		if(whence == SEEK_SET && offset >= 0)
-		{
+		case SEEK_CUR:
+			stream->posRead += offset;
+			stream->posWrite += offset;
+		break;
+		case SEEK_SET:
 			stream->posRead = offset;
 			stream->posWrite = offset;
+		break;
+		case SEEK_END:
+		{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
+			//Grösse der Datei ermitteln
+#ifdef BUILD_KERNEL
+			size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
+#else
+			size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
+#endif
+			stream->posRead = stream->posWrite = filesize - offset;
 		}
+		break;
 	}
 
 	stream->eof = false;

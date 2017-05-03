@@ -65,7 +65,7 @@ typedef struct{
 	bool eof;
 	io_error_t error;
 	struct{
-		bool write, read, binary;
+		bool write, read;
 	} mode;
 } FILE;
 
