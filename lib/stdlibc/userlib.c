@@ -39,7 +39,7 @@ int getArgCount(char *cmd)
 	return count;
 }
 
-void c_main(size_t length, void *data)
+void c_main(void *data)
 {
 	initLib();
 
