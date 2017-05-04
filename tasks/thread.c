@@ -52,8 +52,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 			.gs = 0x10,
 			.fs = 0x10,
 
-			.rbx = data_length,
-			.rcx = cpuInfo.syscall,
+			.rdi = cpuInfo.syscall,
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 

@@ -5,18 +5,17 @@
 .global _start
 .global _syscall
 
+.section .text
 _start:
-#im rcx Register werden flags übergeben
+#Im rdi Register werden flags übergeben
 #Bit 0 gibt an, ob syscall unterstützt wird
-test $1,%rcx
+test $1,%rdi
 lea interrupt(%rip),%rax
 lea syscall(%rip),%rdx
 cmovne %rdx,%rax
 mov %rax,_syscall(%rip)
 
-#im rdx Register werden zusätzliche Daten übergeben (Parameter)
-mov %rbx,%rdi
-mov %rsp,%rsi
+mov %rsp,%rdi
 #Stack wieder alignen
 and $~0xF,%rsp
 
