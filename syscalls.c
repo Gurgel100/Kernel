@@ -34,7 +34,7 @@ extern void setCursor(uint16_t, uint16_t);
 extern void isr_syscall();
 
 static void nop();
-static uint64_t createThreadHandler(void *entry);
+static uint64_t createThreadHandler(void *entry, void *arg);
 static void exitThreadHandler();
 static void sleepHandler(uint64_t msec);
 
@@ -146,9 +146,9 @@ static void nop()
 	asm volatile("nop");
 }
 
-static uint64_t createThreadHandler(void *entry)
+static uint64_t createThreadHandler(void *entry, void *arg)
 {
-	thread_t *thread = thread_create(currentProcess, entry, 0, NULL, false);
+	thread_t *thread = thread_create(currentProcess, entry, sizeof(void*), &arg, false);
 	thread_unblock(thread);
 	return thread->tid;
 }
