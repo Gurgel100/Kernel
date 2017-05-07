@@ -925,7 +925,14 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 		break;
 		case TYPE_MOUNT:
 			if(stream->stream.res->flags.read)
+			{
+				size_t filesize = stream->stream.res->res->meta_read(&stream->stream, CDI_FS_META_SIZE);
+				if(start > filesize)
+					start = filesize;
+				if(start + length > filesize)
+					length = filesize - start;
 				sizeRead = stream->stream.res->file->read(&stream->stream, start, length, buffer);
+			}
 		break;
 		default:
 			assert(false);
