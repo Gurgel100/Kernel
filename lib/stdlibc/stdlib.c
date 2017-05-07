@@ -60,6 +60,10 @@ atexit_list_t *Atexit_List_Base = NULL;
 
 static heap_t *lastHeap = NULL;
 static heap_empty_t *base_emptyHeap = NULL;
+static char **real_environ;
+
+//Global visible
+char **environ;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
@@ -1048,6 +1052,191 @@ void setupNewHeapEntry(heap_t *old, heap_t *new)
 	new->Flags = HEAP_FLAGS;
 }
 
+
+//Environment variables
+static size_t count_envs(char **env)
+{
+	size_t count = 0;
+
+	while(env++ != NULL) count++;
+
+	return count;
+}
+
+static void check_environ()
+{
+	if(real_environ != environ)
+	{
+		while(*real_environ != NULL)
+		{
+			free(*real_environ);
+		}
+		free(real_environ);
+
+		size_t count = count_envs(environ);
+		real_environ = malloc(count + 1 * sizeof(char*));
+		for(size_t i = 0; i < count; i++)
+		{
+			real_environ[i] = strdup(environ[i]);
+		}
+		real_environ[count] = NULL;
+	}
+}
+
+static char *getenvvar(const char *name, char **value, size_t *index)
+{
+	check_environ();
+
+	char **env = real_environ;
+	size_t i = 0;
+	while(env[i] != NULL)
+	{
+		char *env_name_end = strchr(env[i], '=');
+		if(strncmp(name, env[i], env[i] - env_name_end) == 0)
+		{
+			if(value != NULL) *value = env_name_end + 1;
+			break;
+		}
+		i++;
+	}
+	if(*index) *index = i;
+	return env[i];
+}
+
+void init_envvars(char **env)
+{
+	environ = env;
+	check_environ();
+}
+
+char *getenv(const char *name)
+{
+	char *val = NULL;
+	getenvvar(name, &val, NULL);
+	return val;
+}
+
+int setenv(const char *name, const char *value, int overwrite)
+{
+	//EINVAL
+	if(strlen(name) == 0 || strchr(name, '=') != NULL)
+		return -1;
+
+	char *val;
+	size_t index;
+	char *env = getenvvar(name, &val, &index);
+	if(env == NULL)
+	{
+		//Resize environ
+		char **new_environ = realloc(real_environ, (index + 2) * sizeof(char*));
+		//ENOMEM
+		if(new_environ == NULL)
+		{
+			return -1;
+		}
+		real_environ = new_environ;
+		environ = real_environ;
+		real_environ[index + 1] = NULL;
+		env = malloc(strlen(name) + 1 + strlen(value) + 1);
+		//ENOMEM
+		if(env == NULL)
+		{
+			return -1;
+		}
+
+		strcpy(env, name);
+		strcat(env, "=");
+		strcat(env, value);
+		real_environ[index] = env;
+	}
+	else if(overwrite)
+	{
+		char *new_env = realloc(env, (val - env) + strlen(value));
+		//ENOMEM
+		if(new_env == NULL)
+		{
+			return -1;
+		}
+		real_environ[index] = new_env;
+		strcpy(new_env + (val - env), value);
+	}
+
+	return 0;
+}
+
+int unsetenv(const char *name)
+{
+	//EINVAL
+	if(strlen(name) == 0 || strchr(name, '=') != NULL)
+		return -1;
+
+	size_t index;
+	char *env = getenvvar(name, NULL, &index);
+	if(env != NULL)
+	{
+		size_t count = count_envs(real_environ);
+		free(real_environ[index]);
+		memmove(&real_environ[index], &real_environ[index + 1], (count - index + 1) * sizeof(char*));
+		char **new_environ = realloc(real_environ, count * sizeof(char*));
+		//ENOMEM
+		if(new_environ == NULL)
+		{
+			return -1;
+		}
+		real_environ = new_environ;
+		environ = real_environ;
+	}
+
+	return 0;
+}
+
+int putenv(char *str)
+{
+	char *tmp = strdup(str);
+	//ENOMEM
+	if(tmp == NULL)
+		return -1;
+
+	const char *name = tmp;
+	char *equal = strchr(name, '=');
+	if(equal == NULL)
+	{
+		return -1;
+	}
+	*equal = '\0';
+
+	size_t index;
+	char *env = getenvvar(name, NULL, &index);
+	size_t count = count_envs(real_environ);
+	if(env == NULL)
+	{
+		char **new_environ = realloc(real_environ, (count + 2) * sizeof(char*));
+		//ENOMEM
+		if(new_environ == NULL)
+		{
+			free(tmp);
+			return -1;
+		}
+		real_environ = new_environ;
+		environ = real_environ;
+
+		real_environ[count] = str;
+	}
+	else
+	{
+		//Replace variable
+		free(real_environ[index]);
+		real_environ[index] = str;
+	}
+
+	free(tmp);
+
+	return 0;
+}
+
+
+
+//Algorithms
 static int cmph(const void* a, const void* b, int (*cmp)(const void*, const void*)) {
 	return cmp(a, b);
 }
