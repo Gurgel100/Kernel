@@ -163,6 +163,7 @@ static void *partition_function(void *p, vfs_device_function_t function, ...)
 {
 	void *val;
 	partition_t *part = p;
+	vfs_filesystem_t *prev_fs = part->fs;
 
 	switch(function)
 	{
@@ -176,7 +177,8 @@ static void *partition_function(void *p, vfs_device_function_t function, ...)
 			val = getFilesystem(part);
 		break;
 		case VFS_DEV_FUNC_UMOUNT:
-			REFCOUNT_RELEASE(part->fs);
+			if(REFCOUNT_RELEASE(part->fs))
+				__sync_bool_compare_and_swap(&part->fs, prev_fs, NULL);
 			val = NULL;
 		break;
 		default:
