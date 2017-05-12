@@ -10,6 +10,7 @@
 
 #include "stdint.h"
 #include "stddef.h"
+#include "stdbool.h"
 
 /*
  * Macro für den Namen des Feldes, das für Referenzzählen verwendet wird
@@ -52,6 +53,6 @@ void *refcount_retain(void *obj, size_t offset);
  * Parameter:	obj = Objekt das Verwaltet werden soll
  * 				offset = Offset im Objekt an dem ein Feld vom Typ refcount_t gefunden werden kann
  */
-void refcount_release(void *obj, size_t offset);
+bool refcount_release(void *obj, size_t offset);
 
 #endif /* REFCOUNT_H_ */
