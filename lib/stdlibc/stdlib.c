@@ -1087,19 +1087,22 @@ static char *getenvvar(const char *name, char **value, size_t *index)
 {
 	check_environ();
 
+	if(real_environ == NULL)
+		return NULL;
+
 	char **env = real_environ;
 	size_t i = 0;
 	while(env[i] != NULL)
 	{
 		char *env_name_end = strchr(env[i], '=');
-		if(strncmp(name, env[i], env[i] - env_name_end) == 0)
+		if(strncmp(name, env[i], env_name_end - env[i]) == 0)
 		{
 			if(value != NULL) *value = env_name_end + 1;
 			break;
 		}
 		i++;
 	}
-	if(*index) *index = i;
+	if(index != NULL) *index = i;
 	return env[i];
 }
 
@@ -1123,7 +1126,7 @@ int setenv(const char *name, const char *value, int overwrite)
 		return -1;
 
 	char *val;
-	size_t index;
+	size_t index = 0;
 	char *env = getenvvar(name, &val, &index);
 	if(env == NULL)
 	{
