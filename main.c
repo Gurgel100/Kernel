@@ -68,16 +68,17 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 
 void Init()
 {
-	//MBS zwischenspeichern, bis Speicherverwaltung initialisiert ist, wenn nötig noch andere Strukturen sichern
-	MBS = memcpy(&static_MBS, MBS, sizeof(multiboot_structure));
-	MBS->mbs_mmap_addr = memcpy(__builtin_alloca(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
-
 	Display_Init();		//Anzeige Intialisieren
 	cpu_Init();			//CPU Initialisieren
 	fpu_Init();			//FPU Initialisieren
 	GDT_Init();			//GDT initialisieren
 	IDT_Init();			//IDT initialisieren
 	TSS_Init();			//TSS initialisieren
+
+	//MBS zwischenspeichern, bis Speicherverwaltung initialisiert ist, wenn nötig noch andere Strukturen sichern
+	MBS = memcpy(&static_MBS, MBS, sizeof(multiboot_structure));
+	MBS->mbs_mmap_addr = memcpy(__builtin_alloca(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
+
 	pit_Init(1000);		//PIT initialisieren mit 1kHz
 	pic_Init();			//PIC initialisieren
 	cmos_Init();		//CMOS initialisieren
