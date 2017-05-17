@@ -52,7 +52,7 @@ static syscall syscalls[] = {
 		(syscall)&nop,
 		(syscall)&nop,
 
-		(syscall)&loader_load,			//10
+		(syscall)&loader_syscall_load,			//10
 		(syscall)&pm_ExitTask,			//11
 		(syscall)&createThreadHandler,	//12
 		(syscall)&exitThreadHandler,	//13

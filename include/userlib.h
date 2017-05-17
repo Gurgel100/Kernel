@@ -14,7 +14,9 @@
 #include "stdint.h"
 #include "syscall.h"
 
-#define createProcess(path, cmd) syscall_createProcess(path, cmd, NULL, NULL, NULL)
+extern char **get_environ();
+
+#define createProcess(path, cmd) syscall_createProcess(path, cmd, get_environ(), NULL, NULL, NULL)
 #define sleep(msec)	syscall_sleep(msec)
 #define getSysInfo(Struktur) syscall_getSysInfo(Struktur)
 

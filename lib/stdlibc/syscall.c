@@ -26,9 +26,10 @@ void syscall_unusePage(void *Address, size_t Pages)
 	_syscall(2, Address, Pages);
 }
 
-pid_t syscall_createProcess(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
+pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
-	return (pid_t)_syscall(10, path, cmd, stdin, stdout, stderr);
+	const char *stddevs[3] = {stdin, stdout, stderr};
+	return (pid_t)_syscall(10, path, cmd, env, stddevs);
 }
 
 void __attribute__((noreturn)) syscall_exit(int status)
