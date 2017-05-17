@@ -18,6 +18,7 @@ void initLib()
 	init_stdio();
 }
 #ifndef BUILD_KERNEL
+extern char **get_environ();
 extern int main(int argc, char *argv[]);
 
 int getArgCount(char *cmd)
@@ -57,6 +58,12 @@ void c_main(void *data)
 
 	exit(main(argc, argv));
 }
+
+pid_t createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
+{
+	return syscall_createProcess(path, cmd, env ? : get_environ(), stdin, stdout, stderr);
+}
+
 #endif
 
 void reverse(char *s)
