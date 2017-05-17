@@ -64,7 +64,8 @@ static heap_empty_t *base_emptyHeap = NULL;
 static char **real_environ;
 
 //Global visible
-char **environ;
+//XXX: remove static as soon as .got sections are supported
+static char **environ;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
@@ -1098,10 +1099,17 @@ static char *getenvvar(const char *name, char **value, size_t *index)
 	return env[i];
 }
 
+//Internal functions
 void init_envvars(char **env)
 {
 	environ = env;
 	check_environ();
+}
+
+//XXX: remove function as soon as .got sections are supported (the environ variable doesn't need to be declared static then)
+char **get_environ()
+{
+	return environ;
 }
 
 char *getenv(const char *name)
