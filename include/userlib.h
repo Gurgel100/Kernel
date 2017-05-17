@@ -8,6 +8,8 @@
 #ifndef USERLIB_H_
 #define USERLIB_H_
 
+#include "stddef.h"
+
 #ifndef BUILD_KERNEL
 #include "stdint.h"
 #include "syscall.h"
@@ -26,5 +28,6 @@ typedef struct{
 void initLib(void);
 
 void reverse(char *s);
+size_t count_envs(const char **env);
 
 #endif /* USERLIB_H_ */

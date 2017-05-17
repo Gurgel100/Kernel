@@ -69,3 +69,12 @@ void reverse(char *s)
 		s[j] = c;
 	}
 }
+
+size_t count_envs(const char **env)
+{
+	size_t count = 0;
+
+	while(env++ != NULL) count++;
+
+	return count;
+}

@@ -12,6 +12,7 @@
 #include "ctype.h"
 #include "math.h"
 #include "assert.h"
+#include "userlib.h"
 #ifdef BUILD_KERNEL
 #include "mm.h"
 #include "cpu.h"
@@ -1054,15 +1055,6 @@ void setupNewHeapEntry(heap_t *old, heap_t *new)
 
 
 //Environment variables
-static size_t count_envs(char **env)
-{
-	size_t count = 0;
-
-	while(env++ != NULL) count++;
-
-	return count;
-}
-
 static void check_environ()
 {
 	if(real_environ != environ)
@@ -1073,7 +1065,7 @@ static void check_environ()
 		}
 		free(real_environ);
 
-		size_t count = count_envs(environ);
+		size_t count = count_envs((const char**)environ);
 		real_environ = malloc(count + 1 * sizeof(char*));
 		for(size_t i = 0; i < count; i++)
 		{
@@ -1177,7 +1169,7 @@ int unsetenv(const char *name)
 	char *env = getenvvar(name, NULL, &index);
 	if(env != NULL)
 	{
-		size_t count = count_envs(real_environ);
+		size_t count = count_envs((const char**)real_environ);
 		free(real_environ[index]);
 		memmove(&real_environ[index], &real_environ[index + 1], (count - index + 1) * sizeof(char*));
 		char **new_environ = realloc(real_environ, count * sizeof(char*));
@@ -1210,7 +1202,7 @@ int putenv(char *str)
 
 	size_t index;
 	char *env = getenvvar(name, NULL, &index);
-	size_t count = count_envs(real_environ);
+	size_t count = count_envs((const char**)real_environ);
 	if(env == NULL)
 	{
 		char **new_environ = realloc(real_environ, (count + 2) * sizeof(char*));
