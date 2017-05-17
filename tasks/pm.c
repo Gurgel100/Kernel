@@ -20,6 +20,7 @@
 #include "avl.h"
 #include "assert.h"
 #include "vfs.h"
+#include "userlib.h"
 
 static pid_t nextPID = 1;
 static uint64_t numTasks = 0;
@@ -125,7 +126,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	}
 
 	size_t cmd_size = strlen(newProcess->cmd) + 1;
-	size_t num_envs = count_envs(env);
+	size_t num_envs = (env != NULL) ? count_envs(env) : 0;
 	size_t env_size = 0;
 	for(size_t i = 0; i < num_envs; i++)
 	{
