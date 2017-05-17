@@ -42,7 +42,7 @@ typedef struct process_t{
 extern process_t *currentProcess;			//Aktueller Prozess
 
 void pm_Init(void);
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *stdin, const char *stdout, const char *stderr);
+process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
 void pm_DestroyTask(process_t *process);
 void pm_ExitTask(uint64_t code);
 void pm_BlockTask(process_t *process);

@@ -5,14 +5,12 @@
  *      Author: pascal
  */
 
-
 #include "loader.h"
 #include "stdio.h"
 #include "elf.h"
 #include "string.h"
 
-
-pid_t loader_load(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
+pid_t loader_load(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	pid_t pid = 0;
 	char *bin;
@@ -37,7 +35,7 @@ pid_t loader_load(const char *path, const char *cmd, const char *stdin, const ch
 	if(fp == NULL)
 		return 0;
 
-	pid = elfLoad(fp, cmd, stdin, stdout, stderr);
+	pid = elfLoad(fp, cmd, env, stdin, stdout, stderr);
 	fclose(fp);
 	return pid;
 }

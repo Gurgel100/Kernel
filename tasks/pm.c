@@ -93,7 +93,7 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *stdin, const char *stdout, const char *stderr)
+process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
 
@@ -124,8 +124,27 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char *st
 		return NULL;
 	}
 
+	size_t cmd_size = strlen(newProcess->cmd) + 1;
+	size_t num_envs = count_envs(env);
+	size_t env_size = 0;
+	for(size_t i = 0; i < num_envs; i++)
+	{
+		env_size += strlen(env[i]) + 1;
+	}
+	void *data = malloc(cmd_size + env_size);
+	strcpy(data, newProcess->cmd);
+	size_t written_data = cmd_size;
+	for(size_t i = 0; i < num_envs; i++)
+	{
+		size_t env_len = strlen(env[i]) + 1;
+		memcpy(data + written_data, env[i], env_len);
+		written_data += env_len;
+	}
+	assert(written_data == cmd_size + env_size);
+
 	//Mainthread erstellen
-	thread_create(newProcess, entry, strlen(newProcess->cmd) + 1, newProcess->cmd, false);
+	thread_create(newProcess, entry, cmd_size + env_size, data, false);
+	free(data);
 
 	//Prozess in Liste eintragen
 	bool res = LOCKED_RESULT(pm_lock, avl_add_s(&process_list, newProcess, pid_cmp, NULL));

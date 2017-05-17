@@ -173,7 +173,7 @@ static char elfCheck(elf_header *ELFHeader)
 	return -1;
 }
 
-pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
+pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
 	void *Ziel;
@@ -206,7 +206,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char *stdin, const char *stdout, 
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	process_t *task = pm_InitTask(currentProcess, (void*)Header.e_entry, (char*)cmd, stdin, stdout, stderr);
+	process_t *task = pm_InitTask(currentProcess, (void*)Header.e_entry, (char*)cmd, env, stdin, stdout, stderr);
 	if(task == NULL)
 	{
 		free(ProgramHeader);
