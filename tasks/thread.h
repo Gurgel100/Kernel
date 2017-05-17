@@ -12,7 +12,6 @@
 #include "isr.h"
 #include "pm.h"
 #include "stdbool.h"
-#include "pmm.h"
 #include "ring.h"
 
 typedef uint64_t tid_t;
@@ -30,7 +29,6 @@ typedef struct{
 	thread_status_t Status;
 	void *kernelStackBottom, *kernelStack;
 	void *userStackBottom;
-	paddr_t userStackPhys;
 	bool isMainThread;
 }thread_t;
 

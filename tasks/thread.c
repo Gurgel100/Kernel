@@ -17,6 +17,8 @@
 #include "pmm.h"
 #include "assert.h"
 
+extern context_t kernel_context;
+
 list_t threadList;
 
 static tid_t get_tid()
@@ -33,7 +35,7 @@ void thread_Init()
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
 {
 	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
-	if(thread == NULL)
+	if(thread == NULL || data_length >= MM_USER_STACK_SIZE)
 		return NULL;
 
 	thread->isMainThread = (process != currentProcess);
@@ -78,13 +80,11 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Stack mappen
 	if(!kernel)
 	{
-		void *stack = mm_SysAlloc(1);
-		thread->userStackBottom = process->nextThreadStack - MM_BLOCK_SIZE;
+		assert(MM_USER_STACK_SIZE % MM_BLOCK_SIZE == 0);
+		void *stack = mm_SysAlloc(MM_USER_STACK_SIZE / MM_BLOCK_SIZE);
+		thread->userStackBottom = process->nextThreadStack - MM_USER_STACK_SIZE;
 		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
-		thread->userStackPhys = vmm_getPhysAddress(stack);
-		if(thread->userStackPhys == 0)
-			thread->userStackPhys = pmm_Alloc();
-		vmm_ContextMap(process->Context, thread->userStackBottom, thread->userStackPhys,
+		vmm_ReMap(&kernel_context, stack, process->Context, thread->userStackBottom, MM_USER_STACK_SIZE / MM_BLOCK_SIZE,
 				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
 		process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 	}
@@ -133,8 +133,7 @@ void thread_destroy(thread_t *thread)
 	}
 
 	//Userstack freigeben
-	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom);
-	pmm_Free(thread->userStackPhys);
+	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
 
 	free(thread->fpuState);
 	free(thread);
