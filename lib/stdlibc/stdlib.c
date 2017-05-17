@@ -1060,19 +1060,25 @@ static void check_environ()
 {
 	if(real_environ != environ)
 	{
-		while(*real_environ != NULL)
+		if(real_environ != NULL)
 		{
-			free(*real_environ);
+			char **env = real_environ;
+			while(*env != NULL)
+			{
+				free(*env);
+				env++;
+			}
+			free(real_environ);
 		}
-		free(real_environ);
 
 		size_t count = count_envs((const char**)environ);
-		real_environ = malloc(count + 1 * sizeof(char*));
+		real_environ = malloc((count + 1) * sizeof(char*));
 		for(size_t i = 0; i < count; i++)
 		{
 			real_environ[i] = strdup(environ[i]);
 		}
 		real_environ[count] = NULL;
+		environ = real_environ;
 	}
 }
 
