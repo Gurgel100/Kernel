@@ -28,7 +28,7 @@ pid_t loader_load(const char *path, const char *cmd, const char **env, const cha
 	strcpy(binpath, path);
 	binpath[strlen(binpath) + 1] = '\0';
 	binpath[strlen(binpath)] = '/';
-	strcat(binpath, cmd);
+	strcat(binpath, cmdline);
 
 	//Jetzt können wir die Datei öffnen
 	FILE *fp = fopen(binpath, "rb");
