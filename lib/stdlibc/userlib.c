@@ -19,9 +19,10 @@ void initLib()
 }
 #ifndef BUILD_KERNEL
 extern char **get_environ();
+extern void init_envvars(char **env);
 extern int main(int argc, char *argv[]);
 
-int getArgCount(char *cmd)
+static int getArgCount(char *cmd)
 {
 	int count = 0;
 
@@ -40,21 +41,34 @@ int getArgCount(char *cmd)
 	return count;
 }
 
-void c_main(void *data)
+void c_main(char *data)
 {
 	initLib();
 
 	int argc = getArgCount(data);
 	char *argv[argc + 1];
 
+	char *env_start = (char*)((uintptr_t)data + strlen(data) + 1);
+	size_t env_count = *(size_t*)env_start;
+	env_start += sizeof(size_t);
+
 	argv[0] = strtok(data, " ");
 
-	int i;
-	for(i = 1; i < argc; i++)
+	for(int i = 1; i < argc; i++)
 	{
 		argv[i] = strtok(NULL, " ");
 	}
 	argv[argc] = NULL;
+
+	char *envs[env_count + 1];
+	for(size_t i = 0; i < env_count; i++)
+	{
+		envs[i] = env_start;
+		env_start += strlen(env_start);
+	}
+	envs[env_count] = NULL;
+
+	init_envvars(envs);
 
 	exit(main(argc, argv));
 }
