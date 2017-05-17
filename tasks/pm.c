@@ -134,17 +134,18 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	}
 	void *data = malloc(cmd_size + env_size);
 	strcpy(data, newProcess->cmd);
-	size_t written_data = cmd_size;
+	*(size_t*)(data + cmd_size) = num_envs;
+	size_t written_data = cmd_size + sizeof(size_t);
 	for(size_t i = 0; i < num_envs; i++)
 	{
 		size_t env_len = strlen(env[i]) + 1;
 		memcpy(data + written_data, env[i], env_len);
 		written_data += env_len;
 	}
-	assert(written_data == cmd_size + env_size);
+	assert(written_data == cmd_size + sizeof(size_t) + env_size);
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, cmd_size + env_size, data, false);
+	thread_create(newProcess, entry, written_data, data, false);
 	free(data);
 
 	//Prozess in Liste eintragen
