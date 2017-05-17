@@ -23,6 +23,7 @@
 
 #define HEAP_RESERVED	0x01
 #define HEAP_FLAGS		0xAA
+#define HEAP_ALIGNMENT	16
 
 #define MAX(a, b) ((a > b) ? a : b)
 
@@ -845,7 +846,7 @@ void *malloc(size_t size)
 		return NULL;
 
 	//Size sollte ein Vielfaches von 8 sein und mindestens gross genug für die Erweiterung des Baumes
-	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + 7) & ~7));
+	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1)));
 
 	//Nach passendem Eintrag suchen
 	heap_empty_t *node = search_empty_heap(size);
@@ -906,7 +907,7 @@ void *realloc(void *ptr, size_t size)
 	Heap = ptr - sizeof(heap_t);
 
 	//Size sollte ein Vielfaches von 8 sein und mindestens gross genug für die Erweiterung des Baumes
-	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + 7) & ~7));
+	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1)));
 	//Ist dieser Heap gültig?
 	if(Heap->Flags == (HEAP_FLAGS | HEAP_RESERVED))
 	{
