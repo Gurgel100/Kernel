@@ -74,7 +74,7 @@ size_t count_envs(const char **env)
 {
 	size_t count = 0;
 
-	while(env++ != NULL) count++;
+	while(*env++ != NULL) count++;
 
 	return count;
 }
