@@ -75,7 +75,33 @@ void c_main(char *data)
 
 pid_t createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
-	return syscall_createProcess(path, cmd, env ? : get_environ(), stdin, stdout, stderr);
+	char **environ = env ? : get_environ();
+	if(path != NULL)
+	{
+		return syscall_createProcess(path, cmd, environ, stdin, stdout, stderr);
+	}
+	else
+	{
+		char *env = getenv("PATH");
+		if(env == NULL)
+			return 0;
+		char *env_copy = strdup(env);
+		if(env_copy == NULL)
+			return 0;
+
+		char *env_tmp = env_copy;
+		char *token;
+		pid_t pid;
+		while((token = strtok_s(&env_tmp, ":")) != NULL)
+		{
+			pid = syscall_createProcess(token, cmd, environ, stdin, stdout, stderr);
+			if(pid != 0)
+				break;
+		}
+
+		free(env_copy);
+		return pid;
+	}
 }
 
 #endif
