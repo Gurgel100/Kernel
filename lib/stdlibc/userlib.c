@@ -64,7 +64,7 @@ void c_main(char *data)
 	for(size_t i = 0; i < env_count; i++)
 	{
 		envs[i] = env_start;
-		env_start += strlen(env_start);
+		env_start += strlen(env_start) + 1;
 	}
 	envs[env_count] = NULL;
 
