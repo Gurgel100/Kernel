@@ -25,17 +25,18 @@ extern int main(int argc, char *argv[]);
 static int getArgCount(char *cmd)
 {
 	int count = 0;
+	char previous = '\0';
 
-	int i;
-	for(i = 0; ; i++)
+	for(size_t i = 0; ; i++)
 	{
 		if(cmd[i] == '\0')
 		{
 			count++;
 			break;
 		}
-		else if(cmd[i] == ' ')
+		else if(cmd[i] == ' ' && previous != ' ')
 			count++;
+		previous = cmd[i];
 	}
 
 	return count;
