@@ -1095,7 +1095,8 @@ static char *getenvvar(const char *name, char **value, size_t *index)
 	while(env[i] != NULL)
 	{
 		char *env_name_end = strchr(env[i], '=');
-		if(strncmp(name, env[i], env_name_end - env[i]) == 0)
+		size_t env_name_len = env_name_end - env[i];
+		if(strlen(name) <= env_name_len && strncmp(name, env[i], env_name_len) == 0)
 		{
 			if(value != NULL) *value = env_name_end + 1;
 			break;
