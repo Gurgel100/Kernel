@@ -49,4 +49,7 @@ void pm_BlockTask(process_t *process);
 void pm_ActivateTask(process_t *process);
 process_t *pm_getTask(pid_t PID);
 
+//syscalls
+void pm_syscall_exit(int status);
+
 #endif /* PM_H_ */

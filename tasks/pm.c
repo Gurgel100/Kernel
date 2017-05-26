@@ -197,7 +197,7 @@ void pm_DestroyTask(process_t *process)
  * Parameter:		Registerstatus
  * Rückgabewert:	Neuer Registerstatus (Taskswitch)
  */
-void pm_ExitTask(uint64_t code)
+void pm_ExitTask(int code)
 {
 	cleaner_cleanProcess(currentProcess);
 	yield();
@@ -273,4 +273,11 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 		cpu = thread->State;
 	}
 	return cpu;
+}
+
+//syscalls
+void pm_syscall_exit(int status)
+{
+	assert(currentThread != NULL);
+	pm_ExitTask(status);
 }
