@@ -44,7 +44,8 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 	thread->process = process;
 
-	thread->Status = THREAD_BLOCKED;
+	thread->Status.block_reason = THREAD_BLOCKED;
+	thread->Status.status = THREAD_BLOCKED_NOT_BLOCKED;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
 			.cs = (kernel) ? 0x8 : 0x20 + 3,	//Kernel- oder Userspace
@@ -144,14 +145,15 @@ void thread_prepare(thread_t *thread)
 	TSS_setStack(thread->kernelStack);
 }
 
-bool thread_block_self(thread_bail_out_t bail, void *context)
+bool thread_block_self(thread_bail_out_t bail, void *context, thread_block_reason_t reason)
 {
 	assert(currentThread != NULL);
-	if(currentThread->Status == THREAD_RUNNING)
+	const thread_status_t expected = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	thread_status_t newStatus = {{THREAD_BLOCKED, reason}};
+	if(__sync_bool_compare_and_swap(&currentThread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		currentThread->Status = THREAD_BLOCKED;
 		scheduler_remove(currentThread);
-		while(currentThread->Status == THREAD_BLOCKED) yield();
+		while(currentThread->Status.status == THREAD_BLOCKED) yield();
 	}
 
 	if(currentProcess->Status != PM_RUNNING)
@@ -167,12 +169,14 @@ bool thread_block_self(thread_bail_out_t bail, void *context)
 bool thread_try_unblock(thread_t *thread)
 {
 	assert(thread != NULL);
-	if(thread->Status != THREAD_RUNNING)
+	thread_status_t expected = {{THREAD_BLOCKED, thread->Status.block_reason}};
+	const thread_status_t newStatus = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		thread->Status = THREAD_RUNNING;
 		if(!scheduler_try_add(thread))
 		{
-			thread->Status = THREAD_RUNNING;
+			thread->Status.block_reason = expected.block_reason;
+			thread->Status.status = THREAD_BLOCKED;
 			return false;
 		}
 		return true;
@@ -183,14 +187,15 @@ bool thread_try_unblock(thread_t *thread)
 void thread_unblock(thread_t *thread)
 {
 	assert(thread != NULL);
-	if(thread->Status != THREAD_RUNNING)
+	thread_status_t expected = {{THREAD_BLOCKED, thread->Status.block_reason}};
+	const thread_status_t newStatus = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		thread->Status = THREAD_RUNNING;
 		scheduler_add(thread);
 	}
 }
 
 void thread_waitUserIO()
 {
-	thread_block_self(NULL, NULL);
+	thread_block_self(NULL, NULL, THREAD_BLOCKED_USER_IO);
 }
