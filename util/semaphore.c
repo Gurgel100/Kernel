@@ -34,7 +34,7 @@ retry:
 		lock(&sem->lock);
 		queue_enqueue(sem->waiting, currentThread);
 		unlock(&sem->lock);
-		if(!thread_block_self((thread_bail_out_t)semaphore_release, sem)) goto retry;
+		if(!thread_block_self((thread_bail_out_t)semaphore_release, sem, THREAD_BLOCKED_SEMAPHORE)) goto retry;
 	}
 }
 
