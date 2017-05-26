@@ -140,6 +140,7 @@ void thread_Init();
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel);
 void thread_destroy(thread_t *thread);
 void thread_prepare(thread_t *thread);
+bool thread_block(thread_t *thread, thread_block_reason_t reason);
 bool thread_block_self(thread_bail_out_t bail, void *context, thread_block_reason_t reason);
 bool thread_try_unblock(thread_t *thread);
 void thread_unblock(thread_t *thread);

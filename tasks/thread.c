@@ -145,6 +145,18 @@ void thread_prepare(thread_t *thread)
 	TSS_setStack(thread->kernelStack);
 }
 
+bool thread_block(thread_t *thread, thread_block_reason_t reason)
+{
+	const thread_status_t expected = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	thread_status_t newStatus = {{THREAD_BLOCKED, reason}};
+	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
+	{
+		scheduler_remove(thread);
+		return true;
+	}
+	return false;
+}
+
 bool thread_block_self(thread_bail_out_t bail, void *context, thread_block_reason_t reason)
 {
 	assert(currentThread != NULL);
