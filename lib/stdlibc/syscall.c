@@ -39,14 +39,19 @@ void __attribute__((noreturn)) syscall_exit(int status)
 	while(1);
 }
 
+pid_t syscall_wait(pid_t pid, int *status)
+{
+	return (pid_t)_syscall(12, pid, status);
+}
+
 tid_t syscall_createThread(void *entry, void *arg)
 {
-	return (tid_t)_syscall(12, entry, arg);
+	return (tid_t)_syscall(13, entry, arg);
 }
 
 void __attribute__((noreturn)) syscall_exitThread(int status)
 {
-	asm volatile("int $0x30" : : "D"(13), "S"(status));
+	asm volatile("int $0x30" : : "D"(14), "S"(status));
 }
 
 void *syscall_fopen(char *path, vfs_mode_t mode)

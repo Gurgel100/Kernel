@@ -22,6 +22,11 @@
 #include "vfs.h"
 #include "userlib.h"
 
+typedef struct{
+	thread_t *thread;
+	pid_t waiting_pid;
+}pm_wait_entry_t;
+
 static pid_t nextPID = 1;
 static uint64_t numTasks = 0;
 extern process_t kernel_process;				//Handler für idle-Task
@@ -53,13 +58,38 @@ static int pid_cmp(const void *a, const void *b, void *c)
 	return (p1->PID < p2->PID) ? -1 : ((p1->PID == p2->PID) ? 0 : 1);
 }
 
-static void pid_visit(const void *a, void *b)
+static void pid_visit_count_childs(const void *a, void *b)
 {
-	process_t *p = (process_t*)a;
-	process_t *parent = (process_t*)((uintptr_t*)b)[0];
-	list_t childs = (list_t)((uintptr_t*)b)[1];
+	const process_t *p = (const process_t*)a;
+	const process_t *parent = (const process_t*)((void**)b)[0];
 	if(parent == p->parent)
-		list_push(childs, p);
+		(*(size_t*)(((void**)b)[1]))++;
+}
+
+static void child_terminated(process_t *parent, process_t *process)
+{
+	lock(&parent->lock);
+	list_push(parent->terminated_childs, process);
+
+	//wakeup any waiting thread
+	pm_wait_entry_t *entry;
+	thread_t *thread;
+	bool found = false;
+	for(size_t i = 0; (entry = list_get(parent->waiting_threads_pid, i)) != NULL; i++)
+	{
+		if(entry->waiting_pid == process->PID)
+		{
+			thread_unblock(entry->thread);
+			free(entry);
+			found = true;
+			break;
+		}
+	}
+	if(!found && (thread = list_pop(parent->waiting_threads)) != NULL)
+	{
+		thread_unblock(thread);
+	}
+	unlock(&parent->lock);
 }
 
 /*
@@ -116,6 +146,10 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	//Liste der Threads erstellen
 	newProcess->threads = list_create();
 
+	newProcess->terminated_childs = list_create();
+	newProcess->waiting_threads = list_create();
+	newProcess->waiting_threads_pid = list_create();
+
 	if(!vfs_initUserspace(parent, newProcess, stdin, stdout, stderr))
 	{
 		//Fehler
@@ -166,25 +200,8 @@ void pm_DestroyTask(process_t *process)
 {
 	if(LOCKED_RESULT(pm_lock, avl_remove_s(&process_list, process, pid_cmp, NULL)))
 	{
-		//Wenn der richtige Prozess gefunden wurde, alle Datenstrukturen des Prozesses freigeben
-		//und alle Kindprozesse beenden
-		//TODO: Signal senden anstatt einfach zu killen
-		list_t childs = list_create();
-		void *a[2] = {process, childs};
-		LOCKED_TASK(pm_lock, avl_visit_s(process_list, avl_visiting_in_order, pid_visit, a));
-		process_t *child;
-		while((child = list_pop(childs)))
-		{
-			pm_DestroyTask(child);
-		}
-		list_destroy(childs);
-
-		//Alle Threads beenden
-		thread_t *thread;
-		while((thread = list_get(process->threads, 0)))
-			thread_destroy(thread);
+		//free all resources of the process
 		deleteContext(process->Context);
-		vfs_deinitUserspace(process);
 		free(process->cmd);
 		free(process);
 		__sync_fetch_and_add(&numTasks, -1);
@@ -199,8 +216,26 @@ void pm_DestroyTask(process_t *process)
  */
 void pm_ExitTask(int code)
 {
-	cleaner_cleanProcess(currentProcess);
-	yield();
+	assert(currentProcess != NULL);
+	assert(currentProcess->parent != NULL);
+
+	//Alle Threads beenden
+	thread_t *thread;
+	while((thread = list_pop(currentProcess->threads)) != NULL)
+	{
+		if(thread != currentThread)
+			thread_block(thread, THREAD_BLOCKED_TERMINATED);
+	}
+
+	vfs_deinitUserspace(currentProcess);
+
+	//TODO: free userspace
+
+	currentProcess->exit_status = code;
+	currentProcess->Status = PM_TERMINATED;
+	child_terminated(currentProcess->parent, currentProcess);
+	thread_block_self(NULL, NULL, THREAD_BLOCKED_TERMINATED);
+	assert(false);
 }
 
 /*
@@ -275,9 +310,86 @@ ihs_t *pm_Schedule(ihs_t *cpu)
 	return cpu;
 }
 
+pid_t pm_WaitChild(pid_t pid, int *status)
+{
+	assert(currentProcess != NULL);
+	process_t *child = NULL;
+	if(pid == 0)
+	{
+		//Wait for any child
+		size_t childs = 0;
+		void *tmp[2] = {currentProcess, &childs};
+		LOCKED_TASK(pm_lock, avl_visit_s(process_list, avl_visiting_in_order, pid_visit_count_childs, tmp));
+		if(childs > 0)
+		{
+			lock(&currentProcess->lock);
+			child = list_pop(currentProcess->terminated_childs);
+			while(child == NULL)
+			{
+				list_push(currentProcess->waiting_threads, currentThread);
+				unlock(&currentProcess->lock);
+				thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT);
+				lock(&currentProcess->lock);
+				child = list_pop(currentProcess->terminated_childs);
+			}
+			unlock(&currentProcess->lock);
+			if(status != NULL) *status = child->exit_status;
+		}
+	}
+	else
+	{
+		//Check if pid is a child
+		child = pm_getTask(pid);
+		if(child != NULL && child->parent == currentProcess)
+		{
+			process_t *item;
+			size_t i = 0;
+			bool found = false;
+			lock(&currentProcess->lock);
+			while(!found)
+			{
+				while((item = list_get(currentProcess->terminated_childs, i)) != NULL)
+				{
+					if(item->PID == child->PID)
+					{
+						list_remove(currentProcess->terminated_childs, i);
+						found = true;
+						break;
+					}
+					i++;
+				}
+				if(!found)
+				{
+					pm_wait_entry_t *entry = malloc(sizeof(pm_wait_entry_t));
+					entry->thread = currentThread;
+					entry->waiting_pid = pid;
+					list_push(currentProcess->waiting_threads_pid, entry);
+					unlock(&currentProcess->lock);
+					thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT);
+					lock(&currentProcess->lock);
+				}
+			}
+			unlock(&currentProcess->lock);
+			if(status != NULL) *status = child->exit_status;
+		}
+	}
+	pid_t child_pid = child->PID;
+	pm_DestroyTask(child);
+
+	return child_pid;
+}
+
 //syscalls
 void pm_syscall_exit(int status)
 {
 	assert(currentThread != NULL);
 	pm_ExitTask(status);
+}
+
+pid_t pm_syscall_wait(pid_t pid, int *status)
+{
+	assert(currentThread != NULL);
+	if(status != NULL && !vmm_userspacePointerValid(status, sizeof(*status)))
+		return 0;
+	return pm_WaitChild(pid, status);
 }

@@ -41,6 +41,7 @@ inline void syscall_unusePage(void *Address, size_t Pages);
 
 inline pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
 inline void syscall_exit(int status);
+pid_t syscall_wait(pid_t pid, int *status);
 inline tid_t syscall_createThread(void *entry, void *arg);
 inline void syscall_exitThread(int status);
 
