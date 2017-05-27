@@ -35,7 +35,7 @@ pid_t syscall_createProcess(const char *path, const char *cmd, const char **env,
 void __attribute__((noreturn)) syscall_exit(int status)
 {
 	//Dieser syscall funktioniert nur über Interrupts
-	asm volatile("int $0x30" : : "D"(11), "S"(status));
+	_syscall(11, status);
 	while(1);
 }
 
