@@ -218,7 +218,7 @@ void pm_BlockTask(process_t *process)
 		size_t i = 0;
 		while((thread = list_get(process->threads, i++)))
 		{
-			scheduler_remove(thread);
+			thread_block(thread, THREAD_BLOCKED_PROCESS_BLOCKED);
 		}
 	}
 }

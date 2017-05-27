@@ -51,6 +51,11 @@ typedef enum{
 	THREAD_BLOCKED_WAIT,
 
 	/**
+	 * Thread is blocked because the process is blocked
+	 */
+	THREAD_BLOCKED_PROCESS_BLOCKED,
+
+	/**
 	 * Thread is terminated
 	 */
 	THREAD_BLOCKED_TERMINATED
