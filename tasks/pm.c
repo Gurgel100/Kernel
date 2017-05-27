@@ -187,7 +187,7 @@ void pm_DestroyTask(process_t *process)
 		vfs_deinitUserspace(process);
 		free(process->cmd);
 		free(process);
-		numTasks--;
+		__sync_fetch_and_add(&numTasks, -1);
 	}
 	assert(!LOCKED_RESULT(pm_lock, avl_search_s(process_list, process, pid_cmp, NULL)));
 }
