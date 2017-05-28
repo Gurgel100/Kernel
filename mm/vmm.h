@@ -46,7 +46,7 @@ void *getFreePages(void *start, void *end, size_t pages);
 paddr_t vmm_getPhysAddress(void *virtualAddress);
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl);
 uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
-uint8_t vmm_ContextUnMap(context_t *context, void *vAddress);
+uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page);
 
 bool vmm_getPageStatus(void *Address);
 

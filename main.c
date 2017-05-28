@@ -51,13 +51,14 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 	Init();		//Initialisiere System
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
-	sound_Play(10000, 1000);
+
 	printf("Kernel version: %i.%i.%i - %s %s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, BUILD_DATE, BUILD_TIME);
 	if(vfs_MountRoot())
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
 	{
-		loader_load("/bin", "init", "/dev/tty01", "/dev/tty01", "/dev/tty01");
+		const char **env = {NULL};
+		loader_load("/bin", "init", env, "/dev/tty01", "/dev/tty01", "/dev/tty01");
 		scheduler_activate();
 	}
 
@@ -67,16 +68,17 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 
 void Init()
 {
-	//MBS zwischenspeichern, bis Speicherverwaltung initialisiert ist, wenn nötig noch andere Strukturen sichern
-	MBS = memcpy(&static_MBS, MBS, sizeof(multiboot_structure));
-	MBS->mbs_mmap_addr = memcpy(__builtin_alloca(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
-
 	Display_Init();		//Anzeige Intialisieren
 	cpu_Init();			//CPU Initialisieren
 	fpu_Init();			//FPU Initialisieren
 	GDT_Init();			//GDT initialisieren
 	IDT_Init();			//IDT initialisieren
 	TSS_Init();			//TSS initialisieren
+
+	//MBS zwischenspeichern, bis Speicherverwaltung initialisiert ist, wenn nötig noch andere Strukturen sichern
+	MBS = memcpy(&static_MBS, MBS, sizeof(multiboot_structure));
+	MBS->mbs_mmap_addr = memcpy(__builtin_alloca(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
+
 	pit_Init(1000);		//PIT initialisieren mit 1kHz
 	pic_Init();			//PIC initialisieren
 	cmos_Init();		//CMOS initialisieren

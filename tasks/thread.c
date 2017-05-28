@@ -17,6 +17,8 @@
 #include "pmm.h"
 #include "assert.h"
 
+extern context_t kernel_context;
+
 list_t threadList;
 
 static tid_t get_tid()
@@ -33,7 +35,7 @@ void thread_Init()
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
 {
 	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
-	if(thread == NULL)
+	if(thread == NULL || data_length >= MM_USER_STACK_SIZE)
 		return NULL;
 
 	thread->isMainThread = (process != currentProcess);
@@ -42,7 +44,8 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 	thread->process = process;
 
-	thread->Status = THREAD_BLOCKED;
+	thread->Status.block_reason = THREAD_BLOCKED;
+	thread->Status.status = THREAD_BLOCKED_NOT_BLOCKED;
 	// CPU-Zustand für den neuen Task festlegen
 	ihs_t new_state = {
 			.cs = (kernel) ? 0x8 : 0x20 + 3,	//Kernel- oder Userspace
@@ -78,13 +81,11 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 	//Stack mappen
 	if(!kernel)
 	{
-		void *stack = mm_SysAlloc(1);
-		thread->userStackBottom = process->nextThreadStack - MM_BLOCK_SIZE;
+		assert(MM_USER_STACK_SIZE % MM_BLOCK_SIZE == 0);
+		void *stack = mm_SysAlloc(MM_USER_STACK_SIZE / MM_BLOCK_SIZE);
+		thread->userStackBottom = process->nextThreadStack - MM_USER_STACK_SIZE;
 		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
-		thread->userStackPhys = vmm_getPhysAddress(stack);
-		if(thread->userStackPhys == 0)
-			thread->userStackPhys = pmm_Alloc();
-		vmm_ContextMap(process->Context, thread->userStackBottom, thread->userStackPhys,
+		vmm_ReMap(&kernel_context, stack, process->Context, thread->userStackBottom, MM_USER_STACK_SIZE / MM_BLOCK_SIZE,
 				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
 		process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 	}
@@ -133,8 +134,7 @@ void thread_destroy(thread_t *thread)
 	}
 
 	//Userstack freigeben
-	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom);
-	pmm_Free(thread->userStackPhys);
+	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
 
 	free(thread->fpuState);
 	free(thread);
@@ -145,14 +145,27 @@ void thread_prepare(thread_t *thread)
 	TSS_setStack(thread->kernelStack);
 }
 
-bool thread_block_self(thread_bail_out_t bail, void *context)
+bool thread_block(thread_t *thread, thread_block_reason_t reason)
+{
+	const thread_status_t expected = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	thread_status_t newStatus = {{THREAD_BLOCKED, reason}};
+	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
+	{
+		scheduler_remove(thread);
+		return true;
+	}
+	return false;
+}
+
+bool thread_block_self(thread_bail_out_t bail, void *context, thread_block_reason_t reason)
 {
 	assert(currentThread != NULL);
-	if(currentThread->Status == THREAD_RUNNING)
+	const thread_status_t expected = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	thread_status_t newStatus = {{THREAD_BLOCKED, reason}};
+	if(__sync_bool_compare_and_swap(&currentThread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		currentThread->Status = THREAD_BLOCKED;
 		scheduler_remove(currentThread);
-		while(currentThread->Status == THREAD_BLOCKED) yield();
+		while(currentThread->Status.status == THREAD_BLOCKED) yield();
 	}
 
 	if(currentProcess->Status != PM_RUNNING)
@@ -168,12 +181,14 @@ bool thread_block_self(thread_bail_out_t bail, void *context)
 bool thread_try_unblock(thread_t *thread)
 {
 	assert(thread != NULL);
-	if(thread->Status != THREAD_RUNNING)
+	thread_status_t expected = {{THREAD_BLOCKED, thread->Status.block_reason}};
+	const thread_status_t newStatus = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		thread->Status = THREAD_RUNNING;
 		if(!scheduler_try_add(thread))
 		{
-			thread->Status = THREAD_RUNNING;
+			thread->Status.block_reason = expected.block_reason;
+			thread->Status.status = THREAD_BLOCKED;
 			return false;
 		}
 		return true;
@@ -184,14 +199,15 @@ bool thread_try_unblock(thread_t *thread)
 void thread_unblock(thread_t *thread)
 {
 	assert(thread != NULL);
-	if(thread->Status != THREAD_RUNNING)
+	thread_status_t expected = {{THREAD_BLOCKED, thread->Status.block_reason}};
+	const thread_status_t newStatus = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
+	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		thread->Status = THREAD_RUNNING;
 		scheduler_add(thread);
 	}
 }
 
 void thread_waitUserIO()
 {
-	thread_block_self(NULL, NULL);
+	thread_block_self(NULL, NULL, THREAD_BLOCKED_USER_IO);
 }

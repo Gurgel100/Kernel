@@ -36,8 +36,13 @@ void *refcount_retain(void *obj, size_t offset)
 		return obj;
 }
 
-void refcount_release(void *obj, size_t offset)
+bool refcount_release(void *obj, size_t offset)
 {
 	refcount_t *o = (refcount_t*)((uintptr_t)obj + offset);
-	if(__sync_add_and_fetch(&o->ref_count, -1) == 0 && o->free != NULL) o->free(obj);
+	if(__sync_add_and_fetch(&o->ref_count, -1) == 0 && o->free != NULL)
+	{
+		o->free(obj);
+		return true;
+	}
+	return false;
 }

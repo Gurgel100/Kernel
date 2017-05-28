@@ -12,6 +12,7 @@
 #include "ctype.h"
 #include "math.h"
 #include "assert.h"
+#include "userlib.h"
 #ifdef BUILD_KERNEL
 #include "mm.h"
 #include "cpu.h"
@@ -22,6 +23,7 @@
 
 #define HEAP_RESERVED	0x01
 #define HEAP_FLAGS		0xAA
+#define HEAP_ALIGNMENT	16
 
 #define MAX(a, b) ((a > b) ? a : b)
 
@@ -60,6 +62,11 @@ atexit_list_t *Atexit_List_Base = NULL;
 
 static heap_t *lastHeap = NULL;
 static heap_empty_t *base_emptyHeap = NULL;
+static char **real_environ;
+
+//Global visible
+//XXX: remove static as soon as .got sections are supported
+static char **environ;
 
 inline void *AllocPage(size_t Pages);
 inline void FreePage(void *Address, size_t Pages);
@@ -839,7 +846,7 @@ void *malloc(size_t size)
 		return NULL;
 
 	//Size sollte ein Vielfaches von 8 sein und mindestens gross genug für die Erweiterung des Baumes
-	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + 7) & ~7));
+	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1)));
 
 	//Nach passendem Eintrag suchen
 	heap_empty_t *node = search_empty_heap(size);
@@ -881,6 +888,8 @@ void *malloc(size_t size)
 	}
 	heap->Flags |= HEAP_RESERVED;		//Als reserviert markieren
 
+	assert(((uintptr_t)Address & (HEAP_ALIGNMENT - 1)) == 0);
+
 	return Address;
 }
 
@@ -900,7 +909,7 @@ void *realloc(void *ptr, size_t size)
 	Heap = ptr - sizeof(heap_t);
 
 	//Size sollte ein Vielfaches von 8 sein und mindestens gross genug für die Erweiterung des Baumes
-	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + 7) & ~7));
+	size = MAX(sizeof(heap_empty_t) - sizeof(heap_t), ((size + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1)));
 	//Ist dieser Heap gültig?
 	if(Heap->Flags == (HEAP_FLAGS | HEAP_RESERVED))
 	{
@@ -977,6 +986,8 @@ void *realloc(void *ptr, size_t size)
 		}
 	}
 
+	assert(((uintptr_t)Address & (HEAP_ALIGNMENT - 1)) == 0);
+
 	return Address;
 }
 
@@ -1048,6 +1059,199 @@ void setupNewHeapEntry(heap_t *old, heap_t *new)
 	new->Flags = HEAP_FLAGS;
 }
 
+
+//Environment variables
+static void check_environ()
+{
+	if(real_environ != environ)
+	{
+		if(real_environ != NULL)
+		{
+			char **env = real_environ;
+			while(*env != NULL)
+			{
+				free(*env);
+				env++;
+			}
+			free(real_environ);
+		}
+
+		size_t count = count_envs((const char**)environ);
+		real_environ = malloc((count + 1) * sizeof(char*));
+		for(size_t i = 0; i < count; i++)
+		{
+			real_environ[i] = strdup(environ[i]);
+		}
+		real_environ[count] = NULL;
+		environ = real_environ;
+	}
+}
+
+static char *getenvvar(const char *name, char **value, size_t *index)
+{
+	check_environ();
+
+	if(real_environ == NULL)
+		return NULL;
+
+	char **env = real_environ;
+	size_t i = 0;
+	while(env[i] != NULL)
+	{
+		char *env_name_end = strchr(env[i], '=');
+		size_t env_name_len = env_name_end - env[i];
+		if(strlen(name) <= env_name_len && strncmp(name, env[i], env_name_len) == 0)
+		{
+			if(value != NULL) *value = env_name_end + 1;
+			break;
+		}
+		i++;
+	}
+	if(index != NULL) *index = i;
+	return env[i];
+}
+
+//Internal functions
+void init_envvars(char **env)
+{
+	environ = env;
+	check_environ();
+}
+
+//XXX: remove function as soon as .got sections are supported (the environ variable doesn't need to be declared static then)
+char **get_environ()
+{
+	return environ;
+}
+
+char *getenv(const char *name)
+{
+	char *val = NULL;
+	getenvvar(name, &val, NULL);
+	return val;
+}
+
+int setenv(const char *name, const char *value, int overwrite)
+{
+	//EINVAL
+	if(strlen(name) == 0 || strchr(name, '=') != NULL)
+		return -1;
+
+	char *val;
+	size_t index = 0;
+	char *env = getenvvar(name, &val, &index);
+	if(env == NULL)
+	{
+		//Resize environ
+		char **new_environ = realloc(real_environ, (index + 2) * sizeof(char*));
+		//ENOMEM
+		if(new_environ == NULL)
+		{
+			return -1;
+		}
+		real_environ = new_environ;
+		environ = real_environ;
+		real_environ[index + 1] = NULL;
+		env = malloc(strlen(name) + 1 + strlen(value) + 1);
+		//ENOMEM
+		if(env == NULL)
+		{
+			return -1;
+		}
+
+		strcpy(env, name);
+		strcat(env, "=");
+		strcat(env, value);
+		real_environ[index] = env;
+	}
+	else if(overwrite)
+	{
+		char *new_env = realloc(env, (val - env) + strlen(value));
+		//ENOMEM
+		if(new_env == NULL)
+		{
+			return -1;
+		}
+		real_environ[index] = new_env;
+		strcpy(new_env + (val - env), value);
+	}
+
+	return 0;
+}
+
+int unsetenv(const char *name)
+{
+	//EINVAL
+	if(strlen(name) == 0 || strchr(name, '=') != NULL)
+		return -1;
+
+	size_t index;
+	char *env = getenvvar(name, NULL, &index);
+	if(env != NULL)
+	{
+		size_t count = count_envs((const char**)real_environ);
+		free(real_environ[index]);
+		memmove(&real_environ[index], &real_environ[index + 1], (count - index + 1) * sizeof(char*));
+		char **new_environ = realloc(real_environ, count * sizeof(char*));
+		//ENOMEM
+		if(new_environ == NULL)
+		{
+			return -1;
+		}
+		real_environ = new_environ;
+		environ = real_environ;
+	}
+
+	return 0;
+}
+
+int putenv(char *str)
+{
+	char *tmp = strdup(str);
+	//ENOMEM
+	if(tmp == NULL)
+		return -1;
+
+	const char *name = tmp;
+	char *equal = strchr(name, '=');
+	if(equal == NULL)
+	{
+		return -1;
+	}
+	*equal = '\0';
+
+	size_t index;
+	char *env = getenvvar(name, NULL, &index);
+	size_t count = count_envs((const char**)real_environ);
+	if(env == NULL)
+	{
+		char **new_environ = realloc(real_environ, (count + 2) * sizeof(char*));
+		//ENOMEM
+		if(new_environ == NULL)
+		{
+			free(tmp);
+			return -1;
+		}
+		real_environ = new_environ;
+		environ = real_environ;
+
+		real_environ[count] = str;
+	}
+	else
+	{
+		//Replace variable
+		free(real_environ[index]);
+		real_environ[index] = str;
+	}
+
+	free(tmp);
+
+	return 0;
+}
+
+
+
+//Algorithms
 static int cmph(const void* a, const void* b, int (*cmp)(const void*, const void*)) {
 	return cmp(a, b);
 }

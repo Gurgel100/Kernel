@@ -27,12 +27,12 @@ void __attribute__((noreturn)) cleaner()
 					pm_DestroyTask(entry->data);
 				break;
 				case CL_THREAD:
-					while(((thread_t*)entry->data)->Status != THREAD_BLOCKED) yield();
+					while(((thread_t*)entry->data)->Status.status != THREAD_BLOCKED) yield();
 					thread_destroy(entry->data);
 			}
 			free(entry);
 		}
-		thread_block_self(NULL, NULL);
+		thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT);
 	}
 }
 
@@ -62,5 +62,5 @@ void cleaner_cleanThread(thread_t *thread)
 
 	stack_push(cleanStack, entry);
 	thread_unblock(cleanerThread);
-	thread_block_self(NULL, NULL);
+	thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT);
 }

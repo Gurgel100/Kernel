@@ -5,14 +5,12 @@
  *      Author: pascal
  */
 
-
 #include "loader.h"
 #include "stdio.h"
 #include "elf.h"
 #include "string.h"
 
-
-pid_t loader_load(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
+pid_t loader_load(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	pid_t pid = 0;
 	char *bin;
@@ -30,14 +28,26 @@ pid_t loader_load(const char *path, const char *cmd, const char *stdin, const ch
 	strcpy(binpath, path);
 	binpath[strlen(binpath) + 1] = '\0';
 	binpath[strlen(binpath)] = '/';
-	strcat(binpath, cmd);
+	strcat(binpath, cmdline);
 
 	//Jetzt können wir die Datei öffnen
 	FILE *fp = fopen(binpath, "rb");
 	if(fp == NULL)
 		return 0;
 
-	pid = elfLoad(fp, cmd, stdin, stdout, stderr);
+	pid = elfLoad(fp, cmd, env, stdin, stdout, stderr);
 	fclose(fp);
 	return pid;
+}
+
+pid_t loader_syscall_load(const char *path, const char *cmd, const char **env, const char *stddevs[3])
+{
+	//TODO: check env pointers
+	if(!vmm_userspacePointerValid(path, strlen(path)) || !vmm_userspacePointerValid(cmd, strlen(cmd)))
+		return 0;
+	if((stddevs[0] != NULL && !vmm_userspacePointerValid(stddevs[0], strlen(stddevs[0])))
+		|| (stddevs[1] != NULL && !vmm_userspacePointerValid(stddevs[1], strlen(stddevs[1])))
+		|| (stddevs[2] != NULL && !vmm_userspacePointerValid(stddevs[2], strlen(stddevs[2]))))
+		return 0;
+	return loader_load(path, cmd, env, stddevs[0], stddevs[1], stddevs[2]);
 }

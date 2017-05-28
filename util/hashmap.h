@@ -18,21 +18,7 @@
 #define HASH_MAP_DUPLICATE_KEY -1
 #define HASH_MAP_NO_MEMORY -10
 
-struct _hash_map_entry;
-
-typedef struct _hash_map_entry _hash_map_entry_t;
-
-typedef struct {
-	uint64_t (*hash1)(const void* key, void* context);
-	uint64_t (*hash2)(const void* key, void* context);
-	void (*free_key)(const void* key);
-	void (*free_obj)(const void* obj);
-	bool (*equal)(const void* key1, const void* key2, void* context);
-	void* context;
-	_hash_map_entry_t* entries;
-	uint64_t count;
-	uint8_t prime_index;
-} hashmap_t;
+typedef struct hashmap hashmap_t;
 
 hashmap_t* hashmap_create(
 	uint64_t (*hash1)(const void* key, void* context), /*Hash function used for lookup / insertion. Has to satisfy equal(key1, key2) => hash(key1) == hash(key2).*/
@@ -41,6 +27,7 @@ hashmap_t* hashmap_create(
 	void (*free_key)(const void* key),
 	void (*free_obj)(const void* obj),
 	void* context, /*value passed to hash and equality functions as context parameter*/
+	void (*free_cntx)(const void* cntx),
 	size_t min_size /*expected amount of entries in hashtable*/
 );
 
@@ -49,10 +36,14 @@ hashmap_t* hashmap_create_min(
 	bool (*equal)(const void* key1, const void* key2, void* context) /*Function used to test for key equality.*/
 );
 
+void hashmap_destroy(hashmap_t* map);
+
 int hashmap_search(hashmap_t* map, const void* key, void** result);
-
 int hashmap_delete(hashmap_t* map, const void* key);
-
 int hashmap_set(hashmap_t* map, const void* key, const void* obj);
+
+size_t hashmap_size(hashmap_t* map);
+
+void hashmap_visit(hashmap_t* map, void (*visitor)(const void* key, const void* obj, void* context), void* context);
 
 #endif /* HASHMAP_H_ */

@@ -735,6 +735,7 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
  * 					1 = zu wenig phys. Speicherplatz vorhanden
  * 					2 = Destinationaddresse ist schon belegt
  *///TODO: Bei Fehler alles Rückgängig machen
+//FIXME: getPhysAddress funktioniert nur für kernel_context
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl)
 {
 	size_t i;
@@ -743,7 +744,7 @@ uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, voi
 		uint8_t r;
 		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE), flags, avl)) != 0)
 			return r;
-		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE) == 2)
+		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE, false) == 2)
 			return 1;
 	}
 	return 0;
@@ -1044,7 +1045,7 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
  * 					1 = virt. Addresse nicht belegt
  * 					2 = zu wenig phys. Speicherplatz vorhanden
  */
-uint8_t vmm_ContextUnMap(context_t *context, void *vAddress)
+uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 {
 	PML4_t *PML4 = context->virtualAddress;
 	PDP_t *PDP;
@@ -1102,6 +1103,11 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress)
 	//PT Tabelle bearbeiten
 	if((PT->PTE[PTi] & PG_P) == 1)			//Wenn PT Eintrag vorhanden
 	{										//dann lösche ihn
+		if(free_page)
+		{
+			paddr_t page_addr = PT->PTE[PTi] & PG_ADDRESS;
+			pmm_Free(page_addr);
+		}
 		//Ist dies eine Page des Kernelspaces?
 		if(PG_AVL(PT->PTE[PTi]) == VMM_KERNELSPACE)
 			setPTEntry(PTi, PT, 0, 1, 0, 1, 0, 0, 0, 0, VMM_KERNELSPACE, 0, 0, 0);

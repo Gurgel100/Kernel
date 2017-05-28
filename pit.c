@@ -78,7 +78,7 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 		unlock(&Timerlist_lock);
 
 		//Entsprechenden Thread schlafen legen
-		thread_block_self(NULL, NULL);
+		thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT_TIMER);
 	}
 	else
 	{

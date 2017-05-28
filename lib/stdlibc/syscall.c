@@ -26,26 +26,32 @@ void syscall_unusePage(void *Address, size_t Pages)
 	_syscall(2, Address, Pages);
 }
 
-pid_t syscall_createProcess(const char *path, const char *cmd, const char *stdin, const char *stdout, const char *stderr)
+pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
-	return (pid_t)_syscall(10, path, cmd, stdin, stdout, stderr);
+	const char *stddevs[3] = {stdin, stdout, stderr};
+	return (pid_t)_syscall(10, path, cmd, env, stddevs);
 }
 
 void __attribute__((noreturn)) syscall_exit(int status)
 {
 	//Dieser syscall funktioniert nur über Interrupts
-	asm volatile("int $0x30" : : "D"(11), "S"(status));
+	_syscall(11, status);
 	while(1);
+}
+
+pid_t syscall_wait(pid_t pid, int *status)
+{
+	return (pid_t)_syscall(12, pid, status);
 }
 
 tid_t syscall_createThread(void *entry, void *arg)
 {
-	return (tid_t)_syscall(12, entry, arg);
+	return (tid_t)_syscall(13, entry, arg);
 }
 
 void __attribute__((noreturn)) syscall_exitThread(int status)
 {
-	asm volatile("int $0x30" : : "D"(13), "S"(status));
+	asm volatile("int $0x30" : : "D"(14), "S"(status));
 }
 
 void *syscall_fopen(char *path, vfs_mode_t mode)
