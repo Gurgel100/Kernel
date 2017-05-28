@@ -35,27 +35,27 @@ typedef struct{
 typedef uint64_t pid_t;
 typedef uint64_t tid_t;
 
-inline void *AllocPage(size_t Pages);
-inline void FreePage(void *Address, size_t Pages);
-inline void syscall_unusePage(void *Address, size_t Pages);
+void *AllocPage(size_t Pages);
+void FreePage(void *Address, size_t Pages);
+void syscall_unusePage(void *Address, size_t Pages);
 
-inline pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
-inline void syscall_exit(int status);
+pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
+void syscall_exit(int status);
 pid_t syscall_wait(pid_t pid, int *status);
-inline tid_t syscall_createThread(void *entry, void *arg);
-inline void syscall_exitThread(int status);
+tid_t syscall_createThread(void *entry, void *arg);
+void syscall_exitThread(int status);
 
-inline void *syscall_fopen(char *path, vfs_mode_t mode);
-inline void syscall_fclose(void *stream);
-inline size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer);
-inline size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer);
-inline uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
-inline int syscall_mount(const char *mountpoint, const char *device);
-inline int syscall_unmount(const char *mountpoint);
+void *syscall_fopen(char *path, vfs_mode_t mode);
+void syscall_fclose(void *stream);
+size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer);
+size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer);
+uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
+int syscall_mount(const char *mountpoint, const char *device);
+int syscall_unmount(const char *mountpoint);
 
-inline void syscall_sleep(uint64_t msec);
+void syscall_sleep(uint64_t msec);
 
-inline void syscall_getSysInfo(void *Struktur);
+void syscall_getSysInfo(void *Struktur);
 
 #endif /* SYSCALL_H_ */
 
