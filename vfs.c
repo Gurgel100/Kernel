@@ -598,7 +598,7 @@ static bool check_path(const char *path)
 void vfs_Init(void)
 {
 	res_list = list_create();
-	streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_stream_free, NULL, 3);
+	streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_stream_free, NULL, NULL, 3);
 	assert(streams != NULL);
 
 	//Root
@@ -987,7 +987,7 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr)
 {
 	assert(p != NULL && ((parent == NULL && stdin != NULL && stdout != NULL && stderr != NULL) || parent != NULL));
-	if((p->streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_userspace_stream_free, NULL, 3)) == NULL)
+	if((p->streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_userspace_stream_free, NULL, NULL, 3)) == NULL)
 		return 1;
 
 	vfs_file_t streamid;

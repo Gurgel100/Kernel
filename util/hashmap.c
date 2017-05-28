@@ -12,10 +12,23 @@ typedef enum {
 	entry_state_deleted = 0
 } _hash_map_entry_state_e;
 
-struct _hash_map_entry {
+typedef struct {
 	const void* key;
 	const void* entry;
 	_hash_map_entry_state_e state;
+} _hash_map_entry_t;
+
+struct hashmap {
+	uint64_t (*hash1)(const void* key, void* context);
+	uint64_t (*hash2)(const void* key, void* context);
+	void (*free_key)(const void* key);
+	void (*free_obj)(const void* obj);
+	bool (*equal)(const void* key1, const void* key2, void* context);
+	void* context;
+	void (*free_cntx)(const void* cntx);
+	_hash_map_entry_t* entries;
+	uint64_t count;
+	uint8_t prime_index;
 };
 
 static _hash_map_entry_t* _cleared_entry_array(size_t size) {
@@ -41,8 +54,7 @@ static void _rehash(hashmap_t* map) {
 	size_t new_size = primes[++(map->prime_index)];
 	_hash_map_entry_t* old_entries = map->entries;
 	map->entries = _cleared_entry_array(new_size);
-	size_t i;
-	for (i = 0; i < old_size; i++) {
+	for (size_t i = 0; i < old_size; i++) {
 		if (old_entries[i].state == entry_state_in_use) {
 			_insert_no_check_empty(map, old_entries[i].key, old_entries[i].entry);
 		}
@@ -56,6 +68,7 @@ hashmap_t* hashmap_create(
 	void (*free_key)(const void* key),
 	void (*free_obj)(const void* obj),
 	void* context, /*value passed to hash and equality functions as context parameter*/
+	void (*free_cntx)(const void* cntx),
 	size_t min_size /*expected amount of entries in hashtable*/
 ) {
 	assert(min_size < UINT64_MAX / 2 && "Requested size too large");
@@ -76,6 +89,7 @@ hashmap_t* hashmap_create(
 	ret->count = 0;
 	ret->free_key = free_key;
 	ret->free_obj = free_obj;
+	ret->free_cntx = free_cntx;
 	return ret;
 entry_alloc_failed:
 	free(ret);
@@ -87,7 +101,20 @@ hashmap_t* hashmap_create_min(
 	uint64_t (*hash)(const void* key, void* context), /*Hash function used for lookup / insertion. Has to satisfy equal(key1, key2) => hash(key1) == hash(key2).*/
 	bool (*equal)(const void* key1, const void* key2, void* context) /*Function used to test for key equality.*/
 ) {
-	return hashmap_create(hash, hash, equal, NULL, NULL, NULL, 0);
+	return hashmap_create(hash, hash, equal, NULL, NULL, NULL, NULL, 0);
+}
+
+void hashmap_destroy(hashmap_t* map) {
+	for (uint64_t i = 0; i < primes[map->prime_index]; i++) {
+		_hash_map_entry_t* entry = &(map->entries[i]);
+		if (entry->state == entry_state_in_use) {
+			if (map->free_key) map->free_key((void*)entry->key);
+			if (map->free_obj) map->free_obj((void*)entry->entry);
+		}
+	}
+	if (map->free_cntx) map->free_cntx(map->context);
+	free(map->entries);
+	free(map);
 }
 
 int hashmap_search(hashmap_t* map, const void* key, void** result) {
@@ -152,4 +179,15 @@ int hashmap_set(hashmap_t* map, const void* key, const void* obj) {
 	map->count++;
 	if (map->count > 3 * primes[map->prime_index] / 4) _rehash(map);
 	return 0;
+}
+
+size_t hashmap_size(hashmap_t* map) {
+	return map->count;
+}
+
+void hashmap_visit(hashmap_t* map, void (*visitor)(const void* key, const void* obj, void* context), void* context) {
+	for (uint64_t i = 0; i < primes[map->prime_index]; i++) {
+		_hash_map_entry_t entry = map->entries[i];
+		if (entry.state == entry_state_in_use) visitor(entry.key, entry.entry, context);
+	}
 }
