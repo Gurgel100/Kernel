@@ -888,6 +888,8 @@ void *malloc(size_t size)
 	}
 	heap->Flags |= HEAP_RESERVED;		//Als reserviert markieren
 
+	assert(((uintptr_t)Address & (HEAP_ALIGNMENT - 1)) == 0);
+
 	return Address;
 }
 
@@ -983,6 +985,8 @@ void *realloc(void *ptr, size_t size)
 			}
 		}
 	}
+
+	assert(((uintptr_t)Address & (HEAP_ALIGNMENT - 1)) == 0);
 
 	return Address;
 }
