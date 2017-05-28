@@ -1061,6 +1061,8 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 
 void vfs_deinitUserspace(process_t *p)
 {
+	assert(p != NULL);
+	hashmap_destroy(p->streams);
 }
 
 /*
