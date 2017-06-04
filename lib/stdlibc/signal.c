@@ -22,7 +22,7 @@ void SIG_DFL(int signal)
 			exit(EXIT_SUCCES);
 			break;
 		case SIGSEGV:
-			puts("segmention fault");
+			puts("segmentation fault");
 			abort();
 			break;
 		case SIGINT:
