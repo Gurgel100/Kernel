@@ -46,14 +46,8 @@ void (*signal(int sig, void (*handler)(int)))(int)
 {
 	if(sig > 5)
 		return SIG_ERR;
-	void (*old_handler)(int) = signal_handlers[sig];
-	if(handler == SIG_DFL)
-		signal_handlers[sig] = signal_handler;
-	else if(handler == SIG_IGN)
-		signal_handlers[sig] = NULL;
-	else
-		signal_handlers[sig] = handler;
-	return old_handler;
+	asm volatile("xchg %0,%1": "+r"(handler): "m"(signal_handlers[sig]): "memory");
+	return handler;
 }
 
 int raise(int sig)
