@@ -12,11 +12,9 @@
 
 #ifndef BUILD_KERNEL
 
-static void signal_handler(int signal);
+static void (*signal_handlers[6])(int) = {SIG_DFL, SIG_DFL, SIG_DFL, SIG_DFL, SIG_DFL, SIG_DFL};
 
-static void (*signal_handlers[6])(int) = {signal_handler, signal_handler, signal_handler, signal_handler, signal_handler, signal_handler};
-
-static void signal_handler(int signal)
+void SIG_DFL(int signal)
 {
 	switch(signal)
 	{
@@ -40,6 +38,10 @@ static void signal_handler(int signal)
 	}
 }
 
+void SIG_IGN(int signal __attribute__((unused)))
+{
+}
+
 void (*signal(int sig, void (*handler)(int)))(int)
 {
 	if(sig > 5)
@@ -58,11 +60,7 @@ int raise(int sig)
 {
 	if(sig > 5)
 		return -1;
-	if(signal_handlers[sig] != NULL)
-	{
-		printf("raise signal %i\n", sig);
-		signal_handlers[sig](sig);
-	}
+	signal_handlers[sig](sig);
 	return 0;
 }
 
