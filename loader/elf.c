@@ -176,7 +176,6 @@ static char elfCheck(elf_header *ELFHeader)
 pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
-	void *Ziel;
 
 	//Zurücksetzen des Dateizeigers
 	fseek(fp, 0, SEEK_SET);
@@ -221,12 +220,13 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 
 		size_t pages = ProgramHeader[i].p_memsz / 4096;
 		pages += (ProgramHeader[i].p_memsz % 4096) ? 1 : 0;
-		Ziel = mm_SysAlloc(pages);
+		void *dest = mm_SysAlloc(pages);
+		uintptr_t dest_off = ProgramHeader[i].p_vaddr % 0x1000;
 		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
-		fread(Ziel, 1, ProgramHeader[i].p_filesz, fp);
+		fread(dest + dest_off, 1, ProgramHeader[i].p_filesz, fp);
 
 		//Eventuell mit nullen auffüllen
-		memset(Ziel + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
+		memset(dest + dest_off + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);
 
 		uint16_t flags = VMM_FLAGS_USER;
 		if(ProgramHeader[i].p_flags & ELF_PF_W)
@@ -235,7 +235,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 			flags |= VMM_FLAGS_NX;
 
 		//Speicherbereich an die richtige Addresse mappen
-		vmm_ReMap(&kernel_context, Ziel, task->Context, (void*)ProgramHeader[i].p_vaddr, pages, flags, 0);
+		vmm_ReMap(&kernel_context, dest, task->Context, (void*)ProgramHeader[i].p_vaddr, pages, flags, 0);
 	}
 
 	//Temporäre Daten wieder freigeben
