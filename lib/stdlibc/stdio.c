@@ -622,6 +622,22 @@ char *fgets(char *str, int n, FILE *stream)
 	return str;
 }
 
+int fputc(int ch, FILE *stream)
+{
+	return fwrite(&ch, sizeof(unsigned char), 1, stream);
+}
+
+int fputs(const char *str, FILE *stream)
+{
+	unsigned int i;
+	for(i = 0; str[i] != '\0'; i++)
+	{
+		if(fputc(str[i], stream) == EOF)
+			return EOF;
+	}
+	return 1;
+}
+
 //TODO: alle print-Funktionen fertigstellen
 
 int fprintf(FILE *stream, const char *format, ...)
@@ -1899,14 +1915,14 @@ char *gets(char *str)
 }
 
 
-int putc(int zeichen, FILE *stream)
+int putc(int ch, FILE *stream)
 {
-	return fwrite(&zeichen, sizeof(unsigned char), 1, stream);
+	return fputc(ch, stream);
 }
 
-int putchar(int zeichen)
+int putchar(int ch)
 {
-	return putc(zeichen, stdout);
+	return putc(ch, stdout);
 }
 
 int puts(const char *str)

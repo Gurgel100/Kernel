@@ -76,6 +76,9 @@ extern int feof(FILE *stream);
 extern int fgetc(FILE *stream);
 extern char *fgets(char *str, int n, FILE *stream);
 
+extern int fputc(int ch, FILE *stream);
+extern int fputs(const char *str, FILE *stream);
+
 extern int vfprintf(FILE *stream, const char *format, va_list arg);
 extern int vprintf(const char *format, va_list arg);
 extern int vsprintf(char *str, const char *format, va_list arg);
