@@ -573,6 +573,17 @@ int fgetpos(FILE *stream, fpos_t *pos)
 	return 0;
 }
 
+void rewind(FILE *stream)
+{
+	fseek(stream, 0, SEEK_SET);
+	stream->eof = false;
+	stream->error = IO_NO_ERROR;
+
+	free(stream->ungetch_buffer);
+	stream->ungetch_buffer = NULL;
+	stream->ungetch_count = 0;
+}
+
 int feof(FILE *stream)
 {
 	return stream->eof;
