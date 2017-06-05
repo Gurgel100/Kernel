@@ -18,7 +18,7 @@ void initLib()
 	init_stdio();
 }
 #ifndef BUILD_KERNEL
-extern char **get_environ();
+extern char **environ;
 extern void init_envvars(char **env);
 extern int main(int argc, char *argv[]);
 
@@ -76,10 +76,10 @@ void c_main(char *data)
 
 pid_t createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
-	char **environ = env ? : get_environ();
+	const char **use_environ = env ? : (const char**)environ;
 	if(path != NULL)
 	{
-		return syscall_createProcess(path, cmd, environ, stdin, stdout, stderr);
+		return syscall_createProcess(path, cmd, use_environ, stdin, stdout, stderr);
 	}
 	else
 	{
@@ -95,7 +95,7 @@ pid_t createProcess(const char *path, const char *cmd, const char **env, const c
 		pid_t pid;
 		while((token = strtok_s(&env_tmp, ":")) != NULL)
 		{
-			pid = syscall_createProcess(token, cmd, environ, stdin, stdout, stderr);
+			pid = syscall_createProcess(token, cmd, use_environ, stdin, stdout, stderr);
 			if(pid != 0)
 				break;
 		}

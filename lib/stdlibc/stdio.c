@@ -573,6 +573,17 @@ int fgetpos(FILE *stream, fpos_t *pos)
 	return 0;
 }
 
+void rewind(FILE *stream)
+{
+	fseek(stream, 0, SEEK_SET);
+	stream->eof = false;
+	stream->error = IO_NO_ERROR;
+
+	free(stream->ungetch_buffer);
+	stream->ungetch_buffer = NULL;
+	stream->ungetch_count = 0;
+}
+
 int feof(FILE *stream)
 {
 	return stream->eof;
@@ -609,6 +620,22 @@ char *fgets(char *str, int n, FILE *stream)
 	if(c == EOF)
 		return NULL;
 	return str;
+}
+
+int fputc(int ch, FILE *stream)
+{
+	return fwrite(&ch, sizeof(unsigned char), 1, stream);
+}
+
+int fputs(const char *str, FILE *stream)
+{
+	unsigned int i;
+	for(i = 0; str[i] != '\0'; i++)
+	{
+		if(fputc(str[i], stream) == EOF)
+			return EOF;
+	}
+	return 1;
 }
 
 //TODO: alle print-Funktionen fertigstellen
@@ -1888,14 +1915,14 @@ char *gets(char *str)
 }
 
 
-int putc(int zeichen, FILE *stream)
+int putc(int ch, FILE *stream)
 {
-	return fwrite(&zeichen, sizeof(unsigned char), 1, stream);
+	return fputc(ch, stream);
 }
 
-int putchar(int zeichen)
+int putchar(int ch)
 {
-	return putc(zeichen, stdout);
+	return putc(ch, stdout);
 }
 
 int puts(const char *str)

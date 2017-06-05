@@ -12,11 +12,9 @@
 
 #ifndef BUILD_KERNEL
 
-static void signal_handler(int signal);
+static void (*signal_handlers[6])(int) = {SIG_DFL, SIG_DFL, SIG_DFL, SIG_DFL, SIG_DFL, SIG_DFL};
 
-static void (*signal_handlers[6])(int) = {signal_handler, signal_handler, signal_handler, signal_handler, signal_handler, signal_handler};
-
-static void signal_handler(int signal)
+void SIG_DFL(int signal)
 {
 	switch(signal)
 	{
@@ -24,7 +22,7 @@ static void signal_handler(int signal)
 			exit(EXIT_SUCCES);
 			break;
 		case SIGSEGV:
-			puts("segmention fault");
+			puts("segmentation fault");
 			abort();
 			break;
 		case SIGINT:
@@ -40,29 +38,23 @@ static void signal_handler(int signal)
 	}
 }
 
+void SIG_IGN(int signal __attribute__((unused)))
+{
+}
+
 void (*signal(int sig, void (*handler)(int)))(int)
 {
 	if(sig > 5)
 		return SIG_ERR;
-	void (*old_handler)(int) = signal_handlers[sig];
-	if(handler == SIG_DFL)
-		signal_handlers[sig] = signal_handler;
-	else if(handler == SIG_IGN)
-		signal_handlers[sig] = NULL;
-	else
-		signal_handlers[sig] = handler;
-	return old_handler;
+	asm volatile("xchg %0,%1": "+r"(handler): "m"(signal_handlers[sig]): "memory");
+	return handler;
 }
 
 int raise(int sig)
 {
 	if(sig > 5)
 		return -1;
-	if(signal_handlers[sig] != NULL)
-	{
-		printf("raise signal %i\n", sig);
-		signal_handlers[sig](sig);
-	}
+	signal_handlers[sig](sig);
 	return 0;
 }
 

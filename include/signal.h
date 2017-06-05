@@ -17,10 +17,12 @@
 #define SIGABRT	4
 #define SIGFPE	5
 
-#define SIG_DFL ((void (*)(int))-1)
-#define SIG_IGN ((void (*)(int))-2)
-#define SIG_ERR ((void (*)(int))-3)
+#define SIG_DFL __sig_dfl
+#define SIG_IGN __sig_ign
+#define SIG_ERR NULL
 
+void SIG_DFL(int signal);
+void SIG_IGN(int signal);
 void (*signal(int sig, void (*handler)(int)))(int);
 int raise(int sig);
 
