@@ -58,7 +58,7 @@ int ext2_symlink_create(ext2_inode_t* parent,
 
     // Verzeichniseintrag anlegen
     if (!ext2_dir_link(parent, newi, name)) {
-        return 0;
+        goto fail;
     }
 
     // Initialisierung des Inode
@@ -79,8 +79,11 @@ int ext2_symlink_create(ext2_inode_t* parent,
         return 0;
     }
 
-
     return 1;
+
+fail:
+    ext2_inode_free(newi);
+    return 0;
 }
 
 /**

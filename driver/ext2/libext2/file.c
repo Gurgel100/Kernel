@@ -48,7 +48,7 @@ int ext2_file_create(ext2_inode_t* parent, const char* name,
 
     // Verzeichniseintrag anlegen
     if (!ext2_dir_link(parent, newi, name)) {
-        return 0;
+        goto fail;
     }
 
     if (!ext2_inode_update(newi) ||
@@ -58,5 +58,9 @@ int ext2_file_create(ext2_inode_t* parent, const char* name,
     }
 
     return 1;
+
+fail:
+    ext2_inode_free(newi);
+    return 0;
 }
 

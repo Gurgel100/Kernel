@@ -82,7 +82,7 @@ void ext2_dir_foreach(ext2_inode_t* inode,
  * @return      Pointer auf den gefundenen Verzeichniseintrag. Muss mit free
  *              freigegeben.
  */
-ext2_dirent_t* ext2_dir_get(ext2_inode_t* inode, char* name);
+ext2_dirent_t* ext2_dir_get(ext2_inode_t* inode, const char* name);
 
 /**
  * Sucht einen Inode nach dem Pfad
