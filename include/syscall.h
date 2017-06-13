@@ -49,7 +49,8 @@ uint64_t syscall_fopen(char *path, vfs_mode_t mode);
 void syscall_fclose(uint64_t stream);
 size_t syscall_fread(uint64_t stream, uint64_t start, size_t length, const void *buffer);
 size_t syscall_fwrite(uint64_t stream, uint64_t start, size_t length, const void *buffer);
-uint64_t syscall_StreamInfo(uint64_t stream, vfs_fileinfo_t info);
+uint64_t syscall_getStreamInfo(uint64_t stream, vfs_fileinfo_t info);
+void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value);
 int syscall_mount(const char *mountpoint, const char *device);
 int syscall_unmount(const char *mountpoint);
 

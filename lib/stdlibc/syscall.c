@@ -74,19 +74,24 @@ size_t syscall_fwrite(uint64_t stream, uint64_t start, size_t length, const void
 	return _syscall(43, stream, start, length, buffer);
 }
 
-uint64_t syscall_StreamInfo(uint64_t stream, vfs_fileinfo_t info)
+uint64_t syscall_getStreamInfo(uint64_t stream, vfs_fileinfo_t info)
 {
 	return _syscall(44, stream, info);
 }
 
+void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value)
+{
+	_syscall(45, stream, info, value);
+}
+
 int syscall_mount(const char *mountpoint, const char *device)
 {
-	return _syscall(45, mountpoint, device);
+	return _syscall(46, mountpoint, device);
 }
 
 int syscall_unmount(const char *mountpoint)
 {
-	return _syscall(46, mountpoint);
+	return _syscall(47, mountpoint);
 }
 
 void syscall_sleep(uint64_t msec)
