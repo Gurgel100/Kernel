@@ -690,20 +690,35 @@ static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) star
 static void *console_functionHandler(void *c, vfs_device_function_t function, ...)
 {
 	console_t *console = c;
-	switch (function)
+	void *val = NULL;
+	va_list arg;
+	va_start(arg, function);
+
+	switch(function)
 	{
 		case VFS_DEV_FUNC_TYPE:
-			return (void*)VFS_DEVICE_VIRTUAL;
+			val = (void*)VFS_DEVICE_VIRTUAL;
+		break;
 		case VFS_DEV_FUNC_NAME:
-			return console->name;
+			val = console->name;
+		break;
+		case VFS_DEV_FUNC_GET_ATTR:
+			val = (void*)(uintptr_t)console->flags;
+		break;
+		case VFS_DEV_FUNC_SET_ATTR:
+			console->flags = va_arg(arg, uint32_t);
+		break;
 		default:
-			return NULL;
+			val = NULL;
 	}
+
+	va_end(arg);
+	return val;
 }
 
 static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c)
 {
 	console_t *console = c;
 
-	return 0;
+	return VFS_DEV_CAP_ATTRIBUTES;
 }
