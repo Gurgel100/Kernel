@@ -675,13 +675,12 @@ static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) sta
 static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, void *buffer)
 {
 	console_t *console = c;
-	size_t size = 0;
 	char *buf = buffer;
 
-	while(length-- != 0)
+	size_t size;
+	for(size = 0; size < length; size++)
 	{
-		buf[length] = console_getch(console);
-		size++;
+		buf[size] = console_getch(console);
 	}
 
 	return size;
