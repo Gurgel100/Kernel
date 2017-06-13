@@ -373,8 +373,13 @@ pid_t pm_WaitChild(pid_t pid, int *status)
 			if(status != NULL) *status = child->exit_status;
 		}
 	}
-	pid_t child_pid = child->PID;
-	pm_DestroyTask(child);
+
+	pid_t child_pid = 0;
+	if(child != NULL)
+	{
+		child_pid = child->PID;
+		pm_DestroyTask(child);
+	}
 
 	return child_pid;
 }
