@@ -54,27 +54,27 @@ void __attribute__((noreturn)) syscall_exitThread(int status)
 	asm volatile("int $0x30" : : "D"(14), "S"(status));
 }
 
-void *syscall_fopen(char *path, vfs_mode_t mode)
+uint64_t syscall_fopen(char *path, vfs_mode_t mode)
 {
 	return (void*)_syscall(40, path, mode);
 }
 
-void syscall_fclose(void *stream)
+void syscall_fclose(uint64_t stream)
 {
 	_syscall(41, stream);
 }
 
-size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer)
+size_t syscall_fread(uint64_t stream, uint64_t start, size_t length, const void *buffer)
 {
 	return _syscall(42, stream, start, length, buffer);
 }
 
-size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer)
+size_t syscall_fwrite(uint64_t stream, uint64_t start, size_t length, const void *buffer)
 {
 	return _syscall(43, stream, start, length, buffer);
 }
 
-uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info)
+uint64_t syscall_StreamInfo(uint64_t stream, vfs_fileinfo_t info)
 {
 	return _syscall(44, stream, info);
 }

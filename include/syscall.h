@@ -45,11 +45,11 @@ pid_t syscall_wait(pid_t pid, int *status);
 tid_t syscall_createThread(void *entry, void *arg);
 void syscall_exitThread(int status);
 
-void *syscall_fopen(char *path, vfs_mode_t mode);
-void syscall_fclose(void *stream);
-size_t syscall_fread(void *stream, uint64_t start, size_t length, const void *buffer);
-size_t syscall_fwrite(void *stream, uint64_t start, size_t length, const void *buffer);
-uint64_t syscall_StreamInfo(void *stream, vfs_fileinfo_t info);
+uint64_t syscall_fopen(char *path, vfs_mode_t mode);
+void syscall_fclose(uint64_t stream);
+size_t syscall_fread(uint64_t stream, uint64_t start, size_t length, const void *buffer);
+size_t syscall_fwrite(uint64_t stream, uint64_t start, size_t length, const void *buffer);
+uint64_t syscall_StreamInfo(uint64_t stream, vfs_fileinfo_t info);
 int syscall_mount(const char *mountpoint, const char *device);
 int syscall_unmount(const char *mountpoint);
 
