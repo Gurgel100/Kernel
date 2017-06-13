@@ -43,7 +43,7 @@ typedef enum{
 console_t initConsole = {
 	.buffer = (void*)GRAFIKSPEICHER,
 	.color = BG_BLACK | CL_WHITE,
-	.flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL,
+	.flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL | CONSOLE_ECHO,
 	.height = ROWS,
 	.width = COLS
 };
@@ -170,7 +170,7 @@ void console_Init()
  */
 console_t *console_create(char *name, uint8_t color)
 {
-	console_t *console = malloc(sizeof(console_t));
+	console_t *console = calloc(1, sizeof(console_t));
 	if(console == NULL)
 		return NULL;
 
@@ -201,7 +201,17 @@ console_t *console_create(char *name, uint8_t color)
 		return NULL;
 	}
 
-	console->flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL;
+	console->outputBuffer = queue_create();
+	if(console->outputBuffer == NULL)
+	{
+		free(console->inputBuffer);
+		free(console->name);
+		free(console->buffer);
+		free(console);
+		return NULL;
+	}
+
+	console->flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL | CONSOLE_ECHO;
 	console->height = ROWS;
 	console->width = COLS;
 	console->id = nextID++;
@@ -574,24 +584,79 @@ void console_setCursor(console_t *console, cursor_t cursor)
 	}
 }
 
-char console_getch(console_t *console)
+static char processInput(console_t *console)
 {
-	if(console->id == 0)
-	{
-		while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
-	}
-	else if(console->inputBufferStart == console->inputBufferEnd)
-	{
-		//Auf Eingabe warten
-		console->waitingThread = currentThread;
-		thread_waitUserIO(console->waitingThread);
-	}
-
 	assert(console->inputBufferStart != console->inputBufferEnd);
 	char c = console->inputBuffer[console->inputBufferStart++];
 	if(console->inputBufferStart == console->inputBufferSize)
 		console->inputBufferStart = 0;
+	if(console->flags & CONSOLE_ECHO)
+		console_write(console, c);
+	if(!(console->flags & CONSOLE_RAW))
+	{
+		if(c == '\b')
+		{
+			if(console->currentInputBufferSize > 0)
+				console->currentInputBuffer[--console->currentInputBufferSize] = '\0';
+		}
+		else
+		{
+			console->currentInputBuffer = realloc(console->currentInputBuffer, ++console->currentInputBufferSize + 1);
+			console->currentInputBuffer[console->currentInputBufferSize - 1] = c;
+			console->currentInputBuffer[console->currentInputBufferSize] = '\0';
+
+			if(c == '\n')
+			{
+				queue_enqueue(console->outputBuffer, console->currentInputBuffer);
+				console->currentInputBuffer = NULL;
+				console->currentInputBufferSize = 0;
+			}
+		}
+	}
+
 	return c;
+}
+
+char console_getch(console_t *console)
+{
+	char c;
+	if(console->currentOutputBuffer != NULL || queue_size(console->outputBuffer))
+	{
+		if(console->currentOutputBuffer == NULL)
+			console->currentOutputBuffer = queue_dequeue(console->outputBuffer);
+
+		c = console->currentOutputBuffer[console->currentOutputBufferPos++];
+		if(console->currentOutputBufferPos >= strlen(console->currentOutputBuffer))
+		{
+			free(console->currentOutputBuffer);
+			console->currentOutputBuffer = NULL;
+			console->currentOutputBufferPos = 0;
+		}
+
+		if(console->inputBufferStart != console->inputBufferEnd)
+			processInput(console);
+
+		return c;
+	}
+
+	do
+	{
+		if(console->id == 0)
+		{
+			while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
+		}
+		else if(console->inputBufferStart == console->inputBufferEnd)
+		{
+			//Auf Eingabe warten
+			console->waitingThread = currentThread;
+			thread_waitUserIO(console->waitingThread);
+		}
+
+		c = processInput(console);
+	}
+	while(c != '\n' && !(console->flags & CONSOLE_RAW));
+
+	return (console->flags & CONSOLE_RAW) ? c : console_getch(console);
 }
 
 static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)

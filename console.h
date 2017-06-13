@@ -12,9 +12,12 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "lock.h"
+#include "queue.h"
 
 #define	CONSOLE_AUTOREFRESH	1
 #define CONSOLE_AUTOSCROLL	2
+#define CONSOLE_RAW			(1 << 2)
+#define CONSOLE_ECHO		(1 << 3)
 
 typedef struct{
 	uint8_t x, y;
@@ -40,6 +43,12 @@ typedef struct{
 
 	char *inputBuffer;
 	size_t inputBufferSize, inputBufferStart, inputBufferEnd;
+	char *currentInputBuffer;
+	size_t currentInputBufferSize;
+
+	queue_t *outputBuffer;
+	char *currentOutputBuffer;
+	size_t currentOutputBufferPos;
 }console_t;
 
 extern console_t initConsole;
