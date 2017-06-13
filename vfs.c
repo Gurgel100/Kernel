@@ -1111,6 +1111,12 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 				else
 					return 0;
 			break;
+			case VFS_INFO_ATTRIBUTES:
+				if(stream->node->dev->getCapabilities(stream->node->dev->opaque) & VFS_DEV_CAP_ATTRIBUTES)
+					return (uint64_t)stream->node->dev->function(stream->node->dev->opaque, VFS_DEV_FUNC_GET_ATTR);
+				else
+					return 0;
+			break;
 			default:
 				return 0;
 		}
@@ -1153,6 +1159,16 @@ void vfs_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
 			break;
 			case VFS_INFO_CHANGETIME:
 				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_CHANGETIME, value);
+			break;
+		}
+	}
+	else if(stream->node->type == TYPE_DEV)
+	{
+		switch(info)
+		{
+			case VFS_INFO_ATTRIBUTES:
+				if(stream->node->dev->getCapabilities(stream->node->dev->opaque) & VFS_DEV_CAP_ATTRIBUTES)
+					stream->node->dev->function(stream->node->dev->opaque, VFS_DEV_FUNC_SET_ATTR, value);
 			break;
 		}
 	}

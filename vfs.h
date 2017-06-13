@@ -60,7 +60,17 @@ typedef enum{
 	/**
 	 * Function to unmount a device. Only available if #VFS_DEV_CAP_MOUNTABLE is set in the capabilities flags of the device.
 	 */
-	VFS_DEV_FUNC_UMOUNT
+	VFS_DEV_FUNC_UMOUNT,
+
+	/**
+	 * Function to get attributes.
+	 */
+	VFS_DEV_FUNC_GET_ATTR,
+
+	/**
+	 * Function to set attributes.
+	 */
+	VFS_DEV_FUNC_SET_ATTR
 }vfs_device_function_t;
 
 /**
@@ -102,7 +112,12 @@ typedef enum{
 	/**
 	 * Device supports the VFS_DEV_FUNC_MOUNT and VFS_DEV_FUNC_UMOUNT functions.
 	 */
-	VFS_DEV_CAP_MOUNTABLE	= 0x4
+	VFS_DEV_CAP_MOUNTABLE	= 0x4,
+
+	/**
+	 * Device supports the VFS_DEV_FUNC_GET_ATTR and VFS_DEV_FUNC_SET_ATTR functions.
+	 */
+	VFS_DEV_CAP_ATTRIBUTES	= 0x8
 }vfs_device_capabilities_t;
 
 //Handler für Geräte
@@ -129,7 +144,7 @@ typedef struct{
 typedef uint64_t vfs_file_t;
 
 typedef enum{
-	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
+	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME, VFS_INFO_ATTRIBUTES
 }vfs_fileinfo_t;
 
 typedef enum{
