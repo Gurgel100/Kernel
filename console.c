@@ -305,9 +305,7 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 				delimiter = true;
 			break;
 			case 'm':	//ESC[#;#m oder ESC[#m für Vordergrund und/oder Hintergrundfarbe
-				if(!have_n1)
-					return INVALID;
-				if(handle_ansi_formatting(console, n1) != SUCCESS)
+				if(handle_ansi_formatting(console, have_n1 ? n1 : 0) != SUCCESS)
 					return INVALID;
 				if(have_n2)
 				{
