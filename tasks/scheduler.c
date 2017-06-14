@@ -9,7 +9,6 @@
 #include "ring.h"
 #include "lock.h"
 #include "stdbool.h"
-#include "isr.h"
 
 extern thread_t *fpuThread;
 
@@ -89,12 +88,12 @@ void scheduler_remove(thread_t *thread)
  *
  * Rückgabe:	Neuer Thread, der ausgeführt werden soll
  */
-thread_t *scheduler_schedule(ihs_t *state)
+ihs_t *scheduler_schedule(ihs_t *state)
 {
 	thread_t *newThread;
 
 	if(!active)
-		return NULL;
+		return state;
 
 	if(currentThread != NULL)
 	{
@@ -131,7 +130,7 @@ thread_t *scheduler_schedule(ihs_t *state)
 		}
 	}
 
-	return currentThread;
+	return currentThread->State;
 }
 
 /*

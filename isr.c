@@ -21,6 +21,7 @@
 #include "thread.h"
 #include "cpu.h"
 #include "console.h"
+#include "scheduler.h"
 
 typedef struct{
 		void (*Handler)(ihs_t *ihs);
@@ -34,7 +35,6 @@ typedef struct{
 
 extern void keyboard_Handler(ihs_t *ihs);
 extern ihs_t *syscall_Handler(ihs_t *ihs);
-extern ihs_t *pm_Schedule(ihs_t *ihs);
 extern void cdi_irq_handler(uint8_t irq);
 extern void pit_Handler(void);
 
@@ -87,7 +87,7 @@ static interrupt_handler interrupt_handlers[NUM_INTERRUPTS] = {
 /*19*/			exception_XF,
 [32 ... 47]		irq_handler,
 [48]			syscall_Handler,
-[255]			pm_Schedule
+[255]			scheduler_schedule
 };
 
 //Test
@@ -146,7 +146,7 @@ static ihs_t *irq_handler(ihs_t *ihs)
 			pit_Handler();
 			if(Uptime == nextSchedule)
 			{
-				new_ihs = pm_Schedule(ihs);
+				new_ihs = scheduler_schedule(ihs);
 				nextSchedule += 50;				//Alle 50ms wird der Task gewechselt
 			}
 		}
