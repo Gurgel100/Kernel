@@ -86,7 +86,7 @@ typedef union{
 		thread_state_t status;
 		thread_block_reason_t block_reason;
 	};
-	uint128_t full_status;
+	uint64_t full_status;
 }thread_status_t __attribute__((aligned(16)));
 
 /**
