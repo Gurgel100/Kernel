@@ -588,7 +588,7 @@ static char processInput(console_t *console)
 	char c = console->inputBuffer[console->inputBufferStart++];
 	if(console->inputBufferStart == console->inputBufferSize)
 		console->inputBufferStart = 0;
-	if(console->flags & CONSOLE_ECHO)
+	if((console->flags & CONSOLE_ECHO) && (console->currentInputBufferSize > 0 || c != '\b'))
 		console_write(console, c);
 	if(!(console->flags & CONSOLE_RAW))
 	{
