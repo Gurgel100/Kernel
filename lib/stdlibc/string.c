@@ -325,13 +325,17 @@ void *memchr(const void *ptr, int ch, size_t count)
 
 int memcmp(const void *lhs, const void *rhs, size_t count)
 {
-	unsigned char *l = (unsigned char*)lhs;
-	unsigned char *r = (unsigned char*)rhs;
+	const unsigned char *l = (const unsigned char*)lhs;
+	const unsigned char *r = (const unsigned char*)rhs;
 
-	size_t i;
-	for(i = 0; i < count && l[i] == r[i]; i++);
+	unsigned char res = 0;
 
-	return l[i] - r[i];
+	for(size_t i = 0; i < count && res == 0; i++)
+	{
+		res = l[i] - r[i];
+	}
+
+	return res;
 }
 
 void *memset(void *block, int c, size_t n)
