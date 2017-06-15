@@ -13,7 +13,6 @@
 #include "stddef.h"
 #include "util.h"
 #include "display.h"
-#include "keyboard_SWISS.h"
 #include "console.h"
 #include "ctype.h"
 #include "stdlib.h"
@@ -64,11 +63,6 @@ typedef struct{
 } Puffer_t;
 
 typedef struct{
-	char_handler handler;
-	void *opaque;
-}char_handler_entry_t;
-
-typedef struct{
 	key_handler handler;
 	void *opaque;
 }key_handler_entry_t;
@@ -93,7 +87,6 @@ static volatile Puffer_t *Puffer;		//Anfang des Zeichenpuffers
 static volatile Puffer_t *ActualPuffer;	//Ende des Zeichenpuffers
 
 //Handlers
-static list_t char_handlers;
 static list_t keydown_handlers;
 static list_t keyup_handlers;
 
@@ -108,16 +101,6 @@ static KEY_t keyboard_ScancodeToKey(uint8_t Scancode)
 	if(Scancode != 0xE0 || Scancode != 0xE1)	//Werden momentan noch nicht unterstützt
 		return ScancodeToKey_default[Scancode & 0x7F];
 	return __KEY_INVALID;
-}
-
-static char keyboard_KeyToASCII(KEY_t Key)
-{
-	if(PressedKeys[KEY_LSHIFT] || PressedKeys[KEY_RSHIFT] || PressedKeys[KEY_CAPS])
-		return KeyToAscii_Shift[Key];
-	else if(PressedKeys[KEY_ALTGR])
-		return KeyToAscii_AltGr[Key];
-	else
-		return KeyToAscii_default[Key];
 }
 
 /*
@@ -146,16 +129,6 @@ static void keyboard_SetLEDs()
 	while(inb(KBC_COMMAND) & STATUS_IN);
 	outb(KEYBOARD_PORT, 0x0 | ((PressedKeys[KEY_CAPS] & 0x1) << 2) | ((PressedKeys[KEY_KPNUM] & 0x1) << 1)
 			| (PressedKeys[KEY_SCROLL] & 0x1));
-}
-
-static void notify_charPress(char c)
-{
-	size_t i = 0;
-	char_handler_entry_t *e;
-	while((e = list_get(char_handlers, i++)))
-	{
-		e->handler(e->opaque, c);
-	}
 }
 
 static void notify_keyDown(KEY_t key)
@@ -191,7 +164,6 @@ void keyboard_Init()
 	Puffer = ActualPuffer = NULL;
 
 	//Handlerlisten initialisieren
-	char_handlers = list_create();
 	keydown_handlers = list_create();
 	keyup_handlers = list_create();
 
@@ -204,20 +176,6 @@ void keyboard_Init()
 	PressedKeys[KEY_SCROLL] = false;
 	keyboard_SetLEDs();
 	SysLog("Tastatur", "Initialisierung abgeschlossen");
-}
-
-/*
- * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
- * Parameter:	Der aufzurufende Handler
- */
-void keyboard_registerCharHandler(char_handler handler, void *opaque)
-{
-	assert(char_handlers != NULL);
-	char_handler_entry_t *e = malloc(sizeof(char_handler_entry_t));
-	e->handler = handler;
-	e->opaque = opaque;
-
-	list_push(char_handlers, e);
 }
 
 /*
@@ -263,7 +221,6 @@ void keyboard_Handler(ihs_t *ihs)
 	KEY_t Key = keyboard_ScancodeToKey(Scancode);
 	if(Key == __KEY_INVALID) return;
 	bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
-	bool oldStatus = PressedKeys[Key];
 	//Wenn CapsLock, NumLock oder ScrollLock gedrückt wurde, dann den Status nur ändern beim erneuten Drücken
 	//und nicht beim Break.
 	if(Key == KEY_CAPS || Key == KEY_KPNUM || Key == KEY_SCROLL)
@@ -279,31 +236,11 @@ void keyboard_Handler(ihs_t *ihs)
 	else
 	{
 		PressedKeys[Key] = make;
-		//return;
 	}
-	//Ist nur für den Kernel notwendig
+
 	if(make)
-	{
-		//Nur einmal benachrichtigen, dass die Taste gedrückt wurde
-		if(!oldStatus)
-			notify_keyDown(Key);
-		char Zeichen = keyboard_KeyToASCII(Key);
-		if(Zeichen != 0)
-			notify_charPress(Zeichen);
-	/*if(Zeichen != 0)
-	{
-		Puffer_t *NewPuffer = malloc(sizeof(Puffer_t));
-		NewPuffer->Char = Zeichen;
-		NewPuffer->Next = NULL;
-		if(ActualPuffer != NULL)
-			ActualPuffer->Next = NewPuffer;
-		ActualPuffer = NewPuffer;
-		if(Puffer == NULL)
-			Puffer = ActualPuffer;
-	}*/
-	}
-	//Nur einmal benachrichtigen, dass die Taste losgelassen wurde
-	else if(oldStatus)
+		notify_keyDown(Key);
+	else
 		notify_keyUp(Key);
 }
 

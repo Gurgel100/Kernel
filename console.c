@@ -40,6 +40,68 @@ typedef enum{
 	INVALID, NEED_MORE, SUCCESS
 }esc_seq_status_t;
 
+//Wandelt eine Taste in ein ASCII-Zeichen um
+static const char KeyToAscii_default[] =
+{
+	0,
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q',
+	'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,
+	'\t', 0, 0, 0, 0, 0, 0, 0,
+	0, ' ', 0, 0, '\n', '\b', 0,
+	0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	L'ä', L'ö', L'ü', L'¨', '$',
+	L'§', '\'', L'^',
+	'<', ',', '.', '-',
+	//Keypad-Tasten
+	0, '/', '*', '-', '+', '\n', '.',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+};
+
+static const char KeyToAscii_shift[] =
+{
+	0,
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+	'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+	'=', '+', '"', '*', L'ç', '%', '&', '/', '(', ')',
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, ' ', 0, 0, '\n', '\b', 0,
+	0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	L'à', L'é', L'è', '!', L'£',
+	L'°', '?', '`',
+	'>', ';', ':', '_',
+	//Keypad-Tasten
+	0, '/', '*', '-', '+', '\n', 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+//TODO: Richtige Zeicheṇ
+static const char KeyToAscii_altgr[] =
+{
+	0,
+	'æ', '”', '¢', 'ð', '€', 'đ', 'ŋ', 'ħ', '→', 'j', 'ĸ', 'ł', 'µ',
+	'n', 'ø', 'þ', '@', '¶', 'ß', 'ŧ', '↓', '“', 'ł', '»', '«', '←',
+	'}', '|', '@', '#', '¼', '½', '¬', '|', '¢', ']',
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,
+	'\t', 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, '\n', '\b', 0,
+	0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	'{', L'´', '[', ']', '}',
+	L'¬', L'´', '~',
+	'\\', 0, L'·', '̣',
+	//Keypad-Tasten
+	0, '/', '*', '-', '+', '\n', '.',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+};
+
 console_t initConsole = {
 	.buffer = (void*)GRAFIKSPEICHER,
 	.color = BG_BLACK | CL_WHITE,
@@ -72,22 +134,14 @@ static size_t console_writeHandler(void *c, uint64_t start, size_t length, const
 static void *console_functionHandler(void *c, vfs_device_function_t function, ...);
 static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c);
 
-static void handler_charPress(void *opaque, char c)
+static char convertKeyToAscii(KEY_t key)
 {
-	console_t *console = *(console_t**)opaque;
-
-	console->inputBuffer[console->inputBufferEnd++] = c;
-	if(console->inputBufferEnd == console->inputBufferSize)
-		console->inputBufferEnd = 0;
-	if(console->inputBufferEnd == console->inputBufferStart)
-		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
-	assert(console->inputBufferStart != console->inputBufferEnd);
-
-	if(console->id != 0 && console->waitingThread != NULL)
-	{
-		thread_unblock(console->waitingThread);
-		console->waitingThread = NULL;
-	}
+	if(keyboard_isKeyPressed(KEY_LSHIFT) || keyboard_isKeyPressed(KEY_RSHIFT) || keyboard_isKeyPressed(KEY_CAPS))
+		return KeyToAscii_shift[key];
+	else if(keyboard_isKeyPressed(KEY_ALTGR))
+		return KeyToAscii_altgr[key];
+	else
+		return KeyToAscii_default[key];
 }
 
 static void handler_keyDown(void *opaque, KEY_t key)
@@ -123,6 +177,20 @@ static void handler_keyDown(void *opaque, KEY_t key)
 		else if(key == KEY_ESC)
 			console_switch(0);
 	}
+
+	char c = convertKeyToAscii(key);
+	console->inputBuffer[console->inputBufferEnd++] = c;
+	if(console->inputBufferEnd == console->inputBufferSize)
+		console->inputBufferEnd = 0;
+	if(console->inputBufferEnd == console->inputBufferStart)
+		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
+	assert(console->inputBufferStart != console->inputBufferEnd);
+
+	if(console->id != 0 && console->waitingThread != NULL)
+	{
+		thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
+	}
 }
 
 static void handler_keyUp(void *opaque, KEY_t key)
@@ -155,7 +223,6 @@ void console_Init()
 	}
 
 	//Keyboardhandler registrieren
-	keyboard_registerCharHandler(handler_charPress, &activeConsole);
 	keyboard_registerKeydownHandler(handler_keyDown, &activeConsole);
 	keyboard_registerKeyupHandler(handler_keyUp, &activeConsole);
 }
