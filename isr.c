@@ -22,6 +22,7 @@
 #include "cpu.h"
 #include "console.h"
 #include "scheduler.h"
+#include <dispatcher.h>
 
 typedef struct{
 		void (*Handler)(ihs_t *ihs);
@@ -130,7 +131,7 @@ interrupt_handler isr_setHandler(uint8_t num, interrupt_handler handler)
 ihs_t *isr_Handler(ihs_t *ihs)
 {
 	Counter++;
-	return interrupt_handlers[ihs->interrupt](ihs);
+	return dispatcher_dispatch(interrupt_handlers[ihs->interrupt](ihs));
 }
 
 static ihs_t *irq_handler(ihs_t *ihs)

@@ -40,6 +40,7 @@
 #include "console.h"
 #include "syscalls.h"
 #include "string.h"
+#include <dispatcher.h>
 
 static multiboot_structure static_MBS;
 
@@ -100,6 +101,7 @@ void Init()
 	dmng_Init();
 	pm_Init();			//Tasks initialisieren
 	console_Init();
+	dispatcher_init(100);
 
 	//MBS an einen richtigen Ort sichern
 	MBS->mbs_mmap_addr = memcpy(malloc(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
