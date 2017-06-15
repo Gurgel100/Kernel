@@ -107,7 +107,7 @@ static KEY_t keyboard_ScancodeToKey(uint8_t Scancode)
 {
 	if(Scancode != 0xE0 || Scancode != 0xE1)	//Werden momentan noch nicht unterstützt
 		return ScancodeToKey_default[Scancode & 0x7F];
-	return 0;
+	return __KEY_INVALID;
 }
 
 static char keyboard_KeyToASCII(KEY_t Key)
