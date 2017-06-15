@@ -18,6 +18,7 @@
 #include "stdlib.h"
 #include "list.h"
 #include "assert.h"
+#include <dispatcher.h>
 
 //Ports
 #define KEYBOARD_PORT		0x60
@@ -131,8 +132,9 @@ static void keyboard_SetLEDs()
 			| (PressedKeys[KEY_SCROLL] & 0x1));
 }
 
-static void notify_keyDown(KEY_t key)
+static void notify_keyDown(void *k)
 {
+	KEY_t key = (KEY_t)k;
 	size_t i = 0;
 	key_handler_entry_t *e;
 	while((e = list_get(keydown_handlers, i++)))
@@ -141,8 +143,9 @@ static void notify_keyDown(KEY_t key)
 	}
 }
 
-static void notify_keyUp(KEY_t key)
+static void notify_keyUp(void *k)
 {
+	KEY_t key = (KEY_t)k;
 	size_t i = 0;
 	key_handler_entry_t *e;
 	while((e = list_get(keyup_handlers, i++)))
@@ -239,9 +242,9 @@ void keyboard_Handler(ihs_t *ihs)
 	}
 
 	if(make)
-		notify_keyDown(Key);
+		dispatcher_enqueue(notify_keyDown, (void*)Key);
 	else
-		notify_keyUp(Key);
+		dispatcher_enqueue(notify_keyUp, (void*)Key);
 }
 
 #endif
