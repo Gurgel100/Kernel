@@ -258,7 +258,6 @@ void keyboard_Handler(ihs_t *ihs)
 			return;
 		}
 		key = keyboard_ScancodeToKey(Scancode, e0_code);
-		printf("keyboard: keycode: %i\n", key);
 		e0_code = false;
 		if(key == __KEY_INVALID) return;
 		bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
