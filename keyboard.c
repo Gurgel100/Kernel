@@ -82,6 +82,21 @@ static const KEY_t ScancodeToKey_default[] =
 		0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			//7.
 
 };
+
+static const KEY_t ScancodeToKey_extended[] =
+//		.0			.1			.2			.3			.4			.5			.6			.7			.8			.9			.A			.B			.C			.D			.E			.F
+{
+/*0.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+/*1.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			KEY_KPENTER,KEY_RCTRL,	0,			0,
+/*2.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+/*3.*/	0,			0,			0,			0,			0,			KEY_KPSLASH,0,			0,			KEY_ALTGR,	0,			0,			0,			0,			0,			0,			0,
+/*4.*/	0,			0,			0,			0,			0,			0,			0,			KEY_HOME,	KEY_UP,		KEY_PGUP,	0,			KEY_LEFT,	0,			KEY_RIGHT,	0,			KEY_END,
+/*5.*/	KEY_DOWN,	KEY_PGDOWN,	KEY_INS,	KEY_DEL,	0,			0,			0,			0,			0,			0,			0,			KEY_LGUI,	KEY_RGUI,	KEY_MENU,	0,			0,
+/*6.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+/*7.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+};
+
+
 static bool PressedKeys[__KEY_LAST];
 //static char volatile Puffer;
 static volatile Puffer_t *Puffer;		//Anfang des Zeichenpuffers
@@ -97,11 +112,17 @@ static list_t keyup_handlers;
  * Parameter:	Scancode = der umzuwandelne Scancode
  * Rückgabe:	Die entsprechende Taste
  */
-static KEY_t keyboard_ScancodeToKey(uint8_t Scancode)
+static KEY_t keyboard_ScancodeToKey(uint8_t Scancode, uint8_t set)
 {
-	if(Scancode != 0xE0 || Scancode != 0xE1)	//Werden momentan noch nicht unterstützt
-		return ScancodeToKey_default[Scancode & 0x7F];
-	return __KEY_INVALID;
+	switch(set)
+	{
+		case 0:
+			return ScancodeToKey_default[Scancode & 0x7F];
+		case 1:
+			return ScancodeToKey_extended[Scancode & 0x7F];
+		default:
+			return __KEY_INVALID;
+	}
 }
 
 /*
@@ -220,31 +241,49 @@ bool keyboard_isKeyPressed(KEY_t key)
  */
 void keyboard_Handler(ihs_t *ihs)
 {
+	static bool e0_code = false;
 	uint8_t Scancode = keyboard_getScanCode();
-	KEY_t Key = keyboard_ScancodeToKey(Scancode);
-	if(Key == __KEY_INVALID) return;
-	bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
-	//Wenn CapsLock, NumLock oder ScrollLock gedrückt wurde, dann den Status nur ändern beim erneuten Drücken
-	//und nicht beim Break.
-	if(Key == KEY_CAPS || Key == KEY_KPNUM || Key == KEY_SCROLL)
+
+	if(Scancode == 0xE0)
 	{
-		if(make)
+		e0_code = true;
+	}
+	else
+	{
+		KEY_t key;
+		//Ignore fake shift
+		if(e0_code && (Scancode == 0x2A || Scancode == 0x36))
 		{
-			PressedKeys[Key] = !PressedKeys[Key];
-			//printf(" new Status: %u\n", PressedKeys[Key]);
-			keyboard_SetLEDs();
+			e0_code = false;
 			return;
 		}
-	}
-	else
-	{
-		PressedKeys[Key] = make;
-	}
+		key = keyboard_ScancodeToKey(Scancode, e0_code);
+		printf("keyboard: keycode: %i\n", key);
+		e0_code = false;
+		if(key == __KEY_INVALID) return;
+		bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
+		//Wenn CapsLock, NumLock oder ScrollLock gedrückt wurde, dann den Status nur ändern beim erneuten Drücken
+		//und nicht beim Break.
+		if(key == KEY_CAPS || key == KEY_KPNUM || key == KEY_SCROLL)
+		{
+			if(make)
+			{
+				PressedKeys[key] = !PressedKeys[key];
+				//printf(" new Status: %u\n", PressedKeys[Key]);
+				keyboard_SetLEDs();
+				return;
+			}
+		}
+		else
+		{
+			PressedKeys[key] = make;
+		}
 
-	if(make)
-		dispatcher_enqueue(notify_keyDown, (void*)Key);
-	else
-		dispatcher_enqueue(notify_keyUp, (void*)Key);
+		if(make)
+			dispatcher_enqueue(notify_keyDown, (void*)key);
+		else
+			dispatcher_enqueue(notify_keyUp, (void*)key);
+	}
 }
 
 #endif
