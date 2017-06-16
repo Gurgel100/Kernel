@@ -750,7 +750,7 @@ char console_getch(console_t *console)
 			console->currentOutputBuffer = queue_dequeue(console->outputBuffer);
 
 		c = console->currentOutputBuffer[console->currentOutputBufferPos++];
-		if(console->currentOutputBufferPos >= strlen(console->currentOutputBuffer))
+		if(console->currentOutputBuffer[console->currentOutputBufferPos] == '\0')
 		{
 			free(console->currentOutputBuffer);
 			console->currentOutputBuffer = NULL;
