@@ -251,6 +251,12 @@ static void clearLine(console_t *console, uint8_t mode)
 		display_refresh();
 }
 
+static void updateCursor(console_t *console)
+{
+	if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+		setCursor(console->cursor.x, console->cursor.y);
+}
+
 void console_Init()
 {
 	initConsole.inputBufferSize = INPUT_BUFFER_SIZE;
@@ -438,22 +444,26 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 					n1 = 1;
 				if(console->cursor.y > n1)
 					console->cursor.y -= n1;
+				updateCursor(console);
 				return SUCCESS;
 			case 'B':
 				if(!have_n1)
 					n1 = 1;
 				console->cursor.y = MIN(console->height, console->cursor.y + n1);
+				updateCursor(console);
 				return SUCCESS;
 			case 'C':
 				if(!have_n1)
 					n1 = 1;
 				console->cursor.x = MIN(console->width, console->cursor.x + n1);
+				updateCursor(console);
 				return SUCCESS;
 			case 'D':
 				if(!have_n1)
 					n1 = 1;
 				if(console->cursor.x > n1)
 					console->cursor.x -= n1;
+				updateCursor(console);
 				return SUCCESS;
 			case 'H':	//Setze Cursor Position an n1,n2, wobei n1 und n2 1-basiert sind
 			case 'f':
@@ -594,8 +604,7 @@ void console_write(console_t *console, char c)
 				}
 			break;
 		}
-		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-			setCursor(console->cursor.x, console->cursor.y);
+		updateCursor(console);
 	}
 }
 
@@ -663,8 +672,7 @@ void console_setCursor(console_t *console, cursor_t cursor)
 	if(console != NULL)
 	{
 		console->cursor = cursor;
-		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-			setCursor(console->cursor.x, console->cursor.y);
+		updateCursor(console);
 	}
 }
 
