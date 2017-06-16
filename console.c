@@ -134,14 +134,14 @@ static size_t console_writeHandler(void *c, uint64_t start, size_t length, const
 static void *console_functionHandler(void *c, vfs_device_function_t function, ...);
 static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c);
 
-static char convertKeyToAscii(KEY_t key)
+static char convertKeyToAscii(console_key_status_t *key_status)
 {
-	if(keyboard_isKeyPressed(KEY_LSHIFT) || keyboard_isKeyPressed(KEY_RSHIFT) || keyboard_isKeyPressed(KEY_CAPS))
-		return KeyToAscii_shift[key];
-	else if(keyboard_isKeyPressed(KEY_ALTGR))
-		return KeyToAscii_altgr[key];
+	if(key_status->shift)
+		return KeyToAscii_shift[key_status->key];
+	else if(key_status->altgr)
+		return KeyToAscii_altgr[key_status->key];
 	else
-		return KeyToAscii_default[key];
+		return KeyToAscii_default[key_status->key];
 }
 
 static void handler_keyDown(void *opaque, KEY_t key)
@@ -178,21 +178,21 @@ static void handler_keyDown(void *opaque, KEY_t key)
 			console_switch(0);
 	}
 
-	char c = convertKeyToAscii(key);
-	if(c != 0)
-	{
-		console->inputBuffer[console->inputBufferEnd++] = c;
-		if(console->inputBufferEnd == console->inputBufferSize)
-			console->inputBufferEnd = 0;
-		if(console->inputBufferEnd == console->inputBufferStart)
-			console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
-		assert(console->inputBufferStart != console->inputBufferEnd);
+	console_key_status_t *key_status = &console->inputBuffer[console->inputBufferEnd++];
+	if(console->inputBufferEnd == console->inputBufferSize)
+		console->inputBufferEnd = 0;
+	if(console->inputBufferEnd == console->inputBufferStart)
+		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
+	assert(console->inputBufferStart != console->inputBufferEnd);
 
-		if(console->id != 0 && console->waitingThread != NULL)
-		{
-			thread_unblock(console->waitingThread);
-			console->waitingThread = NULL;
-		}
+	key_status->shift = keyboard_isKeyPressed(KEY_LSHIFT) || keyboard_isKeyPressed(KEY_RSHIFT) || keyboard_isKeyPressed(KEY_CAPS);
+	key_status->altgr = keyboard_isKeyPressed(KEY_ALTGR);
+	key_status->key = key;
+
+	if(console->id != 0 && console->waitingThread != NULL)
+	{
+		thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
 	}
 }
 
@@ -204,7 +204,7 @@ static void handler_keyUp(void *opaque, KEY_t key)
 void console_Init()
 {
 	initConsole.inputBufferSize = INPUT_BUFFER_SIZE;
-	initConsole.inputBuffer = malloc(initConsole.inputBufferSize);
+	initConsole.inputBuffer = malloc(initConsole.inputBufferSize * sizeof(*initConsole.inputBuffer));
 
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
 	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
@@ -262,7 +262,7 @@ console_t *console_create(char *name, uint8_t color)
 
 	console->inputBufferSize = INPUT_BUFFER_SIZE;
 	console->inputBufferStart = console->inputBufferEnd = 0;
-	console->inputBuffer = malloc(console->inputBufferSize);
+	console->inputBuffer = malloc(console->inputBufferSize * sizeof(*initConsole.inputBuffer));
 	if(console->inputBuffer == NULL)
 	{
 		free(console->name);
@@ -652,15 +652,71 @@ void console_setCursor(console_t *console, cursor_t cursor)
 	}
 }
 
+static void processKeyInput(console_t *console, char code)
+{
+	console->currentInputBufferSize += 3;
+	console->currentInputBuffer = realloc(console->currentInputBuffer, console->currentInputBufferSize + 1);
+	console->currentInputBuffer[console->currentInputBufferSize - 3] = '\e';
+	console->currentInputBuffer[console->currentInputBufferSize - 2] = '[';
+	console->currentInputBuffer[console->currentInputBufferSize - 1] = code;
+	console->currentInputBuffer[console->currentInputBufferSize] = '\0';
+
+	if(console->flags & CONSOLE_ECHO)
+	{
+		console_write(console, '^');
+		console_write(console, '[');
+		console_write(console, code);
+	}
+
+	if(console->flags & CONSOLE_RAW)
+	{
+		if(console->currentOutputBuffer == NULL)
+			console->currentOutputBuffer = console->currentInputBuffer;
+		else
+			queue_enqueue(console->outputBuffer, console->currentInputBuffer);
+
+		console->currentInputBuffer = NULL;
+		console->currentInputBufferSize = 0;
+	}
+}
+
+static void processAnsiInput(console_t *console, console_key_status_t *key_status)
+{
+	switch(key_status->key)
+	{
+		case KEY_UP:
+			processKeyInput(console, 'A');
+		break;
+		case KEY_DOWN:
+			processKeyInput(console, 'B');
+		break;
+		case KEY_RIGHT:
+			processKeyInput(console, 'C');
+		break;
+		case KEY_LEFT:
+			processKeyInput(console, 'D');
+		break;
+		default:
+		break;
+	}
+}
+
 static char processInput(console_t *console)
 {
 	assert(console->inputBufferStart != console->inputBufferEnd);
-	char c = console->inputBuffer[console->inputBufferStart++];
+	console_key_status_t key_status = console->inputBuffer[console->inputBufferStart++];
 	if(console->inputBufferStart == console->inputBufferSize)
 		console->inputBufferStart = 0;
-	if((console->flags & CONSOLE_ECHO) && (console->currentInputBufferSize > 0 || c != '\b'))
+
+	char c = convertKeyToAscii(&key_status);
+
+	if(c != 0 && (console->flags & CONSOLE_ECHO) && (console->currentInputBufferSize > 0 || c != '\b'))
 		console_write(console, c);
-	if(!(console->flags & CONSOLE_RAW))
+	if(c == 0)
+	{
+		processAnsiInput(console, &key_status);
+	}
+	else if(!(console->flags & CONSOLE_RAW))
 	{
 		if(c == '\b')
 		{
@@ -724,7 +780,7 @@ char console_getch(console_t *console)
 	}
 	while(c != '\n' && !(console->flags & CONSOLE_RAW));
 
-	return (console->flags & CONSOLE_RAW) ? c : console_getch(console);
+	return (console->flags & CONSOLE_RAW) && c != 0 ? c : console_getch(console);
 }
 
 static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)

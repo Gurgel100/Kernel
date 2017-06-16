@@ -13,6 +13,7 @@
 #include "stdbool.h"
 #include "lock.h"
 #include "queue.h"
+#include "keyboard.h"
 
 #define	CONSOLE_AUTOREFRESH	1
 #define CONSOLE_AUTOSCROLL	2
@@ -22,6 +23,11 @@
 typedef struct{
 	uint8_t x, y;
 }cursor_t;
+
+typedef struct{
+	KEY_t key;
+	bool shift, altgr;
+}console_key_status_t;
 
 typedef struct{
 	uint8_t id;
@@ -41,7 +47,7 @@ typedef struct{
 	uint8_t ansi_buf_ofs;
 	cursor_t saved_cursor;
 
-	char *inputBuffer;
+	console_key_status_t *inputBuffer;
 	size_t inputBufferSize, inputBufferStart, inputBufferEnd;
 	char *currentInputBuffer;
 	size_t currentInputBufferSize;
