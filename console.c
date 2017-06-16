@@ -201,6 +201,56 @@ static void handler_keyUp(void *opaque, KEY_t key)
 	console_t *console = *(console_t**)opaque;
 }
 
+static void clear(console_t *console, uint8_t mode)
+{
+	size_t start = 0;
+	size_t end = console->width * console->height;
+	switch(mode)
+	{
+		case 0:
+			start = console->cursor.y * console->width + console->cursor.x;
+		break;
+		case 1:
+			end = console->cursor.y * console->width + console->cursor.x;
+		break;
+		case 2:
+			console_setCursor(console, (cursor_t){0, 0});
+		break;
+	}
+
+	for(size_t i = start; i < end; i++)
+	{
+		((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
+	}
+
+	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh();
+}
+
+static void clearLine(console_t *console, uint8_t mode)
+{
+	size_t start = 0;
+	size_t end = console->width;
+	switch(mode)
+	{
+		case 0:
+			start = console->cursor.x;
+		break;
+		case 1:
+			end = console->cursor.x;
+		break;
+		case 2:
+			//Clear entire line but do not change cursor
+		break;
+	}
+
+	for(size_t i = start; i < end; i++)
+		((uint16_t*)console->buffer)[console->cursor.y * console->width + i] = ' ' | (console->color << 8);
+
+	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh();
+}
+
 void console_Init()
 {
 	initConsole.inputBufferSize = INPUT_BUFFER_SIZE;
@@ -285,9 +335,9 @@ console_t *console_create(char *name, uint8_t color)
 	console->height = ROWS;
 	console->width = COLS;
 	console->id = nextID++;
-	unlock(&console->lock);
 
-	console_clear(console);
+	clear(console, 2);
+	unlock(&console->lock);
 
 	return console;
 }
@@ -424,16 +474,12 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 				console_setCursor(console, console->saved_cursor);
 				return SUCCESS;
 
-			//TODO: Deadlock beheben durch reentrant locks z.B.
-			/*case 'J':	//ESC[2J Konsole löschen
-				if(!have_n1 || n1 != 2)
-					return INVALID;
-				console_clear(console);
+			case 'J':	//Clear console
+				clear(console, have_n1 ? n1 : 0);
 				return SUCCESS;
-			case 'K':	//Zeile löschen
-				console_clearLine(console, console->cursor.y);
-				printf("line cleared\n");
-				return SUCCESS;*/
+			case 'K':	//Clear line
+				clearLine(console, have_n1 ? n1 : 0);
+				return SUCCESS;
 		}
 	}
 
@@ -551,36 +597,6 @@ void console_write(console_t *console, char c)
 		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
 			setCursor(console->cursor.x, console->cursor.y);
 	}
-}
-
-void console_clear(console_t *console)
-{
-	if(console != NULL)
-	{
-		lock(&console->lock);
-		size_t i;
-		for(i = 0; i < PAGE_SIZE / 2; i++)
-		{
-			((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
-		}
-		unlock(&console->lock);
-	}
-	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh();
-}
-
-void console_clearLine(console_t *console, uint16_t line)
-{
-	if(console != NULL)
-	{
-		lock(&console->lock);
-		size_t i;
-		for(i = 0; i < console->width; i++)
-			((uint16_t*)console->buffer)[line * console->width + i] = ' ' | (console->color << 8);
-		unlock(&console->lock);
-	}
-	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh();
 }
 
 void displayConsole(console_t *console)
