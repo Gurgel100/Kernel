@@ -504,9 +504,9 @@ void console_write(console_t *console, char c)
 				}
 				else
 					console->cursor.x--;
-				buffer[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
+				buffer[console->cursor.y * COLS + console->cursor.x] = (' ' | (Farbwert << 8));	//Das vorhandene Zeichen "löschen"
 				if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-					gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Screen updaten
+					gs[console->cursor.y * COLS + console->cursor.x] = (' ' | (Farbwert << 8));	//Screen updaten
 			break;
 			case '\t':
 			{
