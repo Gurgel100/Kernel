@@ -21,16 +21,13 @@
 #include "scheduler.h"
 #include "cleaner.h"
 #include "assert.h"
+#include <bits/syscall_numbers.h>
 
 #define STAR	0xC0000081
 #define LSTAR	0xC0000082
 #define CSTAR	0xC0000083
 #define SFMASK	0xC0000084
 
-//extern uintptr_t mm_SysAlloc(uint64_t);
-//extern void mm_SysFree(uintptr_t, uint64_t);
-extern void setColor(uint8_t);
-extern void setCursor(uint16_t, uint16_t);
 extern void isr_syscall();
 
 static void nop();
@@ -40,74 +37,31 @@ static void sleepHandler(uint64_t msec);
 
 typedef uint64_t(*syscall)(uint64_t arg, ...);
 
-static syscall syscalls[] = {
-		(syscall)&mm_Alloc,				//0
-		(syscall)&mm_Free,				//1
-		(syscall)&vmm_unusePages,		//2
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
+static syscall syscalls[_SYSCALL_NUM] = {
+[SYSCALL_ALLOC_PAGES]		(syscall)&mm_Alloc,
+[SYSCALL_FREE_PAGES]		(syscall)&mm_Free,
+[SYSCALL_UNUSE_PAGES]		(syscall)&vmm_unusePages,
 
-		(syscall)&loader_syscall_load,	//10
-		(syscall)&pm_syscall_exit,		//11
-		(syscall)&pm_syscall_wait,		//12
-		(syscall)&createThreadHandler,	//13
-		(syscall)&exitThreadHandler,	//14
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
+[SYSCALL_EXEC]				(syscall)&loader_syscall_load,
+[SYSCALL_EXIT]				(syscall)&pm_syscall_exit,
+[SYSCALL_WAIT]				(syscall)&pm_syscall_wait,
+[SYSCALL_THREAD_CREATE]		(syscall)&createThreadHandler,
+[SYSCALL_THREAD_EXIT]		(syscall)&exitThreadHandler,
 
-		(syscall)&nop,					//20
-		(syscall)&nop,					//21
-		(syscall)&nop,
-		(syscall)&setColor,				//23
-		(syscall)&setCursor,			//24
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
+[SYSCALL_OPEN]				(syscall)&vfs_syscall_open,
+[SYSCALL_CLOSE]				(syscall)&vfs_syscall_close,
+[SYSCALL_READ]				(syscall)&vfs_syscall_read,
+[SYSCALL_WRITE]				(syscall)&vfs_syscall_write,
+[SYSCALL_INFO_GET]			(syscall)&vfs_syscall_getFileinfo,
+[SYSCALL_INFO_SET]			(syscall)&vfs_syscall_setFileinfo,
+[SYSCALL_MOUNT]				(syscall)&vfs_syscall_mount,
+[SYSCALL_UNMOUNT]			(syscall)&vfs_syscall_unmount,
 
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
+[SYSCALL_GET_TIME]			(syscall)&cmos_GetTime,
+[SYSCALL_GET_DATE]			(syscall)&cmos_GetDate,
+[SYSCALL_SLEEP]				(syscall)&sleepHandler,
 
-		(syscall)&vfs_syscall_open,			//40
-		(syscall)&vfs_syscall_close,		//41
-		(syscall)&vfs_syscall_read,			//42
-		(syscall)&vfs_syscall_write,		//43
-		(syscall)&vfs_syscall_getFileinfo,	//44
-		(syscall)&vfs_syscall_setFileinfo,	//45
-		(syscall)&vfs_syscall_mount,		//46
-		(syscall)&vfs_syscall_unmount,		//47
-		(syscall)&nop,
-		(syscall)&nop,
-
-		(syscall)&cmos_GetTime,			//50
-		(syscall)&cmos_GetDate,			//51
-		(syscall)&sleepHandler,			//52
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-		(syscall)&nop,
-
-		(syscall)&getSystemInformation	//60
+[SYSCALL_SYSINF_GET]		(syscall)&getSystemInformation
 };
 
 void syscall_Init()
@@ -123,12 +77,18 @@ void syscall_Init()
 		//Bit 0
 		cpu_MSRwrite(0xC0000080, cpu_MSRread(0xC0000080) | 1);
 	}
+
+	for(size_t i = 0; i < _SYSCALL_NUM; i++)
+	{
+		if(syscalls[i] == NULL)
+			syscalls[i] = (syscall)nop;
+	}
 }
 
 uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
 {
 	//FIXME
-	assert(func < sizeof(syscalls) / sizeof(syscall));
+	assert(func < _SYSCALL_NUM);
 	return syscalls[func](arg1, arg2, arg3, arg4, arg5);
 }
 
