@@ -35,6 +35,8 @@ extern "C" {
 #define SEEK_END 3
 #endif
 
+#define FILENAME_MAX	4096
+
 #define BUFSIZ	65536
 
 #ifndef SIZE_T
@@ -104,7 +106,7 @@ extern int getc(FILE *stream);
 extern int getchar(void);
 extern char *gets(char *str);
 
-extern int putc(int zeichen, FILE *stream);
+extern int putc(int ch, FILE *stream);
 extern int putchar(int zeichen);
 extern int puts(const char *str);
 
