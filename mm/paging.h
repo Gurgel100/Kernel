@@ -45,6 +45,11 @@
 #define PG_PD_INDEX		0x3FE00000
 #define PG_PT_INDEX		0x1FF000
 
+#define PG_PAGE_SIZE				4096
+#define PG_PAGE_ALIGN_ROUND_DOWN(n)	((n) & PG_ADDRESS)
+#define PG_PAGE_ALIGN_ROUND_UP(n)	(((n) + ~PG_ADDRESS) & PG_ADDRESS)
+#define PG_NUM_PAGES(size)			(PG_PAGE_ALIGN_ROUND_UP(size) / PG_PAGE_SIZE)
+
 #define MAP				4096	//Anzahl der Bytes pro Map (4kb)
 #define PAGE_ENTRIES	512		//Anzahl der Einträge pro Tabelle
 
