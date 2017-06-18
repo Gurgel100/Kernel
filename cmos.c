@@ -53,9 +53,6 @@
 
 #define CURRENT_CENTURY	2000
 
-uint8_t Read(uint8_t Offset);
-void Write(uint8_t Offset, uint8_t Data);
-
 void cmos_Init()
 {
 	Date_t Date;
@@ -69,7 +66,7 @@ void cmos_Init()
  * Parameter:	Offset = Offset bzw. das Register
  * Rückgabewert: Gelesener Wert
  */
-uint8_t Read(uint8_t Offset)
+static uint8_t Read(uint8_t Offset)
 {
 	uint8_t tmp = inb(CMOS_ADDRESS);
 	outb(CMOS_ADDRESS, (tmp & 0x80) | (Offset & 0x7F));	//Oberstes Bit darf nicht verändert werden, untere 7 Bits dienen als Offset
@@ -81,7 +78,7 @@ uint8_t Read(uint8_t Offset)
  * Parameter:	Offset = Offset bzw. das Register
  * 				Data = Zu schreibender Wert
  */
-void Write(uint8_t Offset, uint8_t Data)
+static void Write(uint8_t Offset, uint8_t Data)
 {
 	uint8_t tmp = inb(CMOS_ADDRESS);
 	outb(CMOS_ADDRESS, (tmp & 0x80) | (Offset & 0x7F));	//Oberstes Bit darf nicht verändert werden, untere 7 Bits dienen als Offset
