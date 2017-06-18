@@ -8,7 +8,7 @@
 #ifndef STDIO_H_
 #define STDIO_H_
 
-#include "stddef.h"
+#include <bits/types.h>
 #include "stdarg.h"
 #include "stdbool.h"
 #include "stdint.h"
@@ -35,12 +35,11 @@ extern "C" {
 #define SEEK_END 3
 #endif
 
+#define FILENAME_MAX	4096
+
 #define BUFSIZ	65536
 
-#ifndef SIZE_T
-#define SIZE_T
-typedef unsigned long	size_t;
-#endif
+typedef _size_t size_t;
 
 typedef enum{
 	IO_MODE_NO_BUFFER, IO_MODE_LINE_BUFFER, IO_MODE_FULL_BUFFER
@@ -104,7 +103,7 @@ extern int getc(FILE *stream);
 extern int getchar(void);
 extern char *gets(char *str);
 
-extern int putc(int zeichen, FILE *stream);
+extern int putc(int ch, FILE *stream);
 extern int putchar(int zeichen);
 extern int puts(const char *str);
 

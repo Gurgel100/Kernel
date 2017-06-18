@@ -12,6 +12,7 @@
 #include "thread.h"
 #include "cpu.h"
 #include "stdbool.h"
+#include "isr.h"
 
 extern process_t kernel_process;
 extern thread_t *currentThread;
@@ -23,7 +24,7 @@ void scheduler_add(thread_t *thread);
 bool scheduler_try_add(thread_t *thread);
 void scheduler_remove(thread_t *thread);
 
-thread_t *scheduler_schedule(ihs_t *state);
+ihs_t *scheduler_schedule(ihs_t *state);
 
 void yield();
 

@@ -635,10 +635,11 @@ static int writeblk(ext2_inode_t* inode, uint64_t block, const void* buf)
     }
 
     b = fs->cache_block(fs->cache_handle, block_offset / block_size, 1);
-    memcpy(b->data, buf, block_size);
     if (!b) {
         return 0;
     }
+
+    memcpy(b->data, buf, block_size);
     fs->cache_block_free(b, 1);
 
     return 1;

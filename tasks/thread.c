@@ -199,12 +199,16 @@ bool thread_try_unblock(thread_t *thread)
 void thread_unblock(thread_t *thread)
 {
 	assert(thread != NULL);
+#ifndef NDEBUG
+	size_t try_count = 0;
+#endif
 	thread_status_t expected = {{THREAD_BLOCKED, thread->Status.block_reason}};
 	const thread_status_t newStatus = {{THREAD_RUNNING, THREAD_BLOCKED_NOT_BLOCKED}};
-	if(__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
+	while(!__sync_bool_compare_and_swap(&thread->Status.full_status, expected.full_status, newStatus.full_status))
 	{
-		scheduler_add(thread);
+		assert(++try_count > 1000 && "Thread could not been unblocked");
 	}
+	scheduler_add(thread);
 }
 
 void thread_waitUserIO()

@@ -736,13 +736,14 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
  * 					2 = Destinationaddresse ist schon belegt
  *///TODO: Bei Fehler alles Rückgängig machen
 //FIXME: getPhysAddress funktioniert nur für kernel_context
+//FIXME: correctly handle pages which are allocated but have not been mapped yet (VMM_UNUSED_PAGE)
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl)
 {
 	size_t i;
 	for(i = 0; i < length; i++)
 	{
 		uint8_t r;
-		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE), flags, avl)) != 0)
+		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE) ? : pmm_Alloc(), flags, avl)) != 0)
 			return r;
 		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE, false) == 2)
 			return 1;

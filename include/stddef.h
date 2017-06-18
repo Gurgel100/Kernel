@@ -8,12 +8,10 @@
 #ifndef STDDEF_H_
 #define STDDEF_H_
 
-#ifndef SIZE_T
-#define SIZE_T
-typedef unsigned long	size_t;
-#endif
+#include <bits/types.h>
 
-typedef long ptrdiff_t;
+typedef _size_t		size_t;
+typedef _ptrdiff_t	ptrdiff_t;
 
 #ifndef NULL
 #define NULL	(void*)0

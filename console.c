@@ -40,10 +40,72 @@ typedef enum{
 	INVALID, NEED_MORE, SUCCESS
 }esc_seq_status_t;
 
+//Wandelt eine Taste in ein ASCII-Zeichen um
+static const char KeyToAscii_default[] =
+{
+	0,
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q',
+	'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,
+	'\t', 0, 0, 0, 0, 0, 0, 0,
+	0, ' ', 0, 0, '\n', '\b', 0,
+	0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	L'ä', L'ö', L'ü', L'¨', '$',
+	L'§', '\'', L'^',
+	'<', ',', '.', '-',
+	//Keypad-Tasten
+	0, '/', '*', '-', '+', '\n', '.',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+};
+
+static const char KeyToAscii_shift[] =
+{
+	0,
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+	'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+	'=', '+', '"', '*', L'ç', '%', '&', '/', '(', ')',
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, ' ', 0, 0, '\n', '\b', 0,
+	0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	L'à', L'é', L'è', '!', L'£',
+	L'°', '?', '`',
+	'>', ';', ':', '_',
+	//Keypad-Tasten
+	0, '/', '*', '-', '+', '\n', 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+//TODO: Richtige Zeicheṇ
+static const char KeyToAscii_altgr[] =
+{
+	0,
+	'æ', '”', '¢', 'ð', '€', 'đ', 'ŋ', 'ħ', '→', 'j', 'ĸ', 'ł', 'µ',
+	'n', 'ø', 'þ', '@', '¶', 'ß', 'ŧ', '↓', '“', 'ł', '»', '«', '←',
+	'}', '|', '@', '#', '¼', '½', '¬', '|', '¢', ']',
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,
+	'\t', 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, '\n', '\b', 0,
+	0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	'{', L'´', '[', ']', '}',
+	L'¬', L'´', '~',
+	'\\', 0, L'·', '̣',
+	//Keypad-Tasten
+	0, '/', '*', '-', '+', '\n', '.',
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+};
+
 console_t initConsole = {
 	.buffer = (void*)GRAFIKSPEICHER,
 	.color = BG_BLACK | CL_WHITE,
-	.flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL,
+	.flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL | CONSOLE_ECHO,
 	.height = ROWS,
 	.width = COLS
 };
@@ -72,22 +134,14 @@ static size_t console_writeHandler(void *c, uint64_t start, size_t length, const
 static void *console_functionHandler(void *c, vfs_device_function_t function, ...);
 static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c);
 
-static void handler_charPress(void *opaque, char c)
+static char convertKeyToAscii(console_key_status_t *key_status)
 {
-	console_t *console = *(console_t**)opaque;
-
-	console->inputBuffer[console->inputBufferEnd++] = c;
-	if(console->inputBufferEnd == console->inputBufferSize)
-		console->inputBufferEnd = 0;
-	if(console->inputBufferEnd == console->inputBufferStart)
-		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
-	assert(console->inputBufferStart != console->inputBufferEnd);
-
-	if(console->id != 0 && console->waitingThread != NULL)
-	{
-		thread_unblock(console->waitingThread);
-		console->waitingThread = NULL;
-	}
+	if(key_status->shift)
+		return KeyToAscii_shift[key_status->key];
+	else if(key_status->altgr)
+		return KeyToAscii_altgr[key_status->key];
+	else
+		return KeyToAscii_default[key_status->key];
 }
 
 static void handler_keyDown(void *opaque, KEY_t key)
@@ -123,6 +177,23 @@ static void handler_keyDown(void *opaque, KEY_t key)
 		else if(key == KEY_ESC)
 			console_switch(0);
 	}
+
+	console_key_status_t *key_status = &console->inputBuffer[console->inputBufferEnd++];
+	if(console->inputBufferEnd == console->inputBufferSize)
+		console->inputBufferEnd = 0;
+	if(console->inputBufferEnd == console->inputBufferStart)
+		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
+	assert(console->inputBufferStart != console->inputBufferEnd);
+
+	key_status->shift = keyboard_isKeyPressed(KEY_LSHIFT) || keyboard_isKeyPressed(KEY_RSHIFT) || keyboard_isKeyPressed(KEY_CAPS);
+	key_status->altgr = keyboard_isKeyPressed(KEY_ALTGR);
+	key_status->key = key;
+
+	if(console->id != 0 && console->waitingThread != NULL)
+	{
+		thread_unblock(console->waitingThread);
+		console->waitingThread = NULL;
+	}
 }
 
 static void handler_keyUp(void *opaque, KEY_t key)
@@ -130,10 +201,66 @@ static void handler_keyUp(void *opaque, KEY_t key)
 	console_t *console = *(console_t**)opaque;
 }
 
+static void clear(console_t *console, uint8_t mode)
+{
+	size_t start = 0;
+	size_t end = console->width * console->height;
+	switch(mode)
+	{
+		case 0:
+			start = console->cursor.y * console->width + console->cursor.x;
+		break;
+		case 1:
+			end = console->cursor.y * console->width + console->cursor.x;
+		break;
+		case 2:
+			console_setCursor(console, (cursor_t){0, 0});
+		break;
+	}
+
+	for(size_t i = start; i < end; i++)
+	{
+		((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
+	}
+
+	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh();
+}
+
+static void clearLine(console_t *console, uint8_t mode)
+{
+	size_t start = 0;
+	size_t end = console->width;
+	switch(mode)
+	{
+		case 0:
+			start = console->cursor.x;
+		break;
+		case 1:
+			end = console->cursor.x;
+		break;
+		case 2:
+			//Clear entire line but do not change cursor
+		break;
+	}
+
+	for(size_t i = start; i < end; i++)
+		((uint16_t*)console->buffer)[console->cursor.y * console->width + i] = ' ' | (console->color << 8);
+
+	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh();
+}
+
+static void updateCursor(console_t *console)
+{
+	if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+		setCursor(console->cursor.x, console->cursor.y);
+}
+
 void console_Init()
 {
 	initConsole.inputBufferSize = INPUT_BUFFER_SIZE;
-	initConsole.inputBuffer = malloc(initConsole.inputBufferSize);
+	initConsole.inputBuffer = malloc(initConsole.inputBufferSize * sizeof(*initConsole.inputBuffer));
 
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
 	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
@@ -155,7 +282,6 @@ void console_Init()
 	}
 
 	//Keyboardhandler registrieren
-	keyboard_registerCharHandler(handler_charPress, &activeConsole);
 	keyboard_registerKeydownHandler(handler_keyDown, &activeConsole);
 	keyboard_registerKeyupHandler(handler_keyUp, &activeConsole);
 }
@@ -170,7 +296,7 @@ void console_Init()
  */
 console_t *console_create(char *name, uint8_t color)
 {
-	console_t *console = malloc(sizeof(console_t));
+	console_t *console = calloc(1, sizeof(console_t));
 	if(console == NULL)
 		return NULL;
 
@@ -192,7 +318,7 @@ console_t *console_create(char *name, uint8_t color)
 
 	console->inputBufferSize = INPUT_BUFFER_SIZE;
 	console->inputBufferStart = console->inputBufferEnd = 0;
-	console->inputBuffer = malloc(console->inputBufferSize);
+	console->inputBuffer = malloc(console->inputBufferSize * sizeof(*initConsole.inputBuffer));
 	if(console->inputBuffer == NULL)
 	{
 		free(console->name);
@@ -201,13 +327,23 @@ console_t *console_create(char *name, uint8_t color)
 		return NULL;
 	}
 
-	console->flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL;
+	console->outputBuffer = queue_create();
+	if(console->outputBuffer == NULL)
+	{
+		free(console->inputBuffer);
+		free(console->name);
+		free(console->buffer);
+		free(console);
+		return NULL;
+	}
+
+	console->flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL | CONSOLE_ECHO;
 	console->height = ROWS;
 	console->width = COLS;
 	console->id = nextID++;
-	unlock(&console->lock);
 
-	console_clear(console);
+	clear(console, 2);
+	unlock(&console->lock);
 
 	return console;
 }
@@ -295,9 +431,7 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 				delimiter = true;
 			break;
 			case 'm':	//ESC[#;#m oder ESC[#m für Vordergrund und/oder Hintergrundfarbe
-				if(!have_n1)
-					return INVALID;
-				if(handle_ansi_formatting(console, n1) != SUCCESS)
+				if(handle_ansi_formatting(console, have_n1 ? n1 : 0) != SUCCESS)
 					return INVALID;
 				if(have_n2)
 				{
@@ -310,22 +444,26 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 					n1 = 1;
 				if(console->cursor.y > n1)
 					console->cursor.y -= n1;
+				updateCursor(console);
 				return SUCCESS;
 			case 'B':
 				if(!have_n1)
 					n1 = 1;
 				console->cursor.y = MIN(console->height, console->cursor.y + n1);
+				updateCursor(console);
 				return SUCCESS;
 			case 'C':
 				if(!have_n1)
 					n1 = 1;
 				console->cursor.x = MIN(console->width, console->cursor.x + n1);
+				updateCursor(console);
 				return SUCCESS;
 			case 'D':
 				if(!have_n1)
 					n1 = 1;
 				if(console->cursor.x > n1)
 					console->cursor.x -= n1;
+				updateCursor(console);
 				return SUCCESS;
 			case 'H':	//Setze Cursor Position an n1,n2, wobei n1 und n2 1-basiert sind
 			case 'f':
@@ -346,16 +484,12 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 				console_setCursor(console, console->saved_cursor);
 				return SUCCESS;
 
-			//TODO: Deadlock beheben durch reentrant locks z.B.
-			/*case 'J':	//ESC[2J Konsole löschen
-				if(!have_n1 || n1 != 2)
-					return INVALID;
-				console_clear(console);
+			case 'J':	//Clear console
+				clear(console, have_n1 ? n1 : 0);
 				return SUCCESS;
-			case 'K':	//Zeile löschen
-				console_clearLine(console, console->cursor.y);
-				printf("line cleared\n");
-				return SUCCESS;*/
+			case 'K':	//Clear line
+				clearLine(console, have_n1 ? n1 : 0);
+				return SUCCESS;
 		}
 	}
 
@@ -426,9 +560,9 @@ void console_write(console_t *console, char c)
 				}
 				else
 					console->cursor.x--;
-				buffer[console->cursor.y * COLS + console->cursor.x] = ' ';	//Das vorhandene Zeichen "löschen"
+				buffer[console->cursor.y * COLS + console->cursor.x] = (' ' | (Farbwert << 8));	//Das vorhandene Zeichen "löschen"
 				if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-					gs[console->cursor.y * COLS + console->cursor.x] = ' ';	//Screen updaten
+					gs[console->cursor.y * COLS + console->cursor.x] = (' ' | (Farbwert << 8));	//Screen updaten
 			break;
 			case '\t':
 			{
@@ -470,39 +604,8 @@ void console_write(console_t *console, char c)
 				}
 			break;
 		}
-		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-			setCursor(console->cursor.x, console->cursor.y);
+		updateCursor(console);
 	}
-}
-
-void console_clear(console_t *console)
-{
-	if(console != NULL)
-	{
-		lock(&console->lock);
-		size_t i;
-		for(i = 0; i < PAGE_SIZE / 2; i++)
-		{
-			((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
-		}
-		unlock(&console->lock);
-	}
-	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh();
-}
-
-void console_clearLine(console_t *console, uint16_t line)
-{
-	if(console != NULL)
-	{
-		lock(&console->lock);
-		size_t i;
-		for(i = 0; i < console->width; i++)
-			((uint16_t*)console->buffer)[line * console->width + i] = ' ' | (console->color << 8);
-		unlock(&console->lock);
-	}
-	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh();
 }
 
 void displayConsole(console_t *console)
@@ -569,29 +672,139 @@ void console_setCursor(console_t *console, cursor_t cursor)
 	if(console != NULL)
 	{
 		console->cursor = cursor;
-		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-			setCursor(console->cursor.x, console->cursor.y);
+		updateCursor(console);
 	}
+}
+
+static void processKeyInput(console_t *console, char code)
+{
+	console->currentInputBufferSize += 3;
+	console->currentInputBuffer = realloc(console->currentInputBuffer, console->currentInputBufferSize + 1);
+	console->currentInputBuffer[console->currentInputBufferSize - 3] = '\e';
+	console->currentInputBuffer[console->currentInputBufferSize - 2] = '[';
+	console->currentInputBuffer[console->currentInputBufferSize - 1] = code;
+	console->currentInputBuffer[console->currentInputBufferSize] = '\0';
+
+	if(console->flags & CONSOLE_ECHO)
+	{
+		console_write(console, '^');
+		console_write(console, '[');
+		console_write(console, code);
+	}
+
+	if(console->flags & CONSOLE_RAW)
+	{
+		if(console->currentOutputBuffer == NULL)
+			console->currentOutputBuffer = console->currentInputBuffer;
+		else
+			queue_enqueue(console->outputBuffer, console->currentInputBuffer);
+
+		console->currentInputBuffer = NULL;
+		console->currentInputBufferSize = 0;
+	}
+}
+
+static void processAnsiInput(console_t *console, console_key_status_t *key_status)
+{
+	switch(key_status->key)
+	{
+		case KEY_UP:
+			processKeyInput(console, 'A');
+		break;
+		case KEY_DOWN:
+			processKeyInput(console, 'B');
+		break;
+		case KEY_RIGHT:
+			processKeyInput(console, 'C');
+		break;
+		case KEY_LEFT:
+			processKeyInput(console, 'D');
+		break;
+		default:
+		break;
+	}
+}
+
+static char processInput(console_t *console)
+{
+	assert(console->inputBufferStart != console->inputBufferEnd);
+	console_key_status_t key_status = console->inputBuffer[console->inputBufferStart++];
+	if(console->inputBufferStart == console->inputBufferSize)
+		console->inputBufferStart = 0;
+
+	char c = convertKeyToAscii(&key_status);
+
+	if(c != 0 && (console->flags & CONSOLE_ECHO) && (console->currentInputBufferSize > 0 || c != '\b'))
+		console_write(console, c);
+	if(c == 0)
+	{
+		processAnsiInput(console, &key_status);
+	}
+	else if(!(console->flags & CONSOLE_RAW))
+	{
+		if(c == '\b')
+		{
+			if(console->currentInputBufferSize > 0)
+				console->currentInputBuffer[--console->currentInputBufferSize] = '\0';
+		}
+		else
+		{
+			console->currentInputBuffer = realloc(console->currentInputBuffer, ++console->currentInputBufferSize + 1);
+			console->currentInputBuffer[console->currentInputBufferSize - 1] = c;
+			console->currentInputBuffer[console->currentInputBufferSize] = '\0';
+
+			if(c == '\n')
+			{
+				queue_enqueue(console->outputBuffer, console->currentInputBuffer);
+				console->currentInputBuffer = NULL;
+				console->currentInputBufferSize = 0;
+			}
+		}
+	}
+
+	return c;
 }
 
 char console_getch(console_t *console)
 {
-	if(console->id == 0)
+	char c;
+	if(console->currentOutputBuffer != NULL || queue_size(console->outputBuffer))
 	{
-		while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
-	}
-	else if(console->inputBufferStart == console->inputBufferEnd)
-	{
-		//Auf Eingabe warten
-		console->waitingThread = currentThread;
-		thread_waitUserIO(console->waitingThread);
+		if(console->currentOutputBuffer == NULL)
+			console->currentOutputBuffer = queue_dequeue(console->outputBuffer);
+
+		c = console->currentOutputBuffer[console->currentOutputBufferPos++];
+		if(console->currentOutputBuffer[console->currentOutputBufferPos] == '\0')
+		{
+			free(console->currentOutputBuffer);
+			console->currentOutputBuffer = NULL;
+			console->currentOutputBufferPos = 0;
+		}
+
+		if(console->inputBufferStart != console->inputBufferEnd)
+			processInput(console);
+
+		return c;
 	}
 
-	assert(console->inputBufferStart != console->inputBufferEnd);
-	char c = console->inputBuffer[console->inputBufferStart++];
-	if(console->inputBufferStart == console->inputBufferSize)
-		console->inputBufferStart = 0;
-	return c;
+	do
+	{
+		if(console->id == 0)
+		{
+			while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
+		}
+		else if(console->inputBufferStart == console->inputBufferEnd)
+		{
+			//Auf Eingabe warten
+			console->waitingThread = currentThread;
+			thread_waitUserIO(console->waitingThread);
+		}
+
+		c = processInput(console);
+	}
+	while(c != '\n' && !(console->flags & CONSOLE_RAW));
+
+	return (console->flags & CONSOLE_RAW) && c != 0 ? c : console_getch(console);
 }
 
 static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
@@ -610,13 +823,12 @@ static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) sta
 static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, void *buffer)
 {
 	console_t *console = c;
-	size_t size = 0;
 	char *buf = buffer;
 
-	while(length-- != 0)
+	size_t size;
+	for(size = 0; size < length; size++)
 	{
-		buf[length] = console_getch(console);
-		size++;
+		buf[size] = console_getch(console);
 	}
 
 	return size;
@@ -625,20 +837,35 @@ static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) star
 static void *console_functionHandler(void *c, vfs_device_function_t function, ...)
 {
 	console_t *console = c;
-	switch (function)
+	void *val = NULL;
+	va_list arg;
+	va_start(arg, function);
+
+	switch(function)
 	{
 		case VFS_DEV_FUNC_TYPE:
-			return (void*)VFS_DEVICE_VIRTUAL;
+			val = (void*)VFS_DEVICE_VIRTUAL;
+		break;
 		case VFS_DEV_FUNC_NAME:
-			return console->name;
+			val = console->name;
+		break;
+		case VFS_DEV_FUNC_GET_ATTR:
+			val = (void*)(uintptr_t)console->flags;
+		break;
+		case VFS_DEV_FUNC_SET_ATTR:
+			console->flags = va_arg(arg, uint32_t);
+		break;
 		default:
-			return NULL;
+			val = NULL;
 	}
+
+	va_end(arg);
+	return val;
 }
 
 static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c)
 {
 	console_t *console = c;
 
-	return 0;
+	return VFS_DEV_CAP_ATTRIBUTES;
 }

@@ -295,21 +295,6 @@ process_t *pm_getTask(pid_t PID)
 	return Process;
 }
 
-/*
- * Scheduler. Gibt den Prozessorzustand des nächsten Tasks zurück. Der aktuelle
- * Prozessorzustand wird als Parameter übergeben und gespeichert, damit er
- * beim nächsten Aufruf des Tasks wiederhergestellt werden kann.
- */
-ihs_t *pm_Schedule(ihs_t *cpu)
-{
-	thread_t *thread = scheduler_schedule(cpu);
-	if(thread != NULL)
-	{
-		cpu = thread->State;
-	}
-	return cpu;
-}
-
 pid_t pm_WaitChild(pid_t pid, int *status)
 {
 	assert(currentProcess != NULL);
@@ -373,8 +358,13 @@ pid_t pm_WaitChild(pid_t pid, int *status)
 			if(status != NULL) *status = child->exit_status;
 		}
 	}
-	pid_t child_pid = child->PID;
-	pm_DestroyTask(child);
+
+	pid_t child_pid = 0;
+	if(child != NULL)
+	{
+		child_pid = child->PID;
+		pm_DestroyTask(child);
+	}
 
 	return child_pid;
 }

@@ -20,6 +20,7 @@
 #include "stdbool.h"
 #include "pm.h"
 #include "refcount.h"
+#include <bits/sys_types.h>
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
@@ -60,7 +61,17 @@ typedef enum{
 	/**
 	 * Function to unmount a device. Only available if #VFS_DEV_CAP_MOUNTABLE is set in the capabilities flags of the device.
 	 */
-	VFS_DEV_FUNC_UMOUNT
+	VFS_DEV_FUNC_UMOUNT,
+
+	/**
+	 * Function to get attributes.
+	 */
+	VFS_DEV_FUNC_GET_ATTR,
+
+	/**
+	 * Function to set attributes.
+	 */
+	VFS_DEV_FUNC_SET_ATTR
 }vfs_device_function_t;
 
 /**
@@ -102,7 +113,12 @@ typedef enum{
 	/**
 	 * Device supports the VFS_DEV_FUNC_MOUNT and VFS_DEV_FUNC_UMOUNT functions.
 	 */
-	VFS_DEV_CAP_MOUNTABLE	= 0x4
+	VFS_DEV_CAP_MOUNTABLE	= 0x4,
+
+	/**
+	 * Device supports the VFS_DEV_FUNC_GET_ATTR and VFS_DEV_FUNC_SET_ATTR functions.
+	 */
+	VFS_DEV_CAP_ATTRIBUTES	= 0x8
 }vfs_device_capabilities_t;
 
 //Handler für Geräte
@@ -122,25 +138,7 @@ typedef struct{
 	void *opaque;
 }vfs_device_t;
 
-typedef struct{
-	bool read, write, append, empty, create, directory;
-}vfs_mode_t;
-
 typedef uint64_t vfs_file_t;
-
-typedef enum{
-	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME
-}vfs_fileinfo_t;
-
-typedef enum{
-	UDT_UNKNOWN, UDT_DIR, UDT_FILE, UDT_LINK, UDT_DEV
-}vfs_userspace_direntry_type_t;
-
-typedef struct{
-	size_t size;
-	vfs_userspace_direntry_type_t type;
-	char name[];
-}vfs_userspace_direntry_t;
 
 typedef struct{
 	struct cdi_fs_filesystem fs;
@@ -195,6 +193,7 @@ void vfs_syscall_close(vfs_file_t streamid);
 size_t vfs_syscall_read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
 size_t vfs_syscall_write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
 uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
+void vfs_syscall_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value);
 int vfs_syscall_mount(const char *mountpoint, const char *device);
 int vfs_syscall_unmount(const char *mountpoint);
 

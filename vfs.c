@@ -1111,6 +1111,12 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 				else
 					return 0;
 			break;
+			case VFS_INFO_ATTRIBUTES:
+				if(stream->node->dev->getCapabilities(stream->node->dev->opaque) & VFS_DEV_CAP_ATTRIBUTES)
+					return (uint64_t)stream->node->dev->function(stream->node->dev->opaque, VFS_DEV_FUNC_GET_ATTR);
+				else
+					return 0;
+			break;
 			default:
 				return 0;
 		}
@@ -1119,6 +1125,54 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 	return 0;
 }
 
+/**
+ * Sets metainformations of a file
+ * \param stream Stream of which the metainformation should be set
+ * \param info Information which should be set
+ * \param value Value to be set
+ */
+void vfs_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
+{
+	vfs_stream_t *stream;
+
+	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
+		return;
+
+	if(stream->node->type == TYPE_MOUNT && stream->stream.res->file != NULL)
+	{
+		switch(info)
+		{
+			case VFS_INFO_FILESIZE:
+				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_SIZE, value);
+			break;
+			case VFS_INFO_USEDBLOCKS:
+				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_USEDBLOCKS, value);
+			break;
+			case VFS_INFO_BLOCKSIZE:
+				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_BLOCKSZ, value);
+			break;
+			case VFS_INFO_CREATETIME:
+				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_CREATETIME, value);
+			break;
+			case VFS_INFO_ACCESSTIME:
+				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_ACCESSTIME, value);
+			break;
+			case VFS_INFO_CHANGETIME:
+				stream->stream.res->res->meta_write(&stream->stream, CDI_FS_META_CHANGETIME, value);
+			break;
+		}
+	}
+	else if(stream->node->type == TYPE_DEV)
+	{
+		switch(info)
+		{
+			case VFS_INFO_ATTRIBUTES:
+				if(stream->node->dev->getCapabilities(stream->node->dev->opaque) & VFS_DEV_CAP_ATTRIBUTES)
+					stream->node->dev->function(stream->node->dev->opaque, VFS_DEV_FUNC_SET_ATTR, value);
+			break;
+		}
+	}
+}
 
 /*
  * Mountet ein Dateisystem (fs) an den entsprechenden Mountpoint (Mount)
@@ -1301,6 +1355,15 @@ uint64_t vfs_syscall_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return 0;
 	return vfs_getFileinfo(stream->stream, info);
+}
+
+void vfs_syscall_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
+{
+	vfs_userspace_stream_t *stream;
+	assert(currentProcess != NULL);
+	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
+		return;
+	vfs_setFileinfo(stream->stream, info, value);
 }
 
 int vfs_syscall_mount(const char *mountpoint, const char *device)

@@ -34,23 +34,12 @@ typedef enum{
 }KEY_t;	//Alle Tasten
 
 /*
- *	Parameter:	Buchstabe der Taste
- */
-typedef void(*char_handler)(void *opaque, char c);
-
-/*
  *	Parameter:	Keycode der  Taste
  */
 typedef void(*key_handler)(void *opaque, KEY_t key);
 
 
 void keyboard_Init(void);
-
-/*
- * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
- * Parameter:	Der aufzurufende Handler
- */
-void keyboard_registerCharHandler(char_handler handler, void *opaque);
 
 /*
  * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
@@ -70,8 +59,6 @@ void keyboard_registerKeyupHandler(key_handler handler, void *opaque);
  * Rückgabe:	Status des Taste
  */
 bool keyboard_isKeyPressed(KEY_t key);
-
-char getch(void);
 
 #endif /* KEYBOARD_H_ */
 

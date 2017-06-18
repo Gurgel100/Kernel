@@ -538,7 +538,7 @@ int fseek(FILE *stream, long int offset, int whence)
 #ifdef BUILD_KERNEL
 			size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
 #else
-			size_t filesize = syscall_StreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
+			size_t filesize = syscall_getStreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
 #endif
 			stream->posRead = stream->posWrite = filesize - offset;
 		}

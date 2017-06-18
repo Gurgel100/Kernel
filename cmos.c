@@ -51,23 +51,14 @@
 #define JHR			0x32	//Jahrhundert (BCD)
 //#define STATUS_A	0x33 - 0x3F	//Reserviert / vom BIOS abhängig
 
-uint8_t Read(uint8_t Offset);
-void Write(uint8_t Offset, uint8_t Data);
-
-void cmos_Init()
-{
-	Date_t Date;
-	Time_t Time;
-	cmos_GetTime(&Time);
-	cmos_GetDate(&Date);
-}
+#define CURRENT_CENTURY	2000
 
 /*
  * Liest ein Byte aus einem CMOS-Register
  * Parameter:	Offset = Offset bzw. das Register
  * Rückgabewert: Gelesener Wert
  */
-uint8_t Read(uint8_t Offset)
+static uint8_t Read(uint8_t Offset)
 {
 	uint8_t tmp = inb(CMOS_ADDRESS);
 	outb(CMOS_ADDRESS, (tmp & 0x80) | (Offset & 0x7F));	//Oberstes Bit darf nicht verändert werden, untere 7 Bits dienen als Offset
@@ -79,40 +70,102 @@ uint8_t Read(uint8_t Offset)
  * Parameter:	Offset = Offset bzw. das Register
  * 				Data = Zu schreibender Wert
  */
-void Write(uint8_t Offset, uint8_t Data)
+static void Write(uint8_t Offset, uint8_t Data)
 {
 	uint8_t tmp = inb(CMOS_ADDRESS);
 	outb(CMOS_ADDRESS, (tmp & 0x80) | (Offset & 0x7F));	//Oberstes Bit darf nicht verändert werden, untere 7 Bits dienen als Offset
 	outb(CMOS_DATA, Data);
 }
 
+static void waitForUpdate()
+{
+	while(Read(STATUS_A) & (1 << 7));
+}
+
+void cmos_Init()
+{
+}
+
 Time_t *cmos_GetTime(Time_t *Time)
 {
-	uint8_t tmp = Read(SECOND);
-	Time->Second = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(MINUTE);
-	Time->Minute = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(HOUR);
-	Time->Hour = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
+	uint8_t sec, min, hour;
+	uint8_t sec2, min2, hour2;
+
+	do
+	{
+		waitForUpdate();
+		sec = Read(SECOND);
+		min = Read(MINUTE);
+		hour = Read(HOUR);
+
+		//Read out again to check if the values have changed
+		waitForUpdate();
+		sec2 = Read(SECOND);
+		min2 = Read(MINUTE);
+		hour2 = Read(HOUR);
+	}
+	while(sec != sec2 || min != min2 || hour != hour2);
+
+	Time->Second = (sec & 0xF) + ((sec >> 4) & 0xF) * 10;
+	Time->Minute = (min & 0xF) + ((min >> 4) & 0xF) * 10;
+	Time->Hour = (hour & 0xF) + ((hour >> 4) & 0xF) * 10;
+
 	return Time;
 }
 
 Date_t *cmos_GetDate(Date_t *Date)
 {
-	uint8_t tmp = Read(DAY_OF_WEEK);
-	Date->DayOfWeek = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(DAY_OF_M);
-	Date->DayOfMonth = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(MONTH);
-	Date->Month = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(YEAR);
-	Date->Year = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
+	uint8_t dow, dom, month, year;
+	uint8_t dow2, dom2, month2, year2;
+
+	do
+	{
+		waitForUpdate();
+		dow = Read(DAY_OF_WEEK);
+		dom = Read(DAY_OF_M);
+		month = Read(MONTH);
+		year = Read(YEAR);
+
+		//Read out again to check if the values have changed
+		waitForUpdate();
+		dow2 = Read(DAY_OF_WEEK);
+		dom2 = Read(DAY_OF_M);
+		month2 = Read(MONTH);
+		year2 = Read(YEAR);
+	}
+	while(dow != dow2 || dom != dom2 || month != month2 || year != year2);
+
+	Date->DayOfWeek = (dow & 0xF) + ((dow >> 4) & 0xF) * 10;
+	Date->DayOfMonth = (dom & 0xF) + ((dom >> 4) & 0xF) * 10;
+	Date->Month = (month & 0xF) + ((month >> 4) & 0xF) * 10;
+	Date->Year = (year & 0xF) + ((year >> 4) & 0xF) * 10;
+
 	return Date;
 }
 
 void cmos_Reboot()
 {
 	Write(SHUTDOWN, 0x2);
+}
+
+time_t cmos_syscall_timestamp()
+{
+	struct tm t;
+	Date_t date;
+	Time_t time;
+
+	cmos_GetDate(&date);
+	cmos_GetTime(&time);
+
+	t.tm_year = CURRENT_CENTURY + date.Year - 1900;
+	t.tm_mon = date.Month - 1;
+	t.tm_mday = date.DayOfMonth;
+
+	t.tm_hour = time.Hour;
+	t.tm_min = time.Minute;
+	t.tm_sec = time.Second;
+
+	return mktime(&t);
 }
 
 #endif

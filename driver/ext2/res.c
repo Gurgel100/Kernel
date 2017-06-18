@@ -383,7 +383,7 @@ int ext2_fs_res_remove(struct cdi_fs_stream* stream)
     for (i = 0; parent_res->res.children &&
         (child_res = cdi_list_get(parent_res->res.children, i)); i++)
     {
-        if (!strcmp(child_res->res.name, res->res.name)) {
+        if (child_res == res) {
             cdi_list_remove(parent_res->res.children, i);
             break;
         }

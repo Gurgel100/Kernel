@@ -11,6 +11,7 @@
 #include "string.h"
 #include "vmm.h"
 #include "stdlib.h"
+#include "assert.h"
 
 typedef uint64_t	elf64_addr;
 typedef uint16_t 	elf64_half;
@@ -221,6 +222,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 		size_t pages = ProgramHeader[i].p_memsz / 4096;
 		pages += (ProgramHeader[i].p_memsz % 4096) ? 1 : 0;
 		void *dest = mm_SysAlloc(pages);
+		assert(dest != NULL);
 		uintptr_t dest_off = ProgramHeader[i].p_vaddr % 0x1000;
 		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
 		fread(dest + dest_off, 1, ProgramHeader[i].p_filesz, fp);

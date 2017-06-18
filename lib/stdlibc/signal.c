@@ -19,7 +19,7 @@ void SIG_DFL(int signal)
 	switch(signal)
 	{
 		case SIGTERM:
-			exit(EXIT_SUCCES);
+			exit(EXIT_SUCCESS);
 			break;
 		case SIGSEGV:
 			puts("segmentation fault");

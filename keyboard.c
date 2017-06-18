@@ -13,12 +13,12 @@
 #include "stddef.h"
 #include "util.h"
 #include "display.h"
-#include "keyboard_SWISS.h"
 #include "console.h"
 #include "ctype.h"
 #include "stdlib.h"
 #include "list.h"
 #include "assert.h"
+#include <dispatcher.h>
 
 //Ports
 #define KEYBOARD_PORT		0x60
@@ -64,11 +64,6 @@ typedef struct{
 } Puffer_t;
 
 typedef struct{
-	char_handler handler;
-	void *opaque;
-}char_handler_entry_t;
-
-typedef struct{
 	key_handler handler;
 	void *opaque;
 }key_handler_entry_t;
@@ -87,13 +82,27 @@ static const KEY_t ScancodeToKey_default[] =
 		0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			//7.
 
 };
+
+static const KEY_t ScancodeToKey_extended[] =
+//		.0			.1			.2			.3			.4			.5			.6			.7			.8			.9			.A			.B			.C			.D			.E			.F
+{
+/*0.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+/*1.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			KEY_KPENTER,KEY_RCTRL,	0,			0,
+/*2.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+/*3.*/	0,			0,			0,			0,			0,			KEY_KPSLASH,0,			0,			KEY_ALTGR,	0,			0,			0,			0,			0,			0,			0,
+/*4.*/	0,			0,			0,			0,			0,			0,			0,			KEY_HOME,	KEY_UP,		KEY_PGUP,	0,			KEY_LEFT,	0,			KEY_RIGHT,	0,			KEY_END,
+/*5.*/	KEY_DOWN,	KEY_PGDOWN,	KEY_INS,	KEY_DEL,	0,			0,			0,			0,			0,			0,			0,			KEY_LGUI,	KEY_RGUI,	KEY_MENU,	0,			0,
+/*6.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+/*7.*/	0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,			0,
+};
+
+
 static bool PressedKeys[__KEY_LAST];
 //static char volatile Puffer;
 static volatile Puffer_t *Puffer;		//Anfang des Zeichenpuffers
 static volatile Puffer_t *ActualPuffer;	//Ende des Zeichenpuffers
 
 //Handlers
-static list_t char_handlers;
 static list_t keydown_handlers;
 static list_t keyup_handlers;
 
@@ -103,21 +112,17 @@ static list_t keyup_handlers;
  * Parameter:	Scancode = der umzuwandelne Scancode
  * Rückgabe:	Die entsprechende Taste
  */
-static KEY_t keyboard_ScancodeToKey(uint8_t Scancode)
+static KEY_t keyboard_ScancodeToKey(uint8_t Scancode, uint8_t set)
 {
-	if(Scancode != 0xE0 || Scancode != 0xE1)	//Werden momentan noch nicht unterstützt
-		return ScancodeToKey_default[Scancode & 0x7F];
-	return 0;
-}
-
-static char keyboard_KeyToASCII(KEY_t Key)
-{
-	if(PressedKeys[KEY_LSHIFT] || PressedKeys[KEY_RSHIFT] || PressedKeys[KEY_CAPS])
-		return KeyToAscii_Shift[Key];
-	else if(PressedKeys[KEY_ALTGR])
-		return KeyToAscii_AltGr[Key];
-	else
-		return KeyToAscii_default[Key];
+	switch(set)
+	{
+		case 0:
+			return ScancodeToKey_default[Scancode & 0x7F];
+		case 1:
+			return ScancodeToKey_extended[Scancode & 0x7F];
+		default:
+			return __KEY_INVALID;
+	}
 }
 
 /*
@@ -148,18 +153,9 @@ static void keyboard_SetLEDs()
 			| (PressedKeys[KEY_SCROLL] & 0x1));
 }
 
-static void notify_charPress(char c)
+static void notify_keyDown(void *k)
 {
-	size_t i = 0;
-	char_handler_entry_t *e;
-	while((e = list_get(char_handlers, i++)))
-	{
-		e->handler(e->opaque, c);
-	}
-}
-
-static void notify_keyDown(KEY_t key)
-{
+	KEY_t key = (KEY_t)k;
 	size_t i = 0;
 	key_handler_entry_t *e;
 	while((e = list_get(keydown_handlers, i++)))
@@ -168,8 +164,9 @@ static void notify_keyDown(KEY_t key)
 	}
 }
 
-static void notify_keyUp(KEY_t key)
+static void notify_keyUp(void *k)
 {
+	KEY_t key = (KEY_t)k;
 	size_t i = 0;
 	key_handler_entry_t *e;
 	while((e = list_get(keyup_handlers, i++)))
@@ -191,7 +188,6 @@ void keyboard_Init()
 	Puffer = ActualPuffer = NULL;
 
 	//Handlerlisten initialisieren
-	char_handlers = list_create();
 	keydown_handlers = list_create();
 	keyup_handlers = list_create();
 
@@ -204,20 +200,6 @@ void keyboard_Init()
 	PressedKeys[KEY_SCROLL] = false;
 	keyboard_SetLEDs();
 	SysLog("Tastatur", "Initialisierung abgeschlossen");
-}
-
-/*
- * Registriert einen Handler beim Tastaturtreiber, der aufgerufen wird, sobald eine Taste gedrückt wurde
- * Parameter:	Der aufzurufende Handler
- */
-void keyboard_registerCharHandler(char_handler handler, void *opaque)
-{
-	assert(char_handlers != NULL);
-	char_handler_entry_t *e = malloc(sizeof(char_handler_entry_t));
-	e->handler = handler;
-	e->opaque = opaque;
-
-	list_push(char_handlers, e);
 }
 
 /*
@@ -259,66 +241,48 @@ bool keyboard_isKeyPressed(KEY_t key)
  */
 void keyboard_Handler(ihs_t *ihs)
 {
+	static bool e0_code = false;
 	uint8_t Scancode = keyboard_getScanCode();
-	KEY_t Key = keyboard_ScancodeToKey(Scancode);
-	if(Key == __KEY_INVALID) return;
-	bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
-	bool oldStatus = PressedKeys[Key];
-	//Wenn CapsLock, NumLock oder ScrollLock gedrückt wurde, dann den Status nur ändern beim erneuten Drücken
-	//und nicht beim Break.
-	if(Key == KEY_CAPS || Key == KEY_KPNUM || Key == KEY_SCROLL)
+
+	if(Scancode == 0xE0)
 	{
-		if(make)
-		{
-			PressedKeys[Key] = !PressedKeys[Key];
-			//printf(" new Status: %u\n", PressedKeys[Key]);
-			keyboard_SetLEDs();
-			return;
-		}
+		e0_code = true;
 	}
 	else
 	{
-		PressedKeys[Key] = make;
-		//return;
-	}
-	//Ist nur für den Kernel notwendig
-	if(make)
-	{
-		//Nur einmal benachrichtigen, dass die Taste gedrückt wurde
-		if(!oldStatus)
-			notify_keyDown(Key);
-		char Zeichen = keyboard_KeyToASCII(Key);
-		if(Zeichen != 0)
-			notify_charPress(Zeichen);
-	/*if(Zeichen != 0)
-	{
-		Puffer_t *NewPuffer = malloc(sizeof(Puffer_t));
-		NewPuffer->Char = Zeichen;
-		NewPuffer->Next = NULL;
-		if(ActualPuffer != NULL)
-			ActualPuffer->Next = NewPuffer;
-		ActualPuffer = NewPuffer;
-		if(Puffer == NULL)
-			Puffer = ActualPuffer;
-	}*/
-	}
-	//Nur einmal benachrichtigen, dass die Taste losgelassen wurde
-	else if(oldStatus)
-		notify_keyUp(Key);
-}
+		KEY_t key;
+		//Ignore fake shift
+		if(e0_code && (Scancode == 0x2A || Scancode == 0x36))
+		{
+			e0_code = false;
+			return;
+		}
+		key = keyboard_ScancodeToKey(Scancode, e0_code);
+		e0_code = false;
+		if(key == __KEY_INVALID) return;
+		bool make = !(Scancode & 0x80);			//Make = Taste gedrückt; Break = Taste losgelassen
+		//Wenn CapsLock, NumLock oder ScrollLock gedrückt wurde, dann den Status nur ändern beim erneuten Drücken
+		//und nicht beim Break.
+		if(key == KEY_CAPS || key == KEY_KPNUM || key == KEY_SCROLL)
+		{
+			if(make)
+			{
+				PressedKeys[key] = !PressedKeys[key];
+				//printf(" new Status: %u\n", PressedKeys[Key]);
+				keyboard_SetLEDs();
+				return;
+			}
+		}
+		else
+		{
+			PressedKeys[key] = make;
+		}
 
-char __attribute__((deprecated)) getch()
-{
-	/*while(Puffer == NULL) asm volatile("hlt;");	//Wir halten die CPU an, bis ein IRQ von der Tastatur kommt
-	char Zeichen = Puffer->Char;
-	Puffer_t *OldPuffer = Puffer;
-	Puffer = Puffer->Next;
-	free(OldPuffer);
-	if(ActualPuffer == OldPuffer)
-		ActualPuffer = NULL;
-	return Zeichen;*/
-	//return console_getch(pm_getConsole());
-	return 0;
+		if(make)
+			dispatcher_enqueue(notify_keyDown, (void*)key);
+		else
+			dispatcher_enqueue(notify_keyUp, (void*)key);
+	}
 }
 
 #endif
