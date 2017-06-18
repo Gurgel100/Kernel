@@ -9,19 +9,25 @@
 #define STDINT_H_
 
 #include <limits.h>
+#include <bits/types.h>
 
-typedef unsigned int __attribute__((__mode__(__TI__))) uint128_t;
-typedef unsigned long	uint64_t;
-typedef unsigned int	uint32_t;
-typedef unsigned short	uint16_t;
-typedef unsigned char	uint8_t;
+typedef _uint128_t	uint128_t;
+typedef _uint64_t	uint64_t;
+typedef _uint32_t	uint32_t;
+typedef _uint16_t	uint16_t;
+typedef _uint8_t	uint8_t;
 
-typedef int __attribute__((__mode__(__TI__))) int128_t;
-typedef signed long		int64_t;
-typedef signed int		int32_t;
-typedef signed short	int16_t;
-typedef signed char		int8_t;
-typedef uint64_t		uintptr_t;
+typedef _int128_t	int128_t;
+typedef _int64_t	int64_t;
+typedef _int32_t	int32_t;
+typedef _int16_t	int16_t;
+typedef _int8_t		int8_t;
+
+typedef _uintptr_t	uintptr_t;
+typedef _intptr_t	intptr_t;
+
+typedef _uintmax_t		_uintmax_t;
+typedef _intmax_t		_intmax_t;
 
 #define INT8_MIN	SCHAR_MIN
 #define INT16_MIN	SHRT_MIN

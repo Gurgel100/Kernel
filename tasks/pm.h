@@ -14,8 +14,9 @@
 #include "list.h"
 #include "hashmap.h"
 #include "lock.h"
+#include <bits/types.h>
 
-typedef uint64_t pid_t;
+typedef _pid_t pid_t;
 
 typedef struct{
 		uint64_t mmx[6];

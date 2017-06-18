@@ -8,7 +8,7 @@
 #ifndef STDIO_H_
 #define STDIO_H_
 
-#include "stddef.h"
+#include <bits/types.h>
 #include "stdarg.h"
 #include "stdbool.h"
 #include "stdint.h"
@@ -39,10 +39,7 @@ extern "C" {
 
 #define BUFSIZ	65536
 
-#ifndef SIZE_T
-#define SIZE_T
-typedef unsigned long	size_t;
-#endif
+typedef _size_t size_t;
 
 typedef enum{
 	IO_MODE_NO_BUFFER, IO_MODE_LINE_BUFFER, IO_MODE_FULL_BUFFER

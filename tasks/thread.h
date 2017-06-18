@@ -18,8 +18,9 @@
 #include "pm.h"
 #include "stdbool.h"
 #include "ring.h"
+#include <bits/types.h>
 
-typedef uint64_t tid_t;
+typedef _tid_t tid_t;
 
 /**
  * \brief Type describing the reason why a thread is blocked
