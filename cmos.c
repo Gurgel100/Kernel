@@ -53,14 +53,6 @@
 
 #define CURRENT_CENTURY	2000
 
-void cmos_Init()
-{
-	Date_t Date;
-	Time_t Time;
-	cmos_GetTime(&Time);
-	cmos_GetDate(&Date);
-}
-
 /*
  * Liest ein Byte aus einem CMOS-Register
  * Parameter:	Offset = Offset bzw. das Register
@@ -83,6 +75,10 @@ static void Write(uint8_t Offset, uint8_t Data)
 	uint8_t tmp = inb(CMOS_ADDRESS);
 	outb(CMOS_ADDRESS, (tmp & 0x80) | (Offset & 0x7F));	//Oberstes Bit darf nicht verändert werden, untere 7 Bits dienen als Offset
 	outb(CMOS_DATA, Data);
+}
+
+void cmos_Init()
+{
 }
 
 Time_t *cmos_GetTime(Time_t *Time)
