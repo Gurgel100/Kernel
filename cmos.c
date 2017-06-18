@@ -77,31 +77,69 @@ static void Write(uint8_t Offset, uint8_t Data)
 	outb(CMOS_DATA, Data);
 }
 
+static void waitForUpdate()
+{
+	while(Read(STATUS_A) & (1 << 7));
+}
+
 void cmos_Init()
 {
 }
 
 Time_t *cmos_GetTime(Time_t *Time)
 {
-	uint8_t tmp = Read(SECOND);
-	Time->Second = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(MINUTE);
-	Time->Minute = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(HOUR);
-	Time->Hour = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
+	uint8_t sec, min, hour;
+	uint8_t sec2, min2, hour2;
+
+	do
+	{
+		waitForUpdate();
+		sec = Read(SECOND);
+		min = Read(MINUTE);
+		hour = Read(HOUR);
+
+		//Read out again to check if the values have changed
+		waitForUpdate();
+		sec2 = Read(SECOND);
+		min2 = Read(MINUTE);
+		hour2 = Read(HOUR);
+	}
+	while(sec != sec2 || min != min2 || hour != hour2);
+
+	Time->Second = (sec & 0xF) + ((sec >> 4) & 0xF) * 10;
+	Time->Minute = (min & 0xF) + ((min >> 4) & 0xF) * 10;
+	Time->Hour = (hour & 0xF) + ((hour >> 4) & 0xF) * 10;
+
 	return Time;
 }
 
 Date_t *cmos_GetDate(Date_t *Date)
 {
-	uint8_t tmp = Read(DAY_OF_WEEK);
-	Date->DayOfWeek = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(DAY_OF_M);
-	Date->DayOfMonth = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(MONTH);
-	Date->Month = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
-	tmp = Read(YEAR);
-	Date->Year = (tmp & 0xF) + ((tmp >> 4) & 0xF) * 10;
+	uint8_t dow, dom, month, year;
+	uint8_t dow2, dom2, month2, year2;
+
+	do
+	{
+		waitForUpdate();
+		dow = Read(DAY_OF_WEEK);
+		dom = Read(DAY_OF_M);
+		month = Read(MONTH);
+		year = Read(YEAR);
+
+		//Read out again to check if the values have changed
+		waitForUpdate();
+		dow2 = Read(DAY_OF_WEEK);
+		dom2 = Read(DAY_OF_M);
+		month2 = Read(MONTH);
+		year2 = Read(YEAR);
+	}
+	while(dow != dow2 || dom != dom2 || month != month2 || year != year2);
+
+	Date->DayOfWeek = (dow & 0xF) + ((dow >> 4) & 0xF) * 10;
+	Date->DayOfMonth = (dom & 0xF) + ((dom >> 4) & 0xF) * 10;
+	Date->Month = (month & 0xF) + ((month >> 4) & 0xF) * 10;
+	Date->Year = (year & 0xF) + ((year >> 4) & 0xF) * 10;
+
 	return Date;
 }
 
