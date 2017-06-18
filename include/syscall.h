@@ -13,27 +13,7 @@
 #include "stddef.h"
 #include "stdint.h"
 #include "stdbool.h"
-
-typedef struct{
-	bool read, write, append, empty, create, directory;
-}vfs_mode_t;
-
-typedef enum{
-	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME, VFS_INFO_ATTRIBUTES
-}vfs_fileinfo_t;
-
-typedef enum{
-	UDT_UNKNOWN, UDT_DIR, UDT_FILE, UDT_LINK, UDT_DEV
-}vfs_userspace_direntry_type_t;
-
-typedef struct{
-	size_t size;
-	vfs_userspace_direntry_type_t type;
-	char name[];
-}vfs_userspace_direntry_t;
-
-typedef uint64_t pid_t;
-typedef uint64_t tid_t;
+#include <bits/sys_types.h>
 
 void *AllocPage(size_t Pages);
 void FreePage(void *Address, size_t Pages);
@@ -54,9 +34,10 @@ void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value)
 int syscall_mount(const char *mountpoint, const char *device);
 int syscall_unmount(const char *mountpoint);
 
+uint64_t syscall_currentTime();
 void syscall_sleep(uint64_t msec);
 
-void syscall_getSysInfo(void *Struktur);
+void syscall_getSysInfo(SIS *Struktur);
 
 #endif /* SYSCALL_H_ */
 

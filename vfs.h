@@ -20,6 +20,7 @@
 #include "stdbool.h"
 #include "pm.h"
 #include "refcount.h"
+#include <bits/sys_types.h>
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
@@ -137,25 +138,7 @@ typedef struct{
 	void *opaque;
 }vfs_device_t;
 
-typedef struct{
-	bool read, write, append, empty, create, directory;
-}vfs_mode_t;
-
 typedef uint64_t vfs_file_t;
-
-typedef enum{
-	VFS_INFO_FILESIZE, VFS_INFO_BLOCKSIZE, VFS_INFO_USEDBLOCKS, VFS_INFO_CREATETIME, VFS_INFO_ACCESSTIME, VFS_INFO_CHANGETIME, VFS_INFO_ATTRIBUTES
-}vfs_fileinfo_t;
-
-typedef enum{
-	UDT_UNKNOWN, UDT_DIR, UDT_FILE, UDT_LINK, UDT_DEV
-}vfs_userspace_direntry_type_t;
-
-typedef struct{
-	size_t size;
-	vfs_userspace_direntry_type_t type;
-	char name[];
-}vfs_userspace_direntry_t;
 
 typedef struct{
 	struct cdi_fs_filesystem fs;

@@ -100,7 +100,7 @@ void syscall_sleep(uint64_t msec)
 	_syscall(SYSCALL_SLEEP, msec);
 }
 
-void syscall_getSysInfo(void *Struktur)
+void syscall_getSysInfo(SIS *Struktur)
 {
 	_syscall(SYSCALL_SYSINF_GET, Struktur);
 }
