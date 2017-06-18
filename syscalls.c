@@ -57,8 +57,7 @@ static syscall syscalls[_SYSCALL_NUM] = {
 [SYSCALL_MOUNT]				(syscall)&vfs_syscall_mount,
 [SYSCALL_UNMOUNT]			(syscall)&vfs_syscall_unmount,
 
-[SYSCALL_GET_TIME]			(syscall)&cmos_GetTime,
-[SYSCALL_GET_DATE]			(syscall)&cmos_GetDate,
+[SYSCALL_GET_TIMESTAMP]		(syscall)&cmos_syscall_timestamp,
 [SYSCALL_SLEEP]				(syscall)&sleepHandler,
 
 [SYSCALL_SYSINF_GET]		(syscall)&getSystemInformation

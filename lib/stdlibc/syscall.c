@@ -95,6 +95,11 @@ int syscall_unmount(const char *mountpoint)
 	return _syscall(SYSCALL_UNMOUNT, mountpoint);
 }
 
+time_t syscall_getTimestamp()
+{
+	return _syscall(SYSCALL_GET_TIMESTAMP);
+}
+
 void syscall_sleep(uint64_t msec)
 {
 	_syscall(SYSCALL_SLEEP, msec);

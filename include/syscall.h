@@ -34,7 +34,7 @@ void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value)
 int syscall_mount(const char *mountpoint, const char *device);
 int syscall_unmount(const char *mountpoint);
 
-uint64_t syscall_currentTime();
+time_t syscall_getTimestamp();
 void syscall_sleep(uint64_t msec);
 
 void syscall_getSysInfo(SIS *Struktur);

@@ -16,6 +16,8 @@ typedef _size_t size_t;
 typedef _pid_t	pid_t;
 typedef _tid_t	tid_t;
 
+typedef _time_t	time_t;
+
 typedef struct{
 	bool read, write, append, empty, create, directory;
 }vfs_mode_t;

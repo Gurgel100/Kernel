@@ -51,6 +51,8 @@
 #define JHR			0x32	//Jahrhundert (BCD)
 //#define STATUS_A	0x33 - 0x3F	//Reserviert / vom BIOS abhängig
 
+#define CURRENT_CENTURY	2000
+
 uint8_t Read(uint8_t Offset);
 void Write(uint8_t Offset, uint8_t Data);
 
@@ -113,6 +115,26 @@ Date_t *cmos_GetDate(Date_t *Date)
 void cmos_Reboot()
 {
 	Write(SHUTDOWN, 0x2);
+}
+
+time_t cmos_syscall_timestamp()
+{
+	struct tm t;
+	Date_t date;
+	Time_t time;
+
+	cmos_GetDate(&date);
+	cmos_GetTime(&time);
+
+	t.tm_year = CURRENT_CENTURY + date.Year - 1900;
+	t.tm_mon = date.Month - 1;
+	t.tm_mday = date.DayOfMonth;
+
+	t.tm_hour = time.Hour;
+	t.tm_min = time.Minute;
+	t.tm_sec = time.Second;
+
+	return mktime(&t);
 }
 
 #endif
