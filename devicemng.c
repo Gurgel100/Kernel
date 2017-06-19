@@ -38,7 +38,7 @@ void dmng_registerDevice(struct cdi_device *dev)
 	vfs_device_t *vfs_dev = malloc(sizeof(vfs_device_t));
 	vfs_dev->opaque = device;
 	vfs_dev->read = dmng_Read;
-	vfs_dev->write = NULL;
+	vfs_dev->write = dmng_Write;
 	vfs_dev->function = dmng_function;
 	vfs_dev->getCapabilities = dmng_getCapabilities;
 
@@ -115,6 +115,97 @@ size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 			semaphore_release(&dev->semaphore);
 
 			memcpy(buffer + offset, tmp_buffer + start_offset, tmp_size);
+			start_offset = 0;
+			offset += tmp_size;
+			tmp_size = MIN(size - offset, 2048);
+		}
+		while(offset < size);
+		free(tmp_buffer);
+	}
+	else
+		return 0;
+
+	return size;
+}
+
+size_t dmng_Write(void *d, uint64_t start, size_t size, const void *buffer)
+{
+	device_t *dev = d;
+	if(size == 0 || buffer == NULL) return 0;
+
+	if(dev->device->bus_data->bus_type == CDI_STORAGE)
+	{
+		struct cdi_storage_driver *driver = (struct cdi_storage_driver*)dev->device->driver;
+		struct cdi_storage_device *device = (struct cdi_storage_device*)dev->device;
+		uint64_t block_start = start / device->block_size;
+		uint64_t start_offset = start % device->block_size;
+		uint64_t block_count = size / device->block_size + ((size % device->block_size) ? 1 : 0);
+		if(block_start + block_count > device->block_count)
+			block_count = device->block_count - block_start;
+		void *block_buffer = malloc(device->block_size * block_count);
+
+		//Gerät reservieren
+		semaphore_acquire(&dev->semaphore);
+		if(driver->read_blocks(device, block_start, block_count, block_buffer))
+		{
+			semaphore_release(&dev->semaphore);
+			return 0;
+		}
+		memcpy(block_buffer + start_offset, buffer, size);
+		if(driver->write_blocks(device, block_start, block_count, block_buffer))
+		{
+			semaphore_release(&dev->semaphore);
+			return 0;
+		}
+		semaphore_release(&dev->semaphore);
+
+		free(block_buffer);
+	}
+	else if(dev->device->bus_data->bus_type == CDI_SCSI)
+	{
+		struct cdi_scsi_driver *driver = (struct cdi_scsi_driver*)dev->device->driver;
+		struct cdi_scsi_device *device = (struct cdi_scsi_device*)dev->device;
+
+		uint32_t lba = start / 2048;
+		uint32_t start_offset = start % 2048;
+		uint64_t tmp_size = MIN(size, 2048);
+		uint64_t offset = 0;
+		void *tmp_buffer = malloc(2048);
+		do
+		{
+			uint32_t length = 1;
+			struct cdi_scsi_packet read_packet = {
+				.buffer = tmp_buffer,
+				.bufsize = 2048,
+				.cmdsize = 12,
+				.command = {0xA8, 0, GET_BYTE(lba, 0x18), GET_BYTE(lba, 0x10), GET_BYTE(lba, 0x08), GET_BYTE(lba, 0x00),
+						GET_BYTE(length, 0x18), GET_BYTE(length, 0x10), GET_BYTE(length, 0x08), GET_BYTE(length, 0x00), 0, 0},
+				.direction = CDI_SCSI_READ
+			};
+			struct cdi_scsi_packet write_packet = {
+				.buffer = tmp_buffer,
+				.bufsize = 2048,
+				.cmdsize = 12,
+				.command = {0xAA, 0, GET_BYTE(lba, 0x18), GET_BYTE(lba, 0x10), GET_BYTE(lba, 0x08), GET_BYTE(lba, 0x00),
+						GET_BYTE(length, 0x18), GET_BYTE(length, 0x10), GET_BYTE(length, 0x08), GET_BYTE(length, 0x00), 0, 0},
+				.direction = CDI_SCSI_WRITE
+			};
+
+			//Gerät reservieren
+			semaphore_acquire(&dev->semaphore);
+			if(driver->request(device, &read_packet))
+			{
+				semaphore_release(&dev->semaphore);
+				return 0;
+			}
+			memcpy(tmp_buffer + start_offset, buffer + offset, tmp_size);
+			if(driver->request(device, &write_packet))
+			{
+				semaphore_release(&dev->semaphore);
+				return 0;
+			}
+			semaphore_release(&dev->semaphore);
+
 			start_offset = 0;
 			offset += tmp_size;
 			tmp_size = MIN(size - offset, 2048);
