@@ -54,6 +54,7 @@ static syscall syscalls[_SYSCALL_NUM] = {
 [SYSCALL_WRITE]				(syscall)&vfs_syscall_write,
 [SYSCALL_INFO_GET]			(syscall)&vfs_syscall_getFileinfo,
 [SYSCALL_INFO_SET]			(syscall)&vfs_syscall_setFileinfo,
+
 [SYSCALL_MOUNT]				(syscall)&vfs_syscall_mount,
 [SYSCALL_UNMOUNT]			(syscall)&vfs_syscall_unmount,
 
