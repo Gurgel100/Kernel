@@ -20,6 +20,7 @@
 #include "pm.h"
 #include "hashmap.h"
 #include "ctype.h"
+#include "path.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
@@ -1174,6 +1175,79 @@ void vfs_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
 	}
 }
 
+int vfs_createDir(const char *path)
+{
+	if(path == NULL || strlen(path) == 0 || !check_path(path))
+		return -1;
+
+	char *name;
+
+	path = path_removeLast(path, &name);
+
+	char *remPath;
+	vfs_node_t *node = resolveLink(getLastNode(path, &remPath));
+
+	free((char*)path);
+
+	switch(node->type)
+	{
+		case TYPE_MOUNT:
+		{
+			struct cdi_fs_stream stream, newStream;
+			stream.fs = &node->fs->fs;
+			stream.res = getRes(&stream, remPath);
+			free(remPath);
+			//Löse symlinks auf
+			while(stream.res != NULL && stream.res->link != NULL)
+			{
+				const char *link_path = stream.res->link->read_link(&stream);
+				stream.res = getRes(&stream, link_path);
+			}
+
+			if(stream.res == NULL || !stream.res->flags.create_child || stream.res->dir == NULL)
+			{
+				free(name);
+				return -1;
+			}
+
+			newStream.fs = stream.fs;
+			newStream.res = NULL;
+			if(!stream.res->dir->create_child(&newStream, name, stream.res)
+				|| !stream.res->res->assign_class(&newStream, CDI_FS_CLASS_DIR))
+			{
+				free(name);
+				return -1;
+			}
+		}
+		break;
+		case TYPE_DIR:
+			free(remPath);
+			if(remPath != NULL)
+			{
+				free(name);
+				return -1;
+			}
+			createDirNode(node, name);
+		break;
+		case TYPE_DEV:
+			free(remPath);
+			free(name);
+			return -1;
+		break;
+		case TYPE_LINK:
+			assert(false);
+		break;
+		case TYPE_FILE:
+			free(remPath);
+			free(name);
+			return -1;
+		break;
+	}
+	free(name);
+
+	return 0;
+}
+
 /*
  * Mountet ein Dateisystem (fs) an den entsprechenden Mountpoint (Mount)
  * Parameter:	Mount = Mountpoint (Pfad)
@@ -1364,6 +1438,13 @@ void vfs_syscall_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t 
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return;
 	vfs_setFileinfo(stream->stream, info, value);
+}
+
+int vfs_syscall_mkdir(const char *path)
+{
+	if(path == NULL || !vmm_userspacePointerValid(path, strlen(path)))
+		return -1;
+	return vfs_createDir(path);
 }
 
 int vfs_syscall_mount(const char *mountpoint, const char *device)

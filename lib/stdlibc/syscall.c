@@ -95,6 +95,11 @@ int syscall_unmount(const char *mountpoint)
 	return _syscall(SYSCALL_UNMOUNT, mountpoint);
 }
 
+int syscall_mkdir(const char *path)
+{
+	return _syscall(SYSCALL_MKDIR, path);
+}
+
 time_t syscall_getTimestamp()
 {
 	return _syscall(SYSCALL_GET_TIMESTAMP);
