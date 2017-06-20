@@ -228,6 +228,6 @@ int cdi_cache_sync(struct cdi_cache* cache)
  */
 void cdi_cache_block_dirty(struct cdi_cache* cache, struct cdi_cache_block* block)
 {
-	block_t *b = (cache_t*)block;
+	block_t *b = (block_t*)block;
 	b->dirty = true;
 }
