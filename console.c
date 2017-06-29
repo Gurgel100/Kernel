@@ -224,7 +224,7 @@ static void clear(console_t *console, uint8_t mode)
 	}
 
 	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh();
+		display_refresh(console->buffer, console->cursor.x, console->cursor.y);
 }
 
 static void clearLine(console_t *console, uint8_t mode)
@@ -248,7 +248,7 @@ static void clearLine(console_t *console, uint8_t mode)
 		((uint16_t*)console->buffer)[console->cursor.y * console->width + i] = ' ' | (console->color << 8);
 
 	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh();
+		display_refresh(console->buffer, console->cursor.x, console->cursor.y);
 }
 
 static void updateCursor(console_t *console)
@@ -614,7 +614,7 @@ void displayConsole(console_t *console)
 	{
 		activeConsole = console;
 		if(console->flags & CONSOLE_AUTOREFRESH)
-			display_refresh();
+			display_refresh(console->buffer, console->cursor.x, console->cursor.y);
 	}
 }
 
@@ -655,7 +655,7 @@ static void console_scrollDown(console_t *console)
 		}
 
 		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-			display_refresh();
+			display_refresh(console->buffer, console->cursor.x, console->cursor.y);
 	}
 }
 

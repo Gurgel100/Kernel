@@ -41,10 +41,13 @@
 #define CL_YELLOW			0xE	//Gelb
 #define CL_WHITE			0xF	//Weiss
 
+#define DISPLAY_ROWS		25
+#define DISPLAY_COLS		80
+
 extern uint8_t Spalte, Zeile;
 
 void Display_Init(void);
-void display_refresh();
+void display_refresh(const uint16_t *buffer, uint8_t cursor_x, uint8_t cursor_y);
 void setColor(uint8_t Color);
 void putch(unsigned char c);
 void setCursor(uint8_t x, uint8_t y);

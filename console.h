@@ -58,7 +58,6 @@ typedef struct{
 }console_t;
 
 extern console_t initConsole;
-extern console_t *activeConsole;
 
 void console_Init();
 console_t *console_create(char *name, uint8_t color);
