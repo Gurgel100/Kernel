@@ -15,9 +15,9 @@
 #include "stdbool.h"
 #include <bits/sys_types.h>
 
-void *AllocPage(size_t Pages);
-void FreePage(void *Address, size_t Pages);
-void syscall_unusePage(void *Address, size_t Pages);
+void *syscall_allocPages(size_t Pages);
+void syscall_freePages(void *Address, size_t Pages);
+void syscall_unusePages(void *Address, size_t Pages);
 
 pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
 void syscall_exit(int status);

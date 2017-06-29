@@ -12,17 +12,17 @@
 
 extern uint64_t (*_syscall)(uint64_t func, ...);
 
-void *AllocPage(size_t Pages)
+void *syscall_allocPages(size_t Pages)
 {
 	return (void*)_syscall(SYSCALL_ALLOC_PAGES, Pages);
 }
 
-void FreePage(void *Address, size_t Pages)
+void syscall_freePages(void *Address, size_t Pages)
 {
 	_syscall(SYSCALL_FREE_PAGES, Address, Pages);
 }
 
-void syscall_unusePage(void *Address, size_t Pages)
+void syscall_unusePages(void *Address, size_t Pages)
 {
 	_syscall(SYSCALL_UNUSE_PAGES, Address, Pages);
 }
