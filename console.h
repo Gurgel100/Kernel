@@ -39,6 +39,8 @@ typedef struct{
 	lock_t lock;
 
 	void *buffer;
+	void *screenBuffer;
+	size_t usedRows, currentRow;
 	uint16_t height, width;
 	uint8_t color;
 	cursor_t cursor;

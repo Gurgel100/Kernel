@@ -25,11 +25,13 @@
 #define SIZE_PER_ROW	(COLS * SIZE_PER_CHAR)
 #define DISPLAY_PAGE_OFFSET(page) ((page) * ((ROWS * COLS + 0xff) & 0xff00))
 #define PAGE_SIZE		ROWS * SIZE_PER_ROW
+#define MAX_ROWS		(MAX_PAGES * ROWS)
 
 #define TAB_HORIZONTAL	4
 
 #define INPUT_BUFFER_SIZE	16
 
+#define MAX(a, b)		((a > b) ? a : b)
 #define MIN(a, b)		((a < b) ? a : b)
 
 #define CONSOLE_NUM		12
@@ -104,6 +106,7 @@ static const char KeyToAscii_altgr[] =
 
 console_t initConsole = {
 	.buffer = (void*)GRAFIKSPEICHER,
+	.screenBuffer = (void*)GRAFIKSPEICHER,
 	.color = BG_BLACK | CL_WHITE,
 	.flags = CONSOLE_AUTOREFRESH | CONSOLE_AUTOSCROLL | CONSOLE_ECHO,
 	.height = ROWS,
@@ -133,6 +136,36 @@ static size_t console_readHandler(void *c, uint64_t start, size_t length, void *
 static size_t console_writeHandler(void *c, uint64_t start, size_t length, const void *buffer);
 static void *console_functionHandler(void *c, vfs_device_function_t function, ...);
 static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c);
+
+static void scroll(console_t *console, int i, bool add)
+{
+	if(add && i < 0 && console->currentRow == 0)
+	{
+		i = MIN(-i, MAX_ROWS);
+		memmove(console->buffer, console->buffer + SIZE_PER_ROW * i, MAX_PAGES * PAGE_SIZE - SIZE_PER_ROW * i);
+
+		console->usedRows = MIN(console->usedRows + i, MAX_ROWS);
+
+		//Letzte Zeile löschen
+		for(uint32_t j = 1; j <= (uint32_t)i; j++)
+		{
+			for(size_t k = 0; k < SIZE_PER_ROW / sizeof(uint16_t); k++)
+			{
+				((uint16_t*)(console->buffer + MAX_PAGES * PAGE_SIZE - j * SIZE_PER_ROW))[k] = ' ' | (console->color << 8);
+			}
+		}
+	}
+	else
+	{
+		if(i < 0 && console->currentRow + i > console->currentRow)
+			console->currentRow = 0;
+		else
+			console->currentRow = MIN(console->currentRow + i, console->usedRows);
+	}
+
+	if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
+		display_refresh(console->buffer + (MAX_PAGES - 1) * PAGE_SIZE - SIZE_PER_ROW * console->currentRow, console->cursor.x, console->cursor.y);
+}
 
 static char convertKeyToAscii(console_key_status_t *key_status)
 {
@@ -176,6 +209,15 @@ static void handler_keyDown(void *opaque, KEY_t key)
 			console_switch(12);
 		else if(key == KEY_ESC)
 			console_switch(0);
+		else if(key == KEY_PGUP)
+			scroll(console, 10, false);
+		else if(key == KEY_PGDOWN)
+			scroll(console, -10, false);
+		else if(key == KEY_UP)
+			scroll(console, 1, false);
+		else if(key == KEY_DOWN)
+			scroll(console, -1, false);
+		return;
 	}
 
 	console_key_status_t *key_status = &console->inputBuffer[console->inputBufferEnd++];
@@ -220,11 +262,13 @@ static void clear(console_t *console, uint8_t mode)
 
 	for(size_t i = start; i < end; i++)
 	{
-		((uint16_t*)console->buffer)[i] = ' ' | (console->color << 8);
+		((uint16_t*)console->screenBuffer)[i] = ' ' | (console->color << 8);
 	}
 
+	console->currentRow = 0;
+
 	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh(console->buffer, console->cursor.x, console->cursor.y);
+		display_refresh(console->screenBuffer, console->cursor.x, console->cursor.y);
 }
 
 static void clearLine(console_t *console, uint8_t mode)
@@ -245,10 +289,12 @@ static void clearLine(console_t *console, uint8_t mode)
 	}
 
 	for(size_t i = start; i < end; i++)
-		((uint16_t*)console->buffer)[console->cursor.y * console->width + i] = ' ' | (console->color << 8);
+		((uint16_t*)console->screenBuffer)[console->cursor.y * console->width + i] = ' ' | (console->color << 8);
+
+	console->currentRow = 0;
 
 	if(activeConsole == console && (console->flags & CONSOLE_AUTOREFRESH))
-		display_refresh(console->buffer, console->cursor.x, console->cursor.y);
+		display_refresh(console->screenBuffer, console->cursor.x, console->cursor.y);
 }
 
 static void updateCursor(console_t *console)
@@ -263,7 +309,8 @@ void console_Init()
 	initConsole.inputBuffer = malloc(initConsole.inputBufferSize * sizeof(*initConsole.inputBuffer));
 
 	//Aktuellen Bildschirminhalt in neuen Buffer kopieren
-	initConsole.buffer = memcpy(malloc(PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
+	initConsole.buffer = memcpy(malloc(MAX_PAGES * PAGE_SIZE), initConsole.buffer, PAGE_SIZE);
+	initConsole.screenBuffer = initConsole.buffer + (MAX_PAGES - 1) * PAGE_SIZE;
 
 	//Alle Konsolen anlegen
 	uint64_t i;
@@ -307,13 +354,14 @@ console_t *console_create(char *name, uint8_t color)
 		return NULL;
 	}
 
-	console->buffer = calloc(SIZE_PER_ROW, ROWS);
+	console->buffer = calloc(MAX_PAGES, PAGE_SIZE);
 	if(console->buffer == NULL)
 	{
 		free(console->name);
 		free(console);
 		return NULL;
 	}
+	console->screenBuffer = console->buffer + (MAX_PAGES - 1) * PAGE_SIZE;
 	console->color = color;
 
 	console->inputBufferSize = INPUT_BUFFER_SIZE;
@@ -537,7 +585,8 @@ void console_write(console_t *console, char c)
 	{
 		uint8_t Farbwert = console->color;
 		uint16_t *gs = (uint16_t*)GRAFIKSPEICHER;
-		uint16_t *buffer = (uint16_t*)console->buffer;
+		uint16_t *buffer = (uint16_t*)console->screenBuffer;
+		console->currentRow = 0;
 		switch(c)
 		{
 			case '\n':
@@ -614,7 +663,7 @@ void displayConsole(console_t *console)
 	{
 		activeConsole = console;
 		if(console->flags & CONSOLE_AUTOREFRESH)
-			display_refresh(console->buffer, console->cursor.x, console->cursor.y);
+			display_refresh(console->screenBuffer, console->cursor.x, console->cursor.y);
 	}
 }
 
@@ -642,21 +691,8 @@ void console_switch(uint8_t id)
 
 static void console_scrollDown(console_t *console)
 {
-	if(console != NULL)
-	{
-		//Letzte 24 Zeilen eine Zeile nach oben verschieben
-		memmove(console->buffer, console->buffer + SIZE_PER_ROW, PAGE_SIZE - SIZE_PER_ROW);
-
-		//Letzte Zeile löschen
-		size_t i;
-		for(i = 0; i < SIZE_PER_ROW / 2; i++)
-		{
-			((uint16_t*)(console->buffer + PAGE_SIZE - SIZE_PER_ROW))[i] = ' '| (console->color << 8);
-		}
-
-		if(console == activeConsole && (console->flags & CONSOLE_AUTOREFRESH))
-			display_refresh(console->buffer, console->cursor.x, console->cursor.y);
-	}
+	console->currentRow = 0;
+	scroll(console, -1, true);
 }
 
 void console_changeColor(console_t *console, uint8_t color)
