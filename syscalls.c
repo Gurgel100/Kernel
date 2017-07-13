@@ -48,6 +48,9 @@ static syscall syscalls[_SYSCALL_NUM] = {
 [SYSCALL_THREAD_CREATE]		(syscall)&createThreadHandler,
 [SYSCALL_THREAD_EXIT]		(syscall)&exitThreadHandler,
 
+[SYSCALL_GET_TIMESTAMP]		(syscall)&cmos_syscall_timestamp,
+[SYSCALL_SLEEP]				(syscall)&sleepHandler,
+
 [SYSCALL_OPEN]				(syscall)&vfs_syscall_open,
 [SYSCALL_CLOSE]				(syscall)&vfs_syscall_close,
 [SYSCALL_READ]				(syscall)&vfs_syscall_read,
@@ -59,9 +62,6 @@ static syscall syscalls[_SYSCALL_NUM] = {
 
 [SYSCALL_MOUNT]				(syscall)&vfs_syscall_mount,
 [SYSCALL_UNMOUNT]			(syscall)&vfs_syscall_unmount,
-
-[SYSCALL_GET_TIMESTAMP]		(syscall)&cmos_syscall_timestamp,
-[SYSCALL_SLEEP]				(syscall)&sleepHandler,
 
 [SYSCALL_SYSINF_GET]		(syscall)&getSystemInformation
 };
