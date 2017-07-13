@@ -1283,6 +1283,58 @@ void vfs_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
 	}
 }
 
+int vfs_truncate(const char *path, size_t size)
+{
+	if(path == NULL || strlen(path) == 0 || !check_path(path))
+		return -1;
+
+	char *remPath;
+	vfs_node_t *node = resolveLink(getLastNode(path, &remPath));
+
+	switch(node->type)
+	{
+		case TYPE_MOUNT:
+		{
+			struct cdi_fs_stream stream;
+			stream.fs = &node->fs->fs;
+			stream.res = getRes(&stream, remPath);
+			free(remPath);
+			//Löse symlinks auf
+			while(stream.res != NULL && stream.res->link != NULL)
+			{
+				const char *link_path = stream.res->link->read_link(&stream);
+				stream.res = getRes(&stream, link_path);
+			}
+
+			if(stream.res == NULL || !stream.res->flags.write || stream.res->dir == NULL)
+				return -1;
+
+			if(!stream.res->file->truncate(&stream, size))
+				return -1;
+		}
+		break;
+		case TYPE_DIR:
+			free(remPath);
+			return -1;
+		break;
+		case TYPE_DEV:
+			free(remPath);
+			return -1;
+		break;
+		case TYPE_LINK:
+			assert(false);
+		break;
+		case TYPE_FILE:
+			//TODO
+			//Not supported
+			free(remPath);
+			return -1;
+		break;
+	}
+
+	return 0;
+}
+
 int vfs_createDir(const char *path)
 {
 	return createDirEntry(path, TYPE_DIR);
@@ -1478,6 +1530,13 @@ void vfs_syscall_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t 
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return;
 	vfs_setFileinfo(stream->stream, info, value);
+}
+
+int vfs_syscall_truncate(const char *path, size_t size)
+{
+	if(path == NULL || !vmm_userspacePointerValid(path, strlen(path)))
+		return -1;
+	return vfs_truncate(path, size);
 }
 
 int vfs_syscall_mkdir(const char *path)
