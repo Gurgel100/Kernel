@@ -85,6 +85,11 @@ void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value)
 	_syscall(SYSCALL_INFO_SET, stream, info, value);
 }
 
+int syscall_truncate(const char *path, size_t size)
+{
+	return _syscall(SYSCALL_TRUNCATE, path, size);
+}
+
 int syscall_mount(const char *mountpoint, const char *device)
 {
 	return _syscall(SYSCALL_MOUNT, mountpoint, device);
