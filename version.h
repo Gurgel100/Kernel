@@ -8,11 +8,16 @@
 #ifndef VERSION_H_
 #define VERSION_H_
 
-#define BUILD_DATE		__DATE__
-#define BUILD_TIME		__TIME__
+extern const unsigned version_major;
+extern const unsigned version_minor;
+extern const unsigned version_bugfix;
 
-#define VERSION_MAJOR	0
-#define VERSION_MINOR	0
-#define VERSION_BUGFIX	0
+extern const char *version_branch;
+extern const char *version_commitId;
+
+extern const char *version_buildDate;
+extern const char *version_buildTime;
+
+extern const char *version_compiler;
 
 #endif /* VERSION_H_ */

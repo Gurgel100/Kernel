@@ -24,6 +24,14 @@ else
 endif
 
 
+#get git information
+DIRTY=
+ifneq ($(shell git diff --shortstat 2> /dev/null),)
+	DIRTY=-dirty
+endif
+GIT_COMMIT_ID=$(shell git rev-parse HEAD)$(DIRTY)
+GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+
 .PHONY: all
 all: kernel libc
 
@@ -55,6 +63,9 @@ $(OUTPUT_DIR)/kernel: $(OBJS)
 
 $(OUTPUT_DIR)/driver/ext2/%: CPPFLAGS += -I"./driver/ext2/libext2/include"
 
+$(OUTPUT_DIR)/version.o: force_build
+$(OUTPUT_DIR)/version.o: CPPFLAGS += -DGIT_BRANCH=$(GIT_BRANCH) -DGIT_COMMIT_ID=$(GIT_COMMIT_ID)
+
 $(OUTPUT_DIR)/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -MT $@ -c $< -o $@
@@ -73,3 +84,5 @@ clean-kernel:
 .PHONY: clean-libc
 clean-libc:
 	-$(MAKE) -C lib clean
+	
+force_build:
