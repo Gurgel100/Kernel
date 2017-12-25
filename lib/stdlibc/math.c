@@ -134,8 +134,6 @@ double pow(double x, double y)
 double sqrt(double x)
 {
 	double Ergebnis;
-	if(x < 0.0)
-		return NAN;
 	asm("sqrtsd %[x],%[res]": [res]"=x"(Ergebnis): [x]"xm"(x));
 	return Ergebnis;
 }
