@@ -68,6 +68,7 @@ char *path_removeLast(const char *path, char **element)
 	{
 		if(element != NULL)
 			*element = strdup(new_path);
+		*new_path = '\0';
 	}
 	else
 	{
