@@ -144,7 +144,7 @@ double ceil(double x)
 {
 #ifdef __SSE4_1__
 	double Ergebnis;
-	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b10));
+	asm("roundsd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b10));
 	return Ergebnis;
 #else
 	//TODO: funktioniert nur für "normale" Zahlen
@@ -163,7 +163,7 @@ double floor(double x)
 {
 #ifdef __SSE4_1__
 	double Ergebnis;
-	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b01));
+	asm("roundsd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b01));
 	return Ergebnis;
 #else
 	//TODO: funktioniert nur für "normale" Zahlen
