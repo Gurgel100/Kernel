@@ -11,7 +11,7 @@
 #include "display.h"
 #include "string.h"
 #include "util.h"
-#include "vfs.h"
+#include "devfs.h"
 #include "stdio.h"
 #include "scheduler.h"
 #include "keyboard.h"
@@ -41,6 +41,11 @@
 typedef enum{
 	INVALID, NEED_MORE, SUCCESS
 }esc_seq_status_t;
+
+typedef struct{
+	vfs_node_dev_t base;
+	console_t *console;
+}console_vfs_node_dev_t;
 
 //Wandelt eine Taste in ein ASCII-Zeichen um
 static const char KeyToAscii_default[] =
@@ -132,10 +137,10 @@ static char *console_names[CONSOLE_NUM] = {
 };
 
 static void console_scrollDown();
-static size_t console_readHandler(void *c, uint64_t start, size_t length, void *buffer);
-static size_t console_writeHandler(void *c, uint64_t start, size_t length, const void *buffer);
-static void *console_functionHandler(void *c, vfs_device_function_t function, ...);
-static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c);
+static size_t console_readHandler(vfs_node_dev_t *node, uint64_t start, size_t length, void *buffer);
+static size_t console_writeHandler(vfs_node_dev_t *node, uint64_t start, size_t length, const void *buffer);
+static int console_getAttributeHandler(vfs_node_t *node, vfs_fileinfo_t attribute, uint64_t *value);
+static int console_setAttributeHandler(vfs_node_t *node, vfs_fileinfo_t attribute, uint64_t value);
 
 static void scroll(console_t *console, int i, bool add)
 {
@@ -319,13 +324,15 @@ void console_Init()
 		console_t *console = console_create(console_names[i], BG_BLACK | CL_LIGHT_GREY);
 		consoles[i] = console;
 
-		vfs_device_t *tty = malloc(sizeof(vfs_device_t));
-		tty->opaque = console;
-		tty->read = console_readHandler;
-		tty->write = console_writeHandler;
-		tty->function = console_functionHandler;
-		tty->getCapabilities = console_getCapabilitiesHandler;
-		vfs_RegisterDevice(tty);
+		console_vfs_node_dev_t *tty_node = calloc(1, sizeof(console_vfs_node_dev_t));
+		vfs_node_dev_init(&tty_node->base, console->name);
+		tty_node->base.type = VFS_DEVICE_CHARACTER;
+		tty_node->base.read = console_readHandler;
+		tty_node->base.write = console_writeHandler;
+		tty_node->base.base.getAttribute = console_getAttributeHandler;
+		tty_node->base.base.setAttribute = console_setAttributeHandler;
+		tty_node->console = console;
+		devfs_registerDeviceNode(&tty_node->base);
 	}
 
 	//Keyboardhandler registrieren
@@ -843,9 +850,10 @@ char console_getch(console_t *console)
 	return (console->flags & CONSOLE_RAW) && c != 0 ? c : console_getch(console);
 }
 
-static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
+static size_t console_writeHandler(vfs_node_dev_t *node, uint64_t __attribute__((unused)) start, size_t length, const void *buffer)
 {
-	console_t *console = c;
+	console_vfs_node_dev_t *dnode = (console_vfs_node_dev_t*)node;
+	console_t *console = dnode->console;
 	size_t size = 0;
 	const char *str = buffer;
 	while(length-- && *str != '\0')
@@ -856,9 +864,10 @@ static size_t console_writeHandler(void *c, uint64_t __attribute__((unused)) sta
 	return size;
 }
 
-static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) start, size_t length, void *buffer)
+static size_t console_readHandler(vfs_node_dev_t *node, uint64_t __attribute__((unused)) start, size_t length, void *buffer)
 {
-	console_t *console = c;
+	console_vfs_node_dev_t *dnode = (console_vfs_node_dev_t*)node;
+	console_t *console = dnode->console;
 	char *buf = buffer;
 
 	size_t size;
@@ -870,38 +879,38 @@ static size_t console_readHandler(void *c, uint64_t __attribute__((unused)) star
 	return size;
 }
 
-static void *console_functionHandler(void *c, vfs_device_function_t function, ...)
+static int console_getAttributeHandler(vfs_node_t *node, vfs_fileinfo_t attribute, uint64_t *value)
 {
-	console_t *console = c;
-	void *val = NULL;
-	va_list arg;
-	va_start(arg, function);
+	assert(node->type == VFS_NODE_DEV);
+	console_vfs_node_dev_t *dnode = (console_vfs_node_dev_t*)node;
+	console_t *console = dnode->console;
 
-	switch(function)
+	switch(attribute)
 	{
-		case VFS_DEV_FUNC_TYPE:
-			val = (void*)VFS_DEVICE_VIRTUAL;
-		break;
-		case VFS_DEV_FUNC_NAME:
-			val = console->name;
-		break;
-		case VFS_DEV_FUNC_GET_ATTR:
-			val = (void*)(uintptr_t)console->flags;
-		break;
-		case VFS_DEV_FUNC_SET_ATTR:
-			console->flags = va_arg(arg, uint32_t);
+		case VFS_INFO_ATTRIBUTES:
+			*value = console->flags;
 		break;
 		default:
-			val = NULL;
+			return 1;
 	}
 
-	va_end(arg);
-	return val;
+	return 0;
 }
 
-static vfs_device_capabilities_t console_getCapabilitiesHandler(void *c)
+static int console_setAttributeHandler(vfs_node_t *node, vfs_fileinfo_t attribute, uint64_t value)
 {
-	console_t *console = c;
+	assert(node->type == VFS_NODE_DEV);
+	console_vfs_node_dev_t *dnode = (console_vfs_node_dev_t*)node;
+	console_t *console = dnode->console;
 
-	return VFS_DEV_CAP_ATTRIBUTES;
+	switch(attribute)
+	{
+		case VFS_INFO_ATTRIBUTES:
+			console->flags = value;
+		break;
+		default:
+			return 1;
+	}
+
+	return 0;
 }

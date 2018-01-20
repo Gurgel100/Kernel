@@ -98,22 +98,19 @@ void init_stdio()
 //Dateifunktionen
 FILE *fopen(const char *filename, const char *mode)
 {
-	vfs_mode_t m;
-
-	//m auf 0 setzen weil sonst können dort irgendwelche Werte drinnen stehen
-	memset(&m, false, sizeof(vfs_mode_t));
+	vfs_mode_t m = 0;
 
 	//Modus analysieren
 	switch(*mode++)
 	{
 	case 'r':
-		m.read = true;
+		m = VFS_MODE_READ;
 		while(*mode != '\0')
 		{
 			switch(*mode++)
 			{
 			case '+':
-				m.write = true;
+				m |= VFS_MODE_WRITE;
 				break;
 			case 'b':	//ignore
 				break;
@@ -121,15 +118,13 @@ FILE *fopen(const char *filename, const char *mode)
 		}
 		break;
 	case 'w':
-		m.write = true;
-		m.empty = true;
-		m.create = true;
+		m = VFS_MODE_WRITE | VFS_MODE_TRUNCATE | VFS_MODE_CREATE;
 		while(*mode != '\0')
 		{
 			switch(*mode++)
 			{
 			case '+':
-				m.read = true;
+				m |= VFS_MODE_READ;
 				break;
 			case 'b':	//ignore
 				break;
@@ -137,15 +132,13 @@ FILE *fopen(const char *filename, const char *mode)
 		}
 		break;
 	case 'a':
-		m.append = true;
-		m.create = true;
-		m.write = true;
+		m = VFS_MODE_WRITE | VFS_MODE_CREATE;
 		while(*mode != '\0')
 		{
 			switch(*mode++)
 			{
 			case '+':
-				m.read = true;
+				m |= VFS_MODE_READ;
 				break;
 			case 'b':	//ignore
 				break;
@@ -158,8 +151,8 @@ FILE *fopen(const char *filename, const char *mode)
 
 	FILE *file = calloc(sizeof(FILE), 1);
 	file->error = IO_NO_ERROR;
-	file->mode.read = m.read;
-	file->mode.write = m.write;
+	file->mode.read = m & VFS_MODE_READ;
+	file->mode.write = m & VFS_MODE_WRITE;
 #ifdef BUILD_KERNEL
 	file->stream_id = vfs_Open(filename, m);
 #else

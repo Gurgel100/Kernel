@@ -12,7 +12,7 @@
 
 #include "vfs.h"
 
-int partition_getPartitions(const char *dev_name, vfs_file_t dev_stream, void(*partition_callback)(void *context, void*), void *context);
+int partition_getPartitions(const char *dev_name, void(*partition_callback)(void *context, void*), void *context);
 
 #endif /* PARTITION_H_ */
 

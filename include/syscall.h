@@ -32,7 +32,7 @@ size_t syscall_fwrite(uint64_t stream, uint64_t start, size_t length, const void
 uint64_t syscall_getStreamInfo(uint64_t stream, vfs_fileinfo_t info);
 void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value);
 int syscall_truncate(const char *path, size_t size);
-int syscall_mount(const char *mountpoint, const char *device);
+int syscall_mount(const char *mountpoint, const char *device, const char *filesystem);
 int syscall_unmount(const char *mountpoint);
 int syscall_mkdir(const char *path);
 

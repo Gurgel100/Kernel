@@ -18,8 +18,13 @@ typedef _tid_t	tid_t;
 
 typedef _time_t	time_t;
 
-typedef struct{
-	bool read, write, append, empty, create, directory;
+typedef enum{
+	VFS_MODE_READ		= (1 << 0),
+	VFS_MODE_WRITE		= (1 << 1),
+	VFS_MODE_EXEC		= (1 << 2),
+	VFS_MODE_CREATE		= (1 << 3),
+	VFS_MODE_TRUNCATE	= (1 << 4),
+	VFS_MODE_DIR		= (1 << 5)
 }vfs_mode_t;
 
 typedef enum{

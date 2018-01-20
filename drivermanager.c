@@ -11,6 +11,7 @@
 #include "stddef.h"
 #include "string.h"
 #include "stdbool.h"
+#include "cdifs.h"
 
 static list_t drivers;
 
@@ -24,6 +25,8 @@ void drivermanager_registerDriver(struct cdi_driver *drv)
 {
 	assert(drv != NULL);
 	list_push(drivers, drv);
+	if(drv->type == CDI_FILESYSTEM)
+		cdifs_registerFilesystemDriver((struct cdi_fs_driver*)drv);
 }
 
 struct cdi_driver *drivermanager_getDriver(const char *name)

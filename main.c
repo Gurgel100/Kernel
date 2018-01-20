@@ -54,7 +54,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 
 	printf("Kernel version: %i.%i.%i - %s %s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, BUILD_DATE, BUILD_TIME);
-	if(vfs_MountRoot())
+	if(vfs_MountRoot() || vfs_Mount("/dev", NULL, "devfs"))
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
 	{

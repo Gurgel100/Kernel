@@ -15,37 +15,17 @@
 #include "stdlib.h"
 #include "string.h"
 #include "assert.h"
-#include "stdarg.h"
+#include "devfs.h"
 
 #define GET_BYTE(value, offset) (value >> offset) & 0xFF
 #define MIN(val1, val2) ((val1 < val2) ? val1 : val2)
 
+typedef struct{
+	vfs_node_dev_t base;
+	device_t *device;
+}dmng_vfs_node_dev_t;
+
 static list_t devices;
-
-void dmng_Init()
-{
-	//Initialisiere Geräteliste
-	devices = list_create();
-}
-
-void dmng_registerDevice(struct cdi_device *dev)
-{
-	device_t *device = malloc(sizeof(device_t));
-	device->partitions = list_create();
-	device->device = dev;
-	semaphore_init(&device->semaphore, 1);
-
-	vfs_device_t *vfs_dev = malloc(sizeof(vfs_device_t));
-	vfs_dev->opaque = device;
-	vfs_dev->read = dmng_Read;
-	vfs_dev->write = dmng_Write;
-	vfs_dev->function = dmng_function;
-	vfs_dev->getCapabilities = dmng_getCapabilities;
-
-	vfs_RegisterDevice(vfs_dev);
-
-	list_push(devices, device);
-}
 
 /*
  * Liest von einem Datenträger
@@ -55,9 +35,10 @@ void dmng_registerDevice(struct cdi_device *dev)
  * 				buffer = Buffer in den die Daten geschrieben werden sollen
  * Rückgabe:	0 bei Fehler und sonst die gelesenen Bytes
  */
-size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
+static size_t read(vfs_node_dev_t *node, uint64_t start, size_t size, void *buffer)
 {
-	device_t *dev = d;
+	dmng_vfs_node_dev_t *dnode = (dmng_vfs_node_dev_t*)node;
+	device_t *dev = dnode->device;
 	if(size == 0 || buffer == NULL) return 0;
 
 	if(dev->device->bus_data->bus_type == CDI_STORAGE)
@@ -128,9 +109,10 @@ size_t dmng_Read(void *d, uint64_t start, size_t size, void *buffer)
 	return size;
 }
 
-size_t dmng_Write(void *d, uint64_t start, size_t size, const void *buffer)
+static size_t write(vfs_node_dev_t *node, uint64_t start, size_t size, const void *buffer)
 {
-	device_t *dev = d;
+	dmng_vfs_node_dev_t *dnode = (dmng_vfs_node_dev_t*)node;
+	device_t *dev = dnode->device;
 	if(size == 0 || buffer == NULL) return 0;
 
 	if(dev->device->bus_data->bus_type == CDI_STORAGE)
@@ -219,50 +201,7 @@ size_t dmng_Write(void *d, uint64_t start, size_t size, const void *buffer)
 	return size;
 }
 
-static void add_partition(void *d, void *p)
-{
-	device_t *dev = d;
-	list_push(dev->partitions, p);
-}
-
-void *dmng_function(void *d, vfs_device_function_t function, ...)
-{
-	void *val;
-	device_t *dev = d;
-
-	va_list arg;
-	va_start(arg, function);
-
-	switch(function)
-	{
-		case VFS_DEV_FUNC_TYPE:
-			val = (void*)VFS_DEVICE_STORAGE;
-		break;
-		case VFS_DEV_FUNC_NAME:
-			val = (void*)dev->device->name;
-		break;
-		case VFS_DEV_FUNC_SCAN_PARTITIONS:
-			dev->partitions = list_create();
-			partition_getPartitions(dev->device->name, va_arg(arg, vfs_file_t), add_partition, dev);
-			val = 0;
-		break;
-		case VFS_DEV_FUNC_BLOCKSIZE:
-			val = (void*)dmng_getBlockSize(dev);
-		break;
-		default:
-			val = NULL;
-	}
-
-	va_end(arg);
-	return val;
-}
-
-vfs_device_capabilities_t dmng_getCapabilities(void *d __attribute__((unused)))
-{
-	return VFS_DEV_CAP_BLOCKSIZE | VFS_DEV_CAP_PARTITIONS;
-}
-
-size_t dmng_getBlockSize(device_t *dev)
+static size_t getBlockSize(device_t *dev)
 {
 	assert(dev != NULL);
 	if(dev->device->bus_data->bus_type == CDI_STORAGE)
@@ -274,6 +213,59 @@ size_t dmng_getBlockSize(device_t *dev)
 		return 2048;
 	else
 		return 0;
+}
+
+static int getAttribute(vfs_node_t *node, vfs_fileinfo_t attribute, uint64_t *value)
+{
+	assert(node->type == VFS_NODE_DEV);
+	dmng_vfs_node_dev_t *dnode = (dmng_vfs_node_dev_t*)node;
+	device_t *dev = dnode->device;
+
+	switch(attribute)
+	{
+		case VFS_INFO_BLOCKSIZE:
+			*value = getBlockSize(dev);
+		break;
+		default:
+			return 1;
+	}
+
+	return 0;
+}
+
+void dmng_Init()
+{
+	//Initialisiere Geräteliste
+	devices = list_create();
+}
+
+static void add_partition(void *d, void *p)
+{
+	device_t *dev = d;
+	list_push(dev->partitions, p);
+}
+
+void dmng_registerDevice(struct cdi_device *dev)
+{
+	device_t *device = malloc(sizeof(device_t));
+	device->partitions = list_create();
+	device->device = dev;
+	semaphore_init(&device->semaphore, 1);
+
+	dmng_vfs_node_dev_t *node = calloc(1, sizeof(dmng_vfs_node_dev_t));
+	if(node == NULL || vfs_node_dev_init(&node->base, dev->name))
+		return;
+	node->device = device;
+	node->base.type = VFS_DEVICE_STORAGE | VFS_DEVICE_MOUNTABLE;
+	node->base.read = read;
+	node->base.write = write;
+	node->base.base.getAttribute = getAttribute;
+
+	devfs_registerDeviceNode(&node->base);
+
+	partition_getPartitions(dev->name, add_partition, device);
+
+	list_push(devices, device);
 }
 
 #endif

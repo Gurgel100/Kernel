@@ -90,9 +90,9 @@ int syscall_truncate(const char *path, size_t size)
 	return _syscall(SYSCALL_TRUNCATE, path, size);
 }
 
-int syscall_mount(const char *mountpoint, const char *device)
+int syscall_mount(const char *mountpoint, const char *device, const char *filesystem)
 {
-	return _syscall(SYSCALL_MOUNT, mountpoint, device);
+	return _syscall(SYSCALL_MOUNT, mountpoint, device, filesystem);
 }
 
 int syscall_unmount(const char *mountpoint)
