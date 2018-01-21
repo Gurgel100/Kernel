@@ -15,8 +15,10 @@
 #include "hashmap.h"
 #include "lock.h"
 #include <bits/types.h>
+#include <bits/error.h>
 
 typedef _pid_t pid_t;
+ERROR_TYPEDEF(pid_t);
 
 typedef struct{
 		uint64_t mmx[6];
@@ -39,11 +41,12 @@ typedef struct process_t{
 		lock_t lock;
 		int exit_status;
 }process_t;
+ERROR_TYPEDEF_POINTER(process_t);
 
 extern process_t *currentProcess;			//Aktueller Prozess
 
 void pm_Init(void);
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
+ERROR_TYPE_POINTER(process_t) pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
 void pm_DestroyTask(process_t *process);
 void pm_ExitTask(int code);
 void pm_BlockTask(process_t *process);

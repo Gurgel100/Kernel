@@ -174,7 +174,7 @@ static char elfCheck(elf_header *ELFHeader)
 	return -1;
 }
 
-pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
+ERROR_TYPE(pid_t) elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
 
@@ -182,36 +182,35 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 	fseek(fp, 0, SEEK_SET);
 
 	if(fread(&Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
-		return -1;
+		return ERROR_RETURN_ERROR(pid_t, E_IO);
 
 	//Header überprüfen
 	if(elfCheck(&Header) != -1)
-		return -1;
+		return ERROR_RETURN_ERROR(pid_t, E_NO_EXECUTABLE);
 
 	if(Header.e_entry < USERSPACE_START)
-	{
-		return -1;
-	}
+		return ERROR_RETURN_ERROR(pid_t, E_FAULT);
 
 	elf_program_header_entry *ProgramHeader = malloc(Header.e_phnum * sizeof(elf_program_header_entry));
 	if(ProgramHeader == NULL)
-	{
-		return -1;
-	}
+		return ERROR_RETURN_ERROR(pid_t, E_NO_MEMORY);
+
 	fseek(fp, Header.e_phoff, SEEK_SET);
 	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header.e_phnum, fp) < Header.e_phnum)
 	{
 		free(ProgramHeader);
-		return -1;
+		return ERROR_RETURN_ERROR(pid_t, E_IO);
 	}
 
 	//Jetzt einen neuen Prozess anlegen
-	process_t *task = pm_InitTask(currentProcess, (void*)Header.e_entry, (char*)cmd, env, stdin, stdout, stderr);
-	if(task == NULL)
+	ERROR_TYPE_POINTER(process_t) task_ret = pm_InitTask(currentProcess, (void*)Header.e_entry, (char*)cmd, env, stdin, stdout, stderr);
+	if(ERROR_DETECT(task_ret))
 	{
 		free(ProgramHeader);
-		return -1;
+		return ERROR_RETURN_ERROR(pid_t, ERROR_GET_ERROR(task_ret));
 	}
+
+	process_t *task = ERROR_GET_VALUE(task_ret);
 
 	int i;
 	for(i = 0; i < Header.e_phnum; i++)
@@ -245,5 +244,5 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 
 	//Prozess aktivieren
 	pm_ActivateTask(task);
-	return task->PID;
+	return ERROR_RETURN_VALUE(pid_t, task->PID);
 }

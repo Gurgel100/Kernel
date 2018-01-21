@@ -124,16 +124,18 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
+ERROR_TYPE_POINTER(process_t) pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
+	if(newProcess == NULL)
+		return ERROR_RETURN_POINTER_ERROR(process_t, E_NO_MEMORY);
 
 	//Argumente kopieren
 	newProcess->cmd = strdup(cmd);
 	if(newProcess->cmd == NULL)
 	{
 		free(newProcess);
-		return 0;
+		return ERROR_RETURN_POINTER_ERROR(process_t, E_NO_MEMORY);
 	}
 
 	newProcess->PID = __sync_fetch_and_add(&nextPID, 1);
@@ -156,7 +158,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 		deleteContext(newProcess->Context);
 		free(newProcess->cmd);
 		free(newProcess);
-		return NULL;
+		return ERROR_RETURN_POINTER_ERROR(process_t, E_CANCELED);	//TODO: better errorcode
 	}
 
 	size_t cmd_size = strlen(newProcess->cmd) + 1;
@@ -189,7 +191,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	__sync_fetch_and_add(&numTasks, 1);
 	newProcess->lock = LOCK_UNLOCKED;
 
-	return newProcess;
+	return ERROR_RETURN_POINTER_VALUE(process_t, newProcess);
 }
 
 /*
