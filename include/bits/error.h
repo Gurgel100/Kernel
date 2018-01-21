@@ -41,6 +41,8 @@
 #define ERROR_GET_ERROR(ret)						(ret.error)
 #define ERROR_GET_VALUE(ret)						(ret.value)
 
+#define ERROR_MESSAGE(error)						(error_messages[error])
+
 //Errorcodes
 typedef enum{
 	///No error
@@ -125,5 +127,28 @@ ERROR_TYPEDEF(uint32_t);
 ERROR_TYPEDEF(uint64_t);
 
 ERROR_TYPEDEF(size_t);
+
+static const char *const error_messages[] = {
+/*E_NONE*/					"No error",
+/*E_INVALID_ARGUMENT*/		"Invalid arguments",
+/*E_ACCESS*/				"Permission denied",
+/*E_AGAIN*/					"Resource unavailable, try again",
+/*E_BAD_FILE_DESCRIPTOR*/	"Bad file descriptor",
+/*E_BUSY*/					"Resource busy",
+/*E_CANCELED*/				"Operation canceled",
+/*E_CHILD*/					"No child process",
+/*E_EXISTS*/				"File exists",
+/*E_FAULT*/					"Bad address",
+/*E_FILE_TO_BIG*/			"File too large",
+/*E_IO*/					"I/O error",
+/*E_IS_DIR*/				"Is a directory",
+/*E_NO_EXECUTABLE*/			"Executable file format error",
+/*E_NO_MEMORY*/				"Not enough memory",
+/*E_OVERFLOW*/				"Value too large to be stored in data type",
+/*E_NOT_DIR*/				"Not a directory or a symbolic link to a directory",
+/*E_NOT_SUPPORTED*/			"Operation not supported",
+/*E_NO_PERMISSION*/			"Operation not permitted",
+/*E_READ_ONLY_FILESYSTEM*/	"Read-only file system",
+};
 
 #endif /* ERROR_H_ */
