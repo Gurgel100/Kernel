@@ -53,7 +53,10 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 
-	printf("Kernel version: %i.%i.%i - %s %s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_BUGFIX, BUILD_DATE, BUILD_TIME);
+	printf("Kernel version   : %u.%u.%u\n", version_major, version_minor, version_bugfix);
+	printf("Kernel commit    : %s %s\n", version_branch, version_commitId);
+	printf("Kernel build date: %s %s\n", version_buildDate, version_buildTime);
+	printf("Kernel compiler  : %s\n", version_compiler);
 	if(vfs_MountRoot())
 		SysLogError("KERNEL", "Could not find root directory\n");
 	else
