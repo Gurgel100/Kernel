@@ -31,7 +31,7 @@ extern void *getFreePages(void *start, void *end, size_t pages);
 
 bool apic_available()
 {
-	return (cpu_CPUID(0x00000001, CR_EDX) >> 9) & 1;
+	return (cpu_cpuid(0x00000001).edx >> 9) & 1;
 }
 
 void apic_Init()
