@@ -110,7 +110,10 @@ static void nop()
 
 static uint64_t createThreadHandler(void *entry, void *arg)
 {
-	thread_t *thread = thread_create(currentProcess, entry, sizeof(void*), &arg, false);
+	ERROR_TYPE_POINTER(thread_t) thread_ret = thread_create(currentProcess, entry, sizeof(void*), &arg, false);
+	if(ERROR_DETECT(thread_ret))
+		return 0;	//TODO: return error to userspace
+	thread_t *thread = ERROR_GET_VALUE(thread_ret);
 	thread_unblock(thread);
 	return thread->tid;
 }

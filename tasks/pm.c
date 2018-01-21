@@ -102,8 +102,8 @@ void pm_Init()
 	cleaner_Init();
 
 	kernel_process.threads = list_create();
-	idleThread = thread_create(&kernel_process, idle, 0, NULL, true);
-	cleanerThread = thread_create(&kernel_process, cleaner, 0, NULL, true);
+	idleThread = ERROR_GET_VALUE(thread_create(&kernel_process, idle, 0, NULL, true));
+	cleanerThread = ERROR_GET_VALUE(thread_create(&kernel_process, cleaner, 0, NULL, true));
 
 	size_t i = 0;
 	thread_t *t;
