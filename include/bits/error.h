@@ -10,29 +10,36 @@
 
 #include "stdint.h"
 
-/**
- * Defined a new type which can hold an error code
- */
-#define ERROR_TYPEDEF(type) \
-	typedef struct{ \
+#define ERROR_STRUCT(type) \
+	struct{ \
 		type value; \
 		error_t error; \
-	} ERROR_TYPE(type)
+	}
 
-#define ERROR_TYPE(type)					error_##type##_t
+#define ERROR_TYPE(type)							error_##type##_t
+#define ERROR_TYPE_POINTER(type)					error_##type##p##_t
 
-#define ERROR_RETURN(type, value, error)	((ERROR_TYPE(type)){value, error})
-#define ERROR_RETURN_VOID(error)			(error)
+/**
+ * Defines a new type which can hold an error code
+ */
+#define ERROR_TYPEDEF(type)							typedef ERROR_STRUCT(type) ERROR_TYPE(type)
+#define ERROR_TYPEDEF_POINTER(type)					typedef ERROR_STRUCT(type*) ERROR_TYPE_POINTER(type)
 
-#define ERROR_DETECT(ret)					(__builtin_expect(ret.error != E_NONE, 0))
-#define ERROR_DETECT_VOID(ret)				(__builtin_expect(ret != E_NONE, 0))
-#define ERROR_ERROR_VALUE(ret)				(ret.error)
-#define ERROR_RETURN_VALUE(ret)				(ret.value)
+#define ERROR_RETURN(type, value, error)			((ERROR_TYPE(type)){value, error})
+#define ERROR_RETURN_VALUE(type, value)				ERROR_RETURN(type, value, E_NONE)
+#define ERROR_RETURN_ERROR(type, error)				ERROR_RETURN(type, (type)0, error)
 
-typedef void*		void_p;
-typedef char*		char_p;
-typedef int8_t*		int8_t_p;
-typedef uint8_t*	uint8_t_p;
+#define ERROR_RETURN_POINTER(type, value, error)	((ERROR_TYPE_POINTER(type)){value, error})
+#define ERROR_RETURN_POINTER_VALUE(type, value)		ERROR_RETURN_POINTER(type, value, E_NONE)
+#define ERROR_RETURN_POINTER_ERROR(type, error)		ERROR_RETURN_POINTER(type, (type*)0, error)
+
+#define ERROR_RETURN_VOID()							(E_NONE)
+#define ERROR_RETURN_VOID_ERROR(error)				(error)
+
+#define ERROR_DETECT(ret)							(__builtin_expect(ret.error != E_NONE, 0))
+#define ERROR_DETECT_VOID(ret)						(__builtin_expect(ret != E_NONE, 0))
+#define ERROR_GET_ERROR(ret)						(ret.error)
+#define ERROR_GET_VALUE(ret)						(ret.value)
 
 //Errorcodes
 typedef enum{
@@ -95,22 +102,24 @@ typedef enum{
 
 	///Read-only file system
 	E_READ_ONLY_FILESYSTEM,
+
+	_E_NUM
 } error_t;
 
 typedef error_t ERROR_TYPE(void);
-ERROR_TYPEDEF(void_p);
+ERROR_TYPEDEF_POINTER(void);
 
 ERROR_TYPEDEF(char);
-ERROR_TYPEDEF(char_p);
+ERROR_TYPEDEF_POINTER(char);
 
 ERROR_TYPEDEF(int8_t);
-ERROR_TYPEDEF(int8_t_p);
+ERROR_TYPEDEF_POINTER(int8_t);
 ERROR_TYPEDEF(int16_t);
 ERROR_TYPEDEF(int32_t);
 ERROR_TYPEDEF(int64_t);
 
 ERROR_TYPEDEF(uint8_t);
-ERROR_TYPEDEF(uint8_t_p);
+ERROR_TYPEDEF_POINTER(uint8_t);
 ERROR_TYPEDEF(uint16_t);
 ERROR_TYPEDEF(uint32_t);
 ERROR_TYPEDEF(uint64_t);
