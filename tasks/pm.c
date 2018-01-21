@@ -181,8 +181,16 @@ ERROR_TYPE_POINTER(process_t) pm_InitTask(process_t *parent, void *entry, char* 
 	assert(written_data == cmd_size + sizeof(size_t) + env_size);
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, written_data, data, false);
+	ERROR_TYPE_POINTER(thread_t) thread_ret = thread_create(newProcess, entry, written_data, data, false);
 	free(data);
+	if(ERROR_DETECT(thread_ret))
+	{
+		vfs_deinitUserspace(newProcess);
+		deleteContext(newProcess->Context);
+		free(newProcess->cmd);
+		free(newProcess);
+		return ERROR_RETURN_POINTER_ERROR(process_t, ERROR_GET_ERROR(thread_ret));
+	}
 
 	//Prozess in Liste eintragen
 	bool res = LOCKED_RESULT(pm_lock, avl_add_s(&process_list, newProcess, pid_cmp, NULL));
