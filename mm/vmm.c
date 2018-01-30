@@ -23,12 +23,6 @@
 #define VMM_SIZE_PER_TABLE	4096
 #define VMM_MAX_ADDRESS		MAX_ADDRESS
 
-//Virtuelle Adressen der Tabellen
-#define VMM_PML4_ADDRESS		0xFFFFFFFFFFFFF000
-#define VMM_PDP_ADDRESS			0xFFFFFFFFFFE00000
-#define VMM_PD_ADDRESS			0xFFFFFFFFC0000000
-#define VMM_PT_ADDRESS			0xFFFFFF8000000000
-
 //Flags für AVL Bits
 #define VMM_KERNELSPACE		0x1
 #define VMM_POINTER_TO_PML4	0x2
@@ -43,10 +37,20 @@
 #define VMM_GET_ADDRESS(PML4i, PDPi, PDi, PTi)	(void*)VMM_EXTEND(((uint64_t)PML4i << 39) | ((uint64_t)PDPi << 30) | (PDi << 21) | (PTi << 12))
 #define VMM_ALLOCATED(entry) ((entry & PG_P) || (PG_AVL(entry) & VMM_UNUSED_PAGE))	//Prüft, ob diese Page schon belegt ist
 
-const uint16_t PML4e = ((KERNELSPACE_END & PG_PML4_INDEX) >> 39) + 1;
-const uint16_t PDPe = ((KERNELSPACE_END & PG_PDP_INDEX) >> 30) + 1;
-const uint16_t PDe = ((KERNELSPACE_END & PG_PD_INDEX) >> 21) + 1;
-const uint16_t PTe = ((KERNELSPACE_END & PG_PT_INDEX) >> 12) + 1;
+#define PML4_INDEX(address)				(((uintptr_t)address & PG_PML4_INDEX) >> 39)
+#define PDP_INDEX(address)				(((uintptr_t)address & PG_PDP_INDEX) >> 30)
+#define PD_INDEX(address)				(((uintptr_t)address & PG_PD_INDEX) >> 21)
+#define PT_INDEX(address)				(((uintptr_t)address & PG_PT_INDEX) >> 12)
+
+#define PML4_ADDRESS()					((PML4_t*)0xFFFFFFFFFFFFF000)
+#define PDP_ADDRESS(PML4i)				((PDP_t*)(0xFFFFFFFFFFE00000 + (PML4i << 12)))
+#define PD_ADDRESS(PML4i, PDPi)			((PD_t*)(0xFFFFFFFFC0000000 + (((uint64_t)PML4i << 21) | (PDPi << 12))))
+#define PT_ADDRESS(PML4i, PDPi, PDi)	((PT_t*)(0xFFFFFF8000000000 + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12))))
+
+const uint16_t PML4e = PML4_INDEX(KERNELSPACE_END) + 1;
+const uint16_t PDPe = PDP_INDEX(KERNELSPACE_END) + 1;
+const uint16_t PDe = PD_INDEX(KERNELSPACE_END) + 1;
+const uint16_t PTe = PT_INDEX(KERNELSPACE_END) + 1;
 
 static lock_t vmm_lock = LOCK_LOCKED;
 
@@ -93,9 +97,9 @@ bool vmm_Init()
 
 	//PML4 in Kernelkontext eintragen
 	kernel_context.physAddress = (uintptr_t)PML4;
-	kernel_context.virtualAddress = (void*)VMM_PML4_ADDRESS;
+	kernel_context.virtualAddress = PML4_ADDRESS();
 
-	PML4 = (PML4_t*)VMM_PML4_ADDRESS;
+	PML4 = PML4_ADDRESS();
 
 	//Speicher bis 1MB bearbeiten
 	//Addresse 0 ist nicht gemappt
@@ -343,7 +347,7 @@ list_t vmm_getTables(context_t *context)
 		//PDP auf die Liste setzen
 		list_push(list, (void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
 
-		PDP = (PDP_t*)(VMM_PDP_ADDRESS + (PML4i << 12));
+		PDP = PDP_ADDRESS(PML4i);
 
 		//Danach die PDP nach Einträgen durchsuchen
 		for(PDPi = 0; PDPi < 512; PDPi++)
@@ -355,7 +359,7 @@ list_t vmm_getTables(context_t *context)
 			//PD auf die Liste setzen
 			list_push(list, (void*)(PDP->PDPE[PDPi] & PG_ADDRESS));
 
-			PD = (void*)(VMM_PD_ADDRESS + ((PML4i << 21) | (PDPi << 12)));
+			PD = PD_ADDRESS(PML4i, PDPi);
 
 			//Danach PD durchsuchen
 			for(PDi = 0; PDi < 512; PDi++)
@@ -387,21 +391,18 @@ list_t vmm_getTables(context_t *context)
  */
 uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 {
-	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
-	PDP_t *PDP = (PDP_t*)VMM_PDP_ADDRESS;
-	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 	paddr_t Address;
 
 	//Einträge in die Page Tabellen
-	uint16_t PML4i = ((uintptr_t)vAddress & PG_PML4_INDEX) >> 39;
-	uint16_t PDPi = ((uintptr_t)vAddress & PG_PDP_INDEX) >> 30;
-	uint16_t PDi = ((uintptr_t)vAddress & PG_PD_INDEX) >> 21;
-	uint16_t PTi = ((uintptr_t)vAddress & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
 
-	PDP = (void*)PDP + (PML4i << 12);
-	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
-	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+	PML4_t *const PML4 = PML4_ADDRESS();
+	PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 	//Flags auslesen
 	bool US = (flags & VMM_FLAGS_USER);
@@ -532,22 +533,18 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
  */
 uint8_t vmm_UnMap(void *vAddress)
 {
-	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
-	PDP_t *PDP = (PDP_t*)VMM_PDP_ADDRESS;
-	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
-	uint16_t PML4i, PDPi, PDi, PTi;
 	uint16_t i;
 
 	//Einträge in die Page Tabellen
-	PML4i = ((uintptr_t)vAddress & PG_PML4_INDEX) >> 39;
-	PDPi = ((uintptr_t)vAddress & PG_PDP_INDEX) >> 30;
-	PDi = ((uintptr_t)vAddress & PG_PD_INDEX) >> 21;
-	PTi = ((uintptr_t)vAddress & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
 
-	PDP = (void*)PDP + (PML4i << 12);
-	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
-	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+	PML4_t *const PML4 = PML4_ADDRESS();
+	PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 	InvalidateTLBEntry(vAddress);
 
@@ -679,15 +676,16 @@ uint8_t vmm_UnMap(void *vAddress)
  */
 uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 {
-	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
-	PDP_t *PDP = (PDP_t*)VMM_PDP_ADDRESS;
-	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 	//Einträge in die Page Tabellen
-	uint16_t PML4i = ((uintptr_t)vAddress & PG_PML4_INDEX) >> 39;
-	uint16_t PDPi = ((uintptr_t)vAddress & PG_PDP_INDEX) >> 30;
-	uint16_t PDi = ((uintptr_t)vAddress & PG_PD_INDEX) >> 21;
-	uint16_t PTi = ((uintptr_t)vAddress & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
+
+	PML4_t *const PML4 = PML4_ADDRESS();
+	PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 	//Flags auslesen
 	bool US = (flags & VMM_FLAGS_USER);
@@ -697,10 +695,6 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 	bool P = !(avl & VMM_UNUSED_PAGE);
 	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
 	bool PWT = (flags & VMM_FLAGS_PWT);
-
-	PDP = (void*)PDP + (PML4i << 12);
-	PD = (void*)PD + ((PML4i << 21) | (PDPi << 12));
-	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
 
 	if(vmm_getPageStatus(vAddress))
 	{
@@ -759,19 +753,19 @@ uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, voi
  */
 void *getFreePages(void *start, void *end, size_t pages)
 {
-	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
+	PML4_t *const PML4 = PML4_ADDRESS();
 
 	size_t found_pages = 0;
 
 	//Einträge in die Page Tabellen
-	uint16_t start_PML4i = ((uintptr_t)start & PG_PML4_INDEX) >> 39;
-	uint16_t start_PDPi = ((uintptr_t)start & PG_PDP_INDEX) >> 30;
-	uint16_t start_PDi = ((uintptr_t)start & PG_PD_INDEX) >> 21;
-	uint16_t start_PTi = ((uintptr_t)start & PG_PT_INDEX) >> 12;
-	uint16_t end_PML4i = ((uintptr_t)end & PG_PML4_INDEX) >> 39;
-	uint16_t end_PDPi = ((uintptr_t)end & PG_PDP_INDEX) >> 30;
-	uint16_t end_PDi = ((uintptr_t)end & PG_PD_INDEX) >> 21;
-	uint16_t end_PTi = ((uintptr_t)end & PG_PT_INDEX) >> 12;
+	uint16_t start_PML4i = PML4_INDEX(start);
+	uint16_t start_PDPi = PDP_INDEX(start);
+	uint16_t start_PDi = PD_INDEX(start);
+	uint16_t start_PTi = PT_INDEX(start);
+	uint16_t end_PML4i = PML4_INDEX(end);
+	uint16_t end_PDPi = PDP_INDEX(end);
+	uint16_t end_PDi = PD_INDEX(end);
+	uint16_t end_PTi = PT_INDEX(end);
 
 	//Anfang des zusammenhängenden Bereichs
 	uint16_t begin_PML4i = start_PML4i;
@@ -779,38 +773,34 @@ void *getFreePages(void *start, void *end, size_t pages)
 	uint16_t begin_PDi = start_PDi;
 	uint16_t begin_PTi = start_PTi;
 
-	uint16_t PML4i;
-	for (PML4i = start_PML4i; PML4i <= end_PML4i; PML4i++)
+	for (uint16_t PML4i = start_PML4i; PML4i <= end_PML4i; PML4i++)
 	{
 		if((PML4->PML4E[PML4i] & PG_P))
 		{
 			//Es sind noch Pages frei
 			if(!(PG_AVL(PML4->PML4E[PML4i]) & VMM_PAGE_FULL))
 			{
-				PDP_t *PDP = (void*)VMM_PDP_ADDRESS + (PML4i << 12);
-				uint16_t PDPi;
+				PDP_t *const PDP = PDP_ADDRESS(PML4i);
 				uint16_t last_PDPi = (PML4i == end_PML4i) ? end_PDPi : PAGE_ENTRIES - 1;
-				for(PDPi = (PML4i == start_PML4i) ? start_PDPi : 0; PDPi <= last_PDPi; PDPi++)
+				for(uint16_t PDPi = (PML4i == start_PML4i) ? start_PDPi : 0; PDPi <= last_PDPi; PDPi++)
 				{
 					if((PDP->PDPE[PDPi] & PG_P))
 					{
 						//Es sind noch Pages frei
 						if(!(PG_AVL(PDP->PDPE[PDPi]) & VMM_PAGE_FULL))
 						{
-							PD_t *PD = (void*)VMM_PD_ADDRESS + (((uint64_t)PML4i << 21) | (PDPi << 12));
-							uint16_t PDi;
+							PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
 							uint16_t last_PDi = (PML4i == end_PML4i && PDPi == end_PDPi) ? end_PDi : PAGE_ENTRIES - 1;
-							for(PDi = (PML4i == start_PML4i && PDPi == start_PDPi) ? start_PDi : 0; PDi <= last_PDi; PDi++)
+							for(uint16_t PDi = (PML4i == start_PML4i && PDPi == start_PDPi) ? start_PDi : 0; PDi <= last_PDi; PDi++)
 							{
 								if((PD->PDE[PDi] & PG_P))
 								{
 									//Es sind noch Pages frei
 									if(!(PG_AVL(PD->PDE[PDi]) & VMM_PAGE_FULL))
 									{
-										PT_t *PT = (void*)VMM_PT_ADDRESS + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
-										uint16_t PTi;
+										PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 										uint16_t last_PTi = (PML4i == end_PML4i && PDPi == end_PDPi && PDi == end_PDi) ? end_PTi : PAGE_ENTRIES - 1;
-										for(PTi = (PML4i == start_PML4i && PDPi == start_PDPi && PDi == start_PDi) ? start_PTi : 0;
+										for(uint16_t PTi = (PML4i == start_PML4i && PDPi == start_PDPi && PDi == start_PDi) ? start_PTi : 0;
 												PTi <= last_PTi; PTi++)
 										{
 											if(VMM_ALLOCATED(PT->PTE[PTi]))
@@ -915,10 +905,10 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	paddr_t Address;
 
 	//Einträge in die Page Tabellen
-	uint16_t PML4i = ((uintptr_t)vAddress & PG_PML4_INDEX) >> 39;
-	uint16_t PDPi = ((uintptr_t)vAddress & PG_PDP_INDEX) >> 30;
-	uint16_t PDi = ((uintptr_t)vAddress & PG_PD_INDEX) >> 21;
-	uint16_t PTi = ((uintptr_t)vAddress & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
 
 	//Flags auslesen
 	bool US = (flags & VMM_FLAGS_USER);
@@ -1055,10 +1045,10 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 	uint16_t i;
 
 	//Einträge in die Page Tabellen
-	uint16_t PML4i = ((uintptr_t)vAddress & PG_PML4_INDEX) >> 39;
-	uint16_t PDPi = ((uintptr_t)vAddress & PG_PDP_INDEX) >> 30;
-	uint16_t PDi = ((uintptr_t)vAddress & PG_PD_INDEX) >> 21;
-	uint16_t PTi = ((uintptr_t)vAddress & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
 
 	InvalidateTLBEntry(vAddress);
 
@@ -1228,20 +1218,16 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
  */
 bool vmm_getPageStatus(void *Address)
 {
-	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
-	PDP_t *PDP = (PDP_t*)VMM_PDP_ADDRESS;
-	PD_t *PD = (PD_t*)VMM_PD_ADDRESS;
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
-
 	//Einträge in die Page Tabellen
-	const uint16_t PML4i = ((uintptr_t)Address & PG_PML4_INDEX) >> 39;
-	const uint16_t PDPi = ((uintptr_t)Address & PG_PDP_INDEX) >> 30;
-	const uint16_t PDi = ((uintptr_t)Address & PG_PD_INDEX) >> 21;
-	const uint16_t PTi = ((uintptr_t)Address & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(Address);
+	const uint16_t PDPi = PDP_INDEX(Address);
+	const uint16_t PDi = PD_INDEX(Address);
+	const uint16_t PTi = PT_INDEX(Address);
 
-	PDP = (void*)PDP + (PML4i << 12);
-	PD = (void*)PD + (((uint64_t)PML4i << 21) | (PDPi << 12));
-	PT = (void*)PT + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
+	const PML4_t *const PML4 = PML4_ADDRESS();
+	const PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	const PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 	//PML4 Eintrag überprüfen
 	if((PML4->PML4E[PML4i] & PG_P) == 0)	//Wenn PML4-Eintrag vorhanden ist
@@ -1261,36 +1247,31 @@ bool vmm_getPageStatus(void *Address)
 
 paddr_t vmm_getPhysAddress(void *virtualAddress)
 {
-	PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
-
 	if(vmm_getPageStatus(virtualAddress))
 		return 0;
 
 	//Einträge in die Page Tabellen
-	uint16_t PML4i = ((uintptr_t)virtualAddress & PG_PML4_INDEX) >> 39;
-	uint16_t PDPi = ((uintptr_t)virtualAddress & PG_PDP_INDEX) >> 30;
-	uint16_t PDi = ((uintptr_t)virtualAddress & PG_PD_INDEX) >> 21;
-	uint16_t PTi = ((uintptr_t)virtualAddress & PG_PT_INDEX) >> 12;
+	const uint16_t PML4i = PML4_INDEX(virtualAddress);
+	const uint16_t PDPi = PDP_INDEX(virtualAddress);
+	const uint16_t PDi = PD_INDEX(virtualAddress);
+	const uint16_t PTi = PT_INDEX(virtualAddress);
 
-	PT = (void*)PT + ((PML4i << 30) | (PDPi << 21) | (PDi << 12));
+	const PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 	return (paddr_t)(PT->PTE[PTi] & PG_ADDRESS);
 }
 
 void vmm_unusePages(void *virt, size_t pages)
 {
-	void *address = virt;
-
-	for(; address < virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
+	for(void *address = virt; address < virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
 	{
-		PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 		//Einträge in die Page Tabellen
-		const uint16_t PML4i = ((uintptr_t)address & PG_PML4_INDEX) >> 39;
-		const uint16_t PDPi = ((uintptr_t)address & PG_PDP_INDEX) >> 30;
-		const uint16_t PDi = ((uintptr_t)address & PG_PD_INDEX) >> 21;
-		const uint16_t PTi = ((uintptr_t)address & PG_PT_INDEX) >> 12;
+		const uint16_t PML4i = PML4_INDEX(address);
+		const uint16_t PDPi = PDP_INDEX(address);
+		const uint16_t PDi = PD_INDEX(address);
+		const uint16_t PTi = PT_INDEX(address);
 
-		PT = (void*)PT + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
+		PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 		if(!vmm_getPageStatus(address) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE) == 0)
 		{
@@ -1309,14 +1290,13 @@ void vmm_usePages(void *virt, size_t pages)
 
 	for(; address < (void*)((uintptr_t)virt & ~0xFFF) + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
 	{
-		PT_t *PT = (PT_t*)VMM_PT_ADDRESS;
 		//Einträge in die Page Tabellen
-		const uint16_t PML4i = ((uintptr_t)address & PG_PML4_INDEX) >> 39;
-		const uint16_t PDPi = ((uintptr_t)address & PG_PDP_INDEX) >> 30;
-		const uint16_t PDi = ((uintptr_t)address & PG_PD_INDEX) >> 21;
-		const uint16_t PTi = ((uintptr_t)address & PG_PT_INDEX) >> 12;
+		const uint16_t PML4i = PML4_INDEX(address);
+		const uint16_t PDPi = PDP_INDEX(address);
+		const uint16_t PDi = PD_INDEX(address);
+		const uint16_t PTi = PT_INDEX(address);
 
-		PT = (void*)PT + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12));
+		PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
 		uint64_t entry = PT->PTE[PTi];
 		paddr_t pAddr = pmm_Alloc();
@@ -1352,7 +1332,7 @@ context_t *createContext()
 	PML4_t *newPML4 = memset(vmm_SysAlloc(1), 0, MM_BLOCK_SIZE);
 
 	//Kernel in den Adressraum einbinden
-	PML4_t *PML4 = (PML4_t*)VMM_PML4_ADDRESS;
+	PML4_t *const PML4 = PML4_ADDRESS();
 
 	uint16_t PML4i;
 	for(PML4i = 0; PML4i < PML4e; PML4i++)
@@ -1375,35 +1355,31 @@ void deleteContext(context_t *context)
 {
 	//Erst alle Pages des Kontextes freigeben
 	PML4_t *PML4 = context->virtualAddress;
-	uint16_t PML4i;
-	for(PML4i = 1; PML4i < PAGE_ENTRIES - 1; PML4i++)
+	for(uint16_t PML4i = 1; PML4i < PAGE_ENTRIES - 1; PML4i++)
 	{
 		//Ist der Eintrag gültig
 		if(PML4->PML4E[PML4i] & PG_P)
 		{
-			uint16_t PDPi;
 			//PDP mappen
 			PDP_t *PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 			vmm_Map(PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX, VMM_KERNELSPACE);
-			for(PDPi = 0; PDPi < PAGE_ENTRIES; PDPi++)
+			for(uint16_t PDPi = 0; PDPi < PAGE_ENTRIES; PDPi++)
 			{
 				//Ist der Eintrag gültig
 				if(PDP->PDPE[PDPi] & PG_P)
 				{
-					uint16_t PDi;
 					//PD mappen
 					PD_t *PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 					vmm_Map(PD, PDP->PDPE[PDPi], VMM_FLAGS_NX, VMM_KERNELSPACE);
-					for(PDi = 0; PDi < PAGE_ENTRIES; PDi++)
+					for(uint16_t PDi = 0; PDi < PAGE_ENTRIES; PDi++)
 					{
 						//Ist der Eintrag gültig
 						if(PD->PDE[PDi] & PG_P)
 						{
-							uint16_t PTi;
 							//PT mappen
 							PT_t *PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
 							vmm_Map(PT, PD->PDE[PDi], VMM_FLAGS_NX, VMM_KERNELSPACE);
-							for(PTi = 0; PTi < PAGE_ENTRIES; PTi++)
+							for(uint16_t PTi = 0; PTi < PAGE_ENTRIES; PTi++)
 							{
 								//Ist die Page alloziiert
 								if(PT->PTE[PTi] & PG_P)
