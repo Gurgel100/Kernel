@@ -895,7 +895,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 				{
 					jprintf_putc(args, '%');
 					pos++;
-					format++;
+					continue;
 				}
 
 				//Flags
