@@ -26,9 +26,9 @@
 //Flags für AVL Bits
 #define VMM_PAGE_FULL			(1 << 0)
 
-#define VMM_PAGES_PER_PML4		PAGE_ENTRIES * PAGE_ENTRIES * PAGE_ENTRIES * PAGE_ENTRIES
-#define VMM_PAGES_PER_PDP		PAGE_ENTRIES * PAGE_ENTRIES * PAGE_ENTRIES
-#define VMM_PAGES_PER_PD		PAGE_ENTRIES * PAGE_ENTRIES
+#define VMM_PAGES_PER_PML4		VMM_PAGES_PER_PDP * PAGE_ENTRIES
+#define VMM_PAGES_PER_PDP		VMM_PAGES_PER_PD * PAGE_ENTRIES
+#define VMM_PAGES_PER_PD		VMM_PAGES_PER_PT * PAGE_ENTRIES
 #define VMM_PAGES_PER_PT		PAGE_ENTRIES
 
 #define VMM_EXTEND(address)	((int64_t)((address) << 16) >> 16)
@@ -50,17 +50,12 @@ const uint16_t PDPe = PDP_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PDe = PD_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PTe = PT_INDEX(KERNELSPACE_END) + 1;
 
-static lock_t vmm_lock = LOCK_LOCKED;
+static lock_t vmm_lock = LOCK_UNLOCKED;
 
 context_t kernel_context;
 
 //Funktionen, die nur in dieser Datei aufgerufen werden sollen
-uint8_t vmm_UnMap(void *vAddress);
 uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
-
-void *getFreePages(void *start, void *end, size_t pages);
-//Ende der Funktionendeklaration
-
 
 /*
  * Löscht eine (virtuelle) Page.
@@ -72,321 +67,27 @@ static void clearPage(void *address)
 }
 
 /*
- * Initialisiert die virtuelle Speicherverwaltung.
- * Parameter:	Speicher = Grösse des phys. Speichers
- * 				Stack = Zeiger auf den Stack
+ * Gibt zurück, ob die entsprechende Page belegt ist oder nicht
+ * Parameter:		Address = virtuelle Addresse
+ * Rückgabewert:	true = Page ist frei
+ * 					false = Page ist belegt
  */
-bool vmm_Init()
+static bool isPageFree(const uint64_t *const PML4E, const uint64_t *const PDPE, const uint64_t *const PDE, const uint64_t *const PTE)
 {
-	extern uint8_t kernel_start, kernel_end, kernel_code_start, kernel_code_end;
-	uint64_t cr3;
-	void *i;
-
-	PML4_t *PML4;
-
-	asm volatile("mov %%cr3,%0" : "=r" (cr3));
-	PML4 = (PML4_t*)(cr3 & 0xFFFFFFFFFF000);	//nur die Adresse wollen wir haben
-
-	//Lasse den letzten Eintrag der PML4 auf die PML4 selber zeigen
-	setPML4Entry(511, PML4, 1, 1, 0, 1, 0, 0, 0, 1, (uintptr_t)PML4);
-
-	//Ersten Eintrag überarbeiten
-	setPML4Entry(0, PML4, 1, 1, 0, 1, 0, 0, 0, 0, PML4->PML4E[0] & PG_ADDRESS);
-
-	//PML4 in Kernelkontext eintragen
-	kernel_context.physAddress = (uintptr_t)PML4;
-	kernel_context.virtualAddress = PML4_ADDRESS();
-
-	PML4 = PML4_ADDRESS();
-
-	//Speicher bis 1MB bearbeiten
-	//Addresse 0 ist nicht gemappt
-	vmm_UnMap(NULL);
-	for(i = (void*)0x1000; i < (void*)0x100000; i += 0x1000)
-	{
-		vmm_ChangeMap(i, (paddr_t)i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
-	}
-	for(i = (void*)&kernel_start; i <= (void*)&kernel_end; i += 0x1000)
-	{
-		if(i >= (void*)&kernel_code_start && i <= (void*)&kernel_code_end)
-		{
-			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL, 0);
-		}
-		else
-		{
-			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
-		}
-	}
-	//Den restlichen virtuellen Speicher freigeben
-	while(!vmm_getPageStatus(i))
-	{
-		vmm_UnMap(i);
-		i += 0x1000;
-	}
-
-	//Lock der Speicherverwaltung freigeben
-	unlock(&vmm_lock);
-
-	SysLog("VMM", "Initialisierung abgeschlossen");
-	return true;
+	//PML4 Eintrag überprüfen
+	if((*PML4E & PG_P) == 0)		//Wenn PML4-Eintrag vorhanden ist
+		return true;
+	//Ansonsten überprüfe PDP-Eintrag
+	else if((*PDPE & PG_P) == 0)	//Wenn PDP-Eintrag vorhanden ist
+		return true;
+	//Ansonsten überprüfe PD-Eintrag
+	else if((*PDE & PG_P) == 0)		//Wenn PD-Eintrag vorhanden ist
+		return true;
+	//Ansonsten überprüfe PT-Eintrag
+	return !VMM_ALLOCATED(*PTE);
 }
 
-//Userspace Funktionen
-/*
- * Reserviert ein Speicherblock mit der Blockgrösse Length (in Pages)
- * Parameter:		Length = Die Anzahl Pages, die reserviert werden sollen
- * Rückgabewerte:	Adresse zum Speicherblock
- * 					NULL = Ein Fehler ist aufgetreten
- */
-void *vmm_Alloc(size_t Length)
-{
-	size_t i, j;
-	uint8_t error;
-
-	lock(&vmm_lock);
-
-	void *vAddress = getFreePages((void*)USERSPACE_START, (void*)USERSPACE_END, Length);
-	if(vAddress == NULL)
-	{
-		unlock(&vmm_lock);
-		return NULL;
-	}
-
-	//Mappen
-	for(i = 0; i < Length; i++)
-	{
-		error = vmm_Map(vAddress + i * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
-		if(error != 0)
-		{
-			//Mapping rückgängig machen
-			for(j = 0; j < i; j++)
-				vmm_UnMap(vAddress + j * VMM_SIZE_PER_PAGE);
-			unlock(&vmm_lock);
-			return NULL;
-		}
-	}
-	unlock(&vmm_lock);
-	return vAddress;
-}
-
-/*
- * Gibt Speicherplatz im Userspace frei
- * Parameter:	vAddress = Virtuelle Adresse, an die der Block anfängt
- * 				Pages = Anzahl Pages, die dieser Block umfasst
- */
-void vmm_Free(void *vAddress, size_t Pages)
-{
-	void *i;
-	for(i = vAddress; i < vAddress + Pages * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
-	{
-		paddr_t pAddress = vmm_getPhysAddress(vAddress);
-		uint8_t Fehler = vmm_UnMap(i);
-		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
-		if(Fehler != 1)
-			pmm_Free(pAddress);
-	}
-}
-
-//------------------------Systemfunktionen---------------------------
-/*
- * Reserviert Speicherplatz für den Kernel an
- * der Addresse vAddress und der Länge Length.
- * Params:
- * vAddress =	Virtuelle Addresse, an die der Speicherplatz gemappt werden soll (fakultativ)
- * 				Length = Anzahl Pages die reserviert werden sollen (mind. 1)
- * 				Ignore = Gibt an ob der Parameter vAddress ignoriert (1) werden soll oder nicht (0)
- *
- * Rückgabewert:	virt. Addresse des angeforderten Speicherbereichs
- * 					NULL bei Fehler
- */
-void *vmm_SysAlloc(size_t Length)
-{
-	size_t i, j;
-	uint8_t error;
-
-	lock(&vmm_lock);
-
-	void *vAddress = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, Length);
-	if(vAddress == NULL)
-	{
-		unlock(&vmm_lock);
-		return NULL;
-	}
-
-	//Mappen
-	for(i = 0; i < Length; i++)
-	{
-		error = vmm_Map(vAddress + i * VMM_SIZE_PER_PAGE, 0, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX, VMM_UNUSED_PAGE);
-		if(error != 0)
-		{
-			//Mapping rückgängig machen
-			for(j = 0; j < i; j++)
-				vmm_UnMap(vAddress + j * VMM_SIZE_PER_PAGE);
-			unlock(&vmm_lock);
-			return NULL;
-		}
-	}
-	unlock(&vmm_lock);
-	return vAddress;
-}
-
-/*
- * Gibt den für den Stack der Physikalischen Speicherverwaltung reservierten Speicherplatz
- * an der Addresse vAddress und der Länge Length frei.
- * Params:
- * vAddress = Virtuelle Addresse des Speicherplatzes, der freigegeben werden soll
- * Length = Anzahl Pages die freigegeben werden sollen
- */
-void vmm_SysFree(void *vAddress, size_t Length)
-{
-	void *i;
-	lock(&vmm_lock);
-	for(i = vAddress; i < vAddress + Length * MM_BLOCK_SIZE; i += VMM_SIZE_PER_PAGE)
-	{
-		paddr_t pAddress = vmm_getPhysAddress(vAddress);
-		uint8_t Fehler = vmm_UnMap(i);
-		if(Fehler == 2) Panic("VMM", "Zu wenig physikalischer Speicher vorhanden");
-		if(Fehler != 1)
-			pmm_Free(pAddress);
-	}
-	unlock(&vmm_lock);
-}
-
-/*
- * Reserviert Speicher für DMA und mappt diesen
- * Params:	maxAddress = maximale physische Adresse für den Speicherbereich
- * 			size = Anzahl Pages des Speicherbereichs
- * 			phys = Zeiger auf Variable, in der die phys. Adresse geschrieben wird
- */
-void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
-{
-	void *startAddress = NULL;
-	void *i;
-	uintptr_t j;
-	uint64_t k = 0;						//Zähler für Anzahl Addressen
-	uint8_t Fehler;
-
-	//Freie virt. Adresse finden
-	uint64_t Pages = Size;
-
-	//Physischen Speicher allozieren
-	*Phys = pmm_AllocDMA(maxAddress, Size);
-		if(*Phys == 1) return NULL;
-
-	lock(&vmm_lock);
-	for(i = (void*)KERNELSPACE_START; i <= (void*)KERNELSPACE_END; i += VMM_SIZE_PER_PAGE)
-	{
-		if(vmm_getPageStatus(i))	//Wenn Page frei ist,
-		{
-			if(k == 0)				//und k = 0 ist,
-			{
-				startAddress = i;	//dann speichere die Addresse (i) in startAddress
-				k = 1;
-			}
-			else if(k < Pages)
-			{
-				if(i == startAddress + k * VMM_SIZE_PER_PAGE)
-					k++;
-				else
-					k = 0;
-			}
-			else
-			{
-				if(i == startAddress + k * VMM_SIZE_PER_PAGE)
-				{
-					//Physischen Speicher mappen
-					for(j = 0; j < k; j++)
-					{
-						Fehler = vmm_Map(startAddress + j * VMM_SIZE_PER_PAGE, *Phys + j * MM_BLOCK_SIZE, 0, 0);
-						if(Fehler == 1)
-						{
-							unlock(&vmm_lock);
-							return (void*)1;
-						}
-						if(Fehler == 2)		//Virt. Adresse schon belegt? Also weiter suchen
-						{
-							k = 0;
-							continue;
-						}
-					}
-				}
-				else
-					k = 0;
-				if(k)
-				{
-					unlock(&vmm_lock);
-					return (void*)startAddress;	//Virtuelle Addresse zurückgeben
-				}
-			}
-		}
-	}
-	unlock(&vmm_lock);
-	return NULL;
-}
-
-list_t vmm_getTables(context_t *context)
-{
-	list_t list = list_create();
-	PML4_t *PML4 = context->virtualAddress;
-	PDP_t *PDP;
-	PD_t *PD;
-
-	//PML4 eintragen
-	list_push(list, (void*)(context->physAddress));
-
-	uint16_t PML4i, PDPi, PDi;
-	//PML4 durchsuchen dabei aber den letzten Eintrag auslassen: er zeigt auf PML4 selber
-	for(PML4i = 0; PML4i < 511; PML4i++)
-	{
-		//Wenn PDP nicht vorhanden dann auch nicht auflisten
-		if(!(PML4->PML4E[PML4i] & PG_P))
-			continue;
-		//PDP auf die Liste setzen
-		list_push(list, (void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
-
-		PDP = PDP_ADDRESS(PML4i);
-
-		//Danach die PDP nach Einträgen durchsuchen
-		for(PDPi = 0; PDPi < 512; PDPi++)
-		{
-			//Wenn PD nicht vorhanden dann auch nicht auflisten
-			if(!(PDP->PDPE[PDPi] & PG_P))
-				continue;
-
-			//PD auf die Liste setzen
-			list_push(list, (void*)(PDP->PDPE[PDPi] & PG_ADDRESS));
-
-			PD = PD_ADDRESS(PML4i, PDPi);
-
-			//Danach PD durchsuchen
-			for(PDi = 0; PDi < 512; PDi++)
-			{
-				//Wenn PT nicht vorhanden dann auch nicht auflisten
-				if(!(PD->PDE[PDi] & PG_P))
-					continue;
-
-				//PT auf die Liste setzen
-				list_push(list, (void*)(PD->PDE[PDi] & PG_ADDRESS));
-			}
-		}
-	}
-
-	return list;
-}
-
-//----------------------Allgemeine Funktionen------------------------
-
-/*
- * Mappt eine physikalische Speicherstelle an eine virtuelle Speicherstelle
- * Params:
- * vAddres = Virtuelle Addresse, an die die Speicherstelle gemappt werden soll
- * pAddress = Physikalische Addresse der Speicherstelle
- *
- * Rückgabewert:	0 = Operation erfolgreich abgeschlossen
- * 					1 = Nicht genug Speicherplatz vorhanden um eine Tabelle anzulegen
- * 					2 = virt. Addresse ist schon belegt
- */
-uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
+static uint8_t map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 {
 	paddr_t Address;
 
@@ -499,195 +200,7 @@ uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 	return 0;
 }
 
-/*
- * Gibt eine physikalischer Addresse zu einer virtuellen Addresse frei
- * Params:	vAddress = virt. Addresse der freizugebenden Speicherstelle
- *
- * Rückgabewert:	0 = Page wurde freigegeben
- * 					1 = virt. Addresse nicht belegt
- * 					2 = zu wenig phys. Speicherplatz vorhanden
- */
-uint8_t vmm_UnMap(void *vAddress)
-{
-	uint16_t i;
-
-	//Einträge in die Page Tabellen
-	const uint16_t PML4i = PML4_INDEX(vAddress);
-	const uint16_t PDPi = PDP_INDEX(vAddress);
-	const uint16_t PDi = PD_INDEX(vAddress);
-	const uint16_t PTi = PT_INDEX(vAddress);
-
-	PML4_t *const PML4 = PML4_ADDRESS();
-	PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
-
-	InvalidateTLBEntry(vAddress);
-
-	//PML4 Tabelle bearbeiten
-	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
-		return 1;
-
-	//PDP Tabelle bearbeiten
-	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
-		return 1;
-
-	//PD Tabelle bearbeiten
-	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
-		return 1;
-
-	//PT Tabelle bearbeiten
-	if((PT->PTE[PTi] & PG_P) == 1)			//Wenn PT Eintrag vorhanden
-	{										//dann lösche ihn
-		clearPTEntry(PTi, PT);
-
-		//Wird die PT noch benötigt?
-		for(i = 0; i < PAGE_ENTRIES; i++)
-		{
-			if((PT->PTE[i] & PG_P) || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
-			{
-				//Full flags löschen
-				setPDEntry(PDi, PD, 1, 1, PD->PDE[PDi] & PG_US, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
-				setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-				setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-				return 0; //Wird die PT noch benötigt, sind wir fertig
-			}
-		}
-		//Ansonsten geben wir den Speicherplatz für die PT frei
-		pmm_Free(PD->PDE[PDi] & PG_ADDRESS);
-		//und löschen den Eintrag für diese PT in der PD
-
-		clearPDEntry(PDi, PD);
-
-		//Wird die PD noch benötigt?
-		for(i = 0; i < PAGE_ENTRIES; i++)
-		{
-			if((PD->PDE[i] & PG_P) == 1)
-			{
-				//Full flags löschen
-				setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-				setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-				return 0; //Wid die PD noch benötigt, sind wir fertig
-			}
-		}
-		//Ansonsten geben wir den Speicherplatz für die PD frei
-		pmm_Free(PDP->PDPE[PDPi] & PG_ADDRESS);
-		//und löschen den Eintrag für diese PD in der PDP
-
-		clearPDPEntry(PDPi, PDP);
-
-		//Wird die PDP noch benötigt?
-		for(i = 0; i < PAGE_ENTRIES; i++)
-		{
-			//Wird die PDP noch benötigt, sind wir fertig
-			if((PDP->PDPE[i] & PG_P) == 1)
-			{
-				//Full flag löschen
-				setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-				return 0;
-			}
-		}
-		//Ansonsten geben wir den Speicherplatz für die PDP frei
-		pmm_Free(PML4->PML4E[PML4i] & PG_ADDRESS);
-		//und löschen den Eintrag für diese PDP in der PML4
-
-		clearPML4Entry(PML4i, PML4);	//PML4 ist immer vorhanden, daher keine Überprüfung
-										//ob sie leer ist (was sehr schlecht sein würde --> PF)
-		//Reserved-Bits zurücksetzen
-		if(PDP->PDPE[PDPi] != 0)
-			PD->PDE[PDi] &= ~0x1C0;
-		if(PML4->PML4E[PML4i] != 0)
-			PDP->PDPE[PDPi] &= ~0x1C0;
-		PML4->PML4E[PML4i] &= ~0x1C0;
-		return 0;
-	}
-	else
-		return 1;
-}
-
-/*
- * Ändert das Mapping einer Page. Falls die Page nicht vorhanden ist, wird sie gemappt
- * Params:			vAddress = Neue virt. Addresse der Page
- * 					pAddress = Neue phys. Addresse der Page
- * 					flags = neue Flags der Page
- * Rückgabewert:	0 = Alles in Ordnung
- * 					1 = zu wenig phys. Speicher vorhanden
- */
-uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
-{
-	//Einträge in die Page Tabellen
-	const uint16_t PML4i = PML4_INDEX(vAddress);
-	const uint16_t PDPi = PDP_INDEX(vAddress);
-	const uint16_t PDi = PD_INDEX(vAddress);
-	const uint16_t PTi = PT_INDEX(vAddress);
-
-	PML4_t *const PML4 = PML4_ADDRESS();
-	PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
-
-	//Flags auslesen
-	bool US = (flags & VMM_FLAGS_USER);
-	bool G = (flags & VMM_FLAGS_GLOBAL);
-	bool RW = (flags & VMM_FLAGS_WRITE);
-	bool NX = (flags & VMM_FLAGS_NX);
-	bool P = !(avl & VMM_UNUSED_PAGE);
-	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
-	bool PWT = (flags & VMM_FLAGS_PWT);
-
-	if(vmm_getPageStatus(vAddress))
-	{
-		if(vmm_Map(vAddress, pAddress, flags, avl) == 1) return 1;
-	}
-	else
-	{
-		setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
-
-		//Reserved bits zurücksetzen
-		PD->PDE[PDi] &= ~0x1C0;
-		PDP->PDPE[PDPi] &= ~0x1C0;
-		PML4->PML4E[PML4i] &= ~0x1C0;
-
-		InvalidateTLBEntry((void*)vAddress);
-	}
-	return 0;
-}
-
-/*
- * Mappt eine virtuelle Adresse an eine andere Adresse
- * Die src Addresse wird nicht auf Gültigkeit überprüft
- * Params:			src = virt. Addresse der Speicherstelle
- * 					dst = virt. Addresse an die remappt werden soll
- * 					length = Anzahl Pages, die die Speicherstelle lang ist
- * 					us = ist das Ziel ein Userspace?
- *
- * Rückgabewert:	0 = Speicherstelle wurde erfolgreich virt. verschoben
- * 					1 = zu wenig phys. Speicherplatz vorhanden
- * 					2 = Destinationaddresse ist schon belegt
- *///TODO: Bei Fehler alles Rückgängig machen
-//FIXME: getPhysAddress funktioniert nur für kernel_context
-//FIXME: correctly handle pages which are allocated but have not been mapped yet (VMM_UNUSED_PAGE)
-uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl)
-{
-	size_t i;
-	for(i = 0; i < length; i++)
-	{
-		uint8_t r;
-		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE) ? : pmm_Alloc(), flags, avl)) != 0)
-			return r;
-		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE, false) == 2)
-			return 1;
-	}
-	return 0;
-}
-
-/*
- * Sucht im Bereich zwischen 'start' und 'end' nach einem freien Raum, der 'pages' gross ist
- * Parameter:	start = Startpunkt
- * 				end = Endpunkt
- * 				pages = Wie gross der Raum sein soll in Anzahl Pages
- */
-void *getFreePages(void *start, void *end, size_t pages)
+static void *getFreePages(void *start, void *end, size_t pages)
 {
 	PML4_t *const PML4 = PML4_ADDRESS();
 
@@ -829,6 +342,409 @@ void *getFreePages(void *start, void *end, size_t pages)
 	return NULL;
 }
 
+static paddr_t unmap(void *vAddress)
+{
+	uint16_t i;
+
+	//Einträge in die Page Tabellen
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
+
+	PML4_t *const PML4 = PML4_ADDRESS();
+	PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+
+	InvalidateTLBEntry(vAddress);
+
+	//PML4 Tabelle bearbeiten
+	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
+		return 0;
+
+	//PDP Tabelle bearbeiten
+	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
+		return 0;
+
+	//PD Tabelle bearbeiten
+	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
+		return 0;
+
+	//PT Tabelle bearbeiten
+	if((PT->PTE[PTi] & PG_P) == 0)
+		return 0;
+
+	paddr_t pAddress = PT->PTE[PTi] & PG_ADDRESS;
+	clearPTEntry(PTi, PT);
+
+	//Wird die PT noch benötigt?
+	for(i = 0; i < PAGE_ENTRIES; i++)
+	{
+		if((PT->PTE[i] & PG_P) || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
+		{
+			//Full flags löschen
+			setPDEntry(PDi, PD, 1, 1, PD->PDE[PDi] & PG_US, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
+			setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+			setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+			return pAddress; //Wird die PT noch benötigt, sind wir fertig
+		}
+	}
+	//Ansonsten geben wir den Speicherplatz für die PT frei
+	pmm_Free(PD->PDE[PDi] & PG_ADDRESS);
+	//und löschen den Eintrag für diese PT in der PD
+
+	clearPDEntry(PDi, PD);
+
+	//Wird die PD noch benötigt?
+	for(i = 0; i < PAGE_ENTRIES; i++)
+	{
+		if((PD->PDE[i] & PG_P) == 1)
+		{
+			//Full flags löschen
+			setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
+			setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+			return pAddress; //Wird die PD noch benötigt, sind wir fertig
+		}
+	}
+	//Ansonsten geben wir den Speicherplatz für die PD frei
+	pmm_Free(PDP->PDPE[PDPi] & PG_ADDRESS);
+	//und löschen den Eintrag für diese PD in der PDP
+
+	clearPDPEntry(PDPi, PDP);
+
+	//Wird die PDP noch benötigt?
+	for(i = 0; i < PAGE_ENTRIES; i++)
+	{
+		//Wird die PDP noch benötigt, sind wir fertig
+		if((PDP->PDPE[i] & PG_P) == 1)
+		{
+			//Full flag löschen
+			setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
+			return pAddress;
+		}
+	}
+	//Ansonsten geben wir den Speicherplatz für die PDP frei
+	pmm_Free(PML4->PML4E[PML4i] & PG_ADDRESS);
+	//und löschen den Eintrag für diese PDP in der PML4
+
+	clearPML4Entry(PML4i, PML4);	//PML4 ist immer vorhanden, daher keine Überprüfung
+									//ob sie leer ist (was sehr schlecht sein würde --> PF)
+	//Reserved-Bits zurücksetzen
+	if(PDP->PDPE[PDPi] != 0)
+		PD->PDE[PDi] &= ~0x1C0;
+	if(PML4->PML4E[PML4i] != 0)
+		PDP->PDPE[PDPi] &= ~0x1C0;
+	PML4->PML4E[PML4i] &= ~0x1C0;
+
+	return pAddress;
+}
+
+/*
+ * Initialisiert die virtuelle Speicherverwaltung.
+ * Parameter:	Speicher = Grösse des phys. Speichers
+ * 				Stack = Zeiger auf den Stack
+ */
+bool vmm_Init()
+{
+	extern uint8_t kernel_start, kernel_end, kernel_code_start, kernel_code_end;
+	uint64_t cr3;
+	void *i;
+
+	PML4_t *PML4;
+
+	asm volatile("mov %%cr3,%0" : "=r" (cr3));
+	PML4 = (PML4_t*)(cr3 & 0xFFFFFFFFFF000);	//nur die Adresse wollen wir haben
+
+	//Lasse den letzten Eintrag der PML4 auf die PML4 selber zeigen
+	setPML4Entry(511, PML4, 1, 1, 0, 1, 0, 0, 0, 1, (uintptr_t)PML4);
+
+	//Ersten Eintrag überarbeiten
+	setPML4Entry(0, PML4, 1, 1, 0, 1, 0, 0, 0, 0, PML4->PML4E[0] & PG_ADDRESS);
+
+	//PML4 in Kernelkontext eintragen
+	kernel_context.physAddress = (uintptr_t)PML4;
+	kernel_context.virtualAddress = PML4_ADDRESS();
+
+	PML4 = PML4_ADDRESS();
+
+	//Speicher bis 1MB bearbeiten
+	//Addresse 0 ist nicht gemappt
+	unmap(NULL);
+	for(i = (void*)0x1000; i < (void*)0x100000; i += 0x1000)
+	{
+		vmm_ChangeMap(i, (paddr_t)i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+	}
+	for(i = (void*)&kernel_start; i <= (void*)&kernel_end; i += 0x1000)
+	{
+		if(i >= (void*)&kernel_code_start && i <= (void*)&kernel_code_end)
+		{
+			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL, 0);
+		}
+		else
+		{
+			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		}
+	}
+	//Den restlichen virtuellen Speicher freigeben
+	while(!vmm_getPageStatus(i))
+	{
+		unmap(i);
+		i += 0x1000;
+	}
+
+	SysLog("VMM", "Initialisierung abgeschlossen");
+	return true;
+}
+
+//Userspace Funktionen
+/*
+ * Reserviert ein Speicherblock mit der Blockgrösse Length (in Pages)
+ * Parameter:		Length = Die Anzahl Pages, die reserviert werden sollen
+ * Rückgabewerte:	Adresse zum Speicherblock
+ * 					NULL = Ein Fehler ist aufgetreten
+ */
+void *vmm_Alloc(size_t Length)
+{
+	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
+}
+
+/*
+ * Gibt Speicherplatz im Userspace frei
+ * Parameter:	vAddress = Virtuelle Adresse, an die der Block anfängt
+ * 				Pages = Anzahl Pages, die dieser Block umfasst
+ */
+void vmm_Free(void *vAddress, size_t Pages)
+{
+	vmm_UnMap(vAddress, Pages, true);
+}
+
+//------------------------Systemfunktionen---------------------------
+/*
+ * Reserviert Speicherplatz für den Kernel an
+ * der Addresse vAddress und der Länge Length.
+ * Params:
+ * vAddress =	Virtuelle Addresse, an die der Speicherplatz gemappt werden soll (fakultativ)
+ * 				Length = Anzahl Pages die reserviert werden sollen (mind. 1)
+ * 				Ignore = Gibt an ob der Parameter vAddress ignoriert (1) werden soll oder nicht (0)
+ *
+ * Rückgabewert:	virt. Addresse des angeforderten Speicherbereichs
+ * 					NULL bei Fehler
+ */
+void *vmm_SysAlloc(size_t Length)
+{
+	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX);
+}
+
+/*
+ * Gibt den für den Stack der Physikalischen Speicherverwaltung reservierten Speicherplatz
+ * an der Addresse vAddress und der Länge Length frei.
+ * Params:
+ * vAddress = Virtuelle Addresse des Speicherplatzes, der freigegeben werden soll
+ * Length = Anzahl Pages die freigegeben werden sollen
+ */
+void vmm_SysFree(void *vAddress, size_t Length)
+{
+	vmm_UnMap(vAddress, Length, true);
+}
+
+/*
+ * Reserviert Speicher für DMA und mappt diesen
+ * Params:	maxAddress = maximale physische Adresse für den Speicherbereich
+ * 			size = Anzahl Pages des Speicherbereichs
+ * 			phys = Zeiger auf Variable, in der die phys. Adresse geschrieben wird
+ */
+void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
+{
+	//Freie virt. Adresse finden
+	uint64_t Pages = Size;
+
+	//Physischen Speicher allozieren
+	*Phys = pmm_AllocDMA(maxAddress, Size);
+		if(*Phys == 1) return NULL;
+
+	return vmm_Map(NULL, *Phys, Pages, VMM_FLAGS_NO_CACHE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+}
+
+list_t vmm_getTables(context_t *context)
+{
+	list_t list = list_create();
+	PML4_t *PML4 = context->virtualAddress;
+	PDP_t *PDP;
+	PD_t *PD;
+
+	//PML4 eintragen
+	list_push(list, (void*)(context->physAddress));
+
+	uint16_t PML4i, PDPi, PDi;
+	//PML4 durchsuchen dabei aber den letzten Eintrag auslassen: er zeigt auf PML4 selber
+	for(PML4i = 0; PML4i < 511; PML4i++)
+	{
+		//Wenn PDP nicht vorhanden dann auch nicht auflisten
+		if(!(PML4->PML4E[PML4i] & PG_P))
+			continue;
+		//PDP auf die Liste setzen
+		list_push(list, (void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
+
+		PDP = PDP_ADDRESS(PML4i);
+
+		//Danach die PDP nach Einträgen durchsuchen
+		for(PDPi = 0; PDPi < 512; PDPi++)
+		{
+			//Wenn PD nicht vorhanden dann auch nicht auflisten
+			if(!(PDP->PDPE[PDPi] & PG_P))
+				continue;
+
+			//PD auf die Liste setzen
+			list_push(list, (void*)(PDP->PDPE[PDPi] & PG_ADDRESS));
+
+			PD = PD_ADDRESS(PML4i, PDPi);
+
+			//Danach PD durchsuchen
+			for(PDi = 0; PDi < 512; PDi++)
+			{
+				//Wenn PT nicht vorhanden dann auch nicht auflisten
+				if(!(PD->PDE[PDi] & PG_P))
+					continue;
+
+				//PT auf die Liste setzen
+				list_push(list, (void*)(PD->PDE[PDi] & PG_ADDRESS));
+			}
+		}
+	}
+
+	return list;
+}
+
+//----------------------Allgemeine Funktionen------------------------
+void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
+{
+	uint8_t res;
+	bool unused = pAddress == 0;
+	uint16_t avl = unused ? VMM_UNUSED_PAGE : 0;
+
+	if(pages == 0)
+		return NULL;
+
+	lock(&vmm_lock);
+	if(vAddress == NULL)
+	{
+		void *start = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_START : KERNELSPACE_START);
+		void *end = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_END : KERNELSPACE_END);
+		vAddress = getFreePages(start, end, pages);
+	}
+
+	for(size_t i = 0; i < pages; i++)
+	{
+		if((res = map(vAddress + i * VMM_SIZE_PER_PAGE, pAddress + i * VMM_SIZE_PER_PAGE * unused, flags, avl)) != 0)
+		{
+			for(size_t j = 0; j < i; j++)
+			{
+				unmap(vAddress + j * VMM_SIZE_PER_PAGE);
+			}
+			break;
+		}
+	}
+	unlock(&vmm_lock);
+	return res == 0 ? vAddress : NULL;
+}
+
+void vmm_UnMap(void *vAddress, size_t pages, bool freePages)
+{
+	lock(&vmm_lock);
+	for(size_t i = 0; i < pages; i++)
+	{
+		paddr_t pAddress = unmap(vAddress + i * VMM_SIZE_PER_PAGE);
+		if(freePages)
+			pmm_Free(pAddress);
+	}
+	unlock(&vmm_lock);
+}
+
+/*
+ * Ändert das Mapping einer Page. Falls die Page nicht vorhanden ist, wird sie gemappt
+ * Params:			vAddress = Neue virt. Addresse der Page
+ * 					pAddress = Neue phys. Addresse der Page
+ * 					flags = neue Flags der Page
+ * Rückgabewert:	0 = Alles in Ordnung
+ * 					1 = zu wenig phys. Speicher vorhanden
+ */
+uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
+{
+	//Einträge in die Page Tabellen
+	const uint16_t PML4i = PML4_INDEX(vAddress);
+	const uint16_t PDPi = PDP_INDEX(vAddress);
+	const uint16_t PDi = PD_INDEX(vAddress);
+	const uint16_t PTi = PT_INDEX(vAddress);
+
+	PML4_t *const PML4 = PML4_ADDRESS();
+	PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+
+	//Flags auslesen
+	bool US = (flags & VMM_FLAGS_USER);
+	bool G = (flags & VMM_FLAGS_GLOBAL);
+	bool RW = (flags & VMM_FLAGS_WRITE);
+	bool NX = (flags & VMM_FLAGS_NX);
+	bool P = !(avl & VMM_UNUSED_PAGE);
+	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
+	bool PWT = (flags & VMM_FLAGS_PWT);
+
+	lock(&vmm_lock);
+
+	if(isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]))
+	{
+		if(map(vAddress, pAddress, flags, avl) == 1)
+		{
+			unlock(&vmm_lock);
+			return 1;
+		}
+	}
+	else
+	{
+		setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
+
+		//Reserved bits zurücksetzen
+		PD->PDE[PDi] &= ~0x1C0;
+		PDP->PDPE[PDPi] &= ~0x1C0;
+		PML4->PML4E[PML4i] &= ~0x1C0;
+
+		InvalidateTLBEntry((void*)vAddress);
+	}
+
+	unlock(&vmm_lock);
+	return 0;
+}
+
+/*
+ * Mappt eine virtuelle Adresse an eine andere Adresse
+ * Die src Addresse wird nicht auf Gültigkeit überprüft
+ * Params:			src = virt. Addresse der Speicherstelle
+ * 					dst = virt. Addresse an die remappt werden soll
+ * 					length = Anzahl Pages, die die Speicherstelle lang ist
+ * 					us = ist das Ziel ein Userspace?
+ *
+ * Rückgabewert:	0 = Speicherstelle wurde erfolgreich virt. verschoben
+ * 					1 = zu wenig phys. Speicherplatz vorhanden
+ * 					2 = Destinationaddresse ist schon belegt
+ *///TODO: Bei Fehler alles Rückgängig machen
+//FIXME: getPhysAddress funktioniert nur für kernel_context
+//FIXME: correctly handle pages which are allocated but have not been mapped yet (VMM_UNUSED_PAGE)
+uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl)
+{
+	size_t i;
+	for(i = 0; i < length; i++)
+	{
+		uint8_t r;
+		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE) ? : pmm_Alloc(), flags, avl)) != 0)
+			return r;
+		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE, false) == 2)
+			return 1;
+	}
+	return 0;
+}
+
 /*
  * Mappt einen Speicherbereich an die vorgegebene Address im entsprechendem Kontext
  */
@@ -866,15 +782,13 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//Eintrag in die PML4S
 		setPML4Entry(PML4i, PML4, 1, 1, (PML4->PML4E[PML4i] & PG_US) || US, 1, 0, 0, 0, 0, Address);
 		//PDP mappen
-		PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-		vmm_Map(PDP, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		PDP = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 		clearPage(PDP);
 	}
 	else
 	{
 		//PDP mappen
-		PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-		vmm_Map(PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	}
 
 	//PDP Tabelle bearbeiten
@@ -882,22 +796,20 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	{											//Neuen Eintrag erstellen
 		if((Address = pmm_Alloc()) == 1)		//Speicherplatz für die PD reservieren
 		{
-			vmm_UnMap(PDP);
+			unmap(PDP);
 			return 1;							//Kein Speicherplatz vorhanden
 		}
 
 		//Eintrag in die PDP
 		setPDPEntry(PDPi, PDP, 1, 1, (PDP->PDPE[PDPi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
 		//PD mappen
-		PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-		vmm_Map(PD, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		PD = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 		clearPage(PD);
 	}
 	else
 	{
 		//PD mappen
-		PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-		vmm_Map(PD, PDP->PDPE[PDPi], VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	}
 
 	//PD Tabelle bearbeiten
@@ -905,23 +817,21 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	{										//Neuen Eintrag erstellen
 		if((Address = pmm_Alloc()) == 1)	//Speicherplatz für die PT reservieren
 		{
-			vmm_UnMap(PDP);
-			vmm_UnMap(PD);
+			unmap(PDP);
+			unmap(PD);
 			return 1;							//Kein Speicherplatz vorhanden
 		}
 
 		//Eintrag in die PDP
 		setPDEntry(PDi, PD, 1, 1, (PD->PDE[PDi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
 		//PT mappen
-		PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-		vmm_Map(PT, Address, VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		PT = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 		clearPage(PT);
 	}
 	else
 	{
 		//PT mappen
-		PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-		vmm_Map(PT, PD->PDE[PDi], VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	}
 
 	//PT Tabelle bearbeiten
@@ -932,9 +842,9 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	}
 	else
 	{
-		vmm_UnMap(PDP);
-		vmm_UnMap(PD);
-		vmm_UnMap(PT);
+		unmap(PDP);
+		unmap(PD);
+		unmap(PT);
 		return 2;							//virtuelle Addresse schon besetzt
 	}
 
@@ -944,9 +854,9 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 	PML4->PML4E[PML4i] &= ~0x1C0;
 
 	//Tabellen wieder unmappen
-	vmm_UnMap(PDP);
-	vmm_UnMap(PD);
-	vmm_UnMap(PT);
+	unmap(PDP);
+	unmap(PD);
+	unmap(PT);
 
 	return 0;
 }
@@ -984,21 +894,19 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 	}
 
 	//PDP mappen
-	PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-	vmm_Map(PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+	PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 
 	//PDP Tabelle bearbeiten
 	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
 	{
 		PDP->PDPE[PDPi] &= ~0x1C0;
 		PML4->PML4E[PML4i] &= ~0x1C0;
-		vmm_UnMap(PDP);
+		unmap(PDP);
 		return 1;
 	}
 
 	//PD mappen
-	PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-	vmm_Map(PD, PDP->PDPE[PDPi], VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+	PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 
 	//PD Tabelle bearbeiten
 	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
@@ -1006,14 +914,13 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 		PD->PDE[PDi] &= ~0x1C0;
 		PDP->PDPE[PDPi] &= ~0x1C0;
 		PML4->PML4E[PML4i] &= ~0x1C0;
-		vmm_UnMap(PD);
-		vmm_UnMap(PDP);
+		unmap(PD);
+		unmap(PDP);
 		return 1;
 	}
 
 	//PT mappen
-	PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-	vmm_Map(PT, PD->PDE[PDi], VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+	PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 
 	//PT Tabelle bearbeiten
 	if((PT->PTE[PTi] & PG_P) == 1)			//Wenn PT Eintrag vorhanden
@@ -1034,9 +941,9 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 				PD->PDE[PDi] &= ~0x1C0;
 				PDP->PDPE[PDPi] &= ~0x1C0;
 				PML4->PML4E[PML4i] &= ~0x1C0;
-				vmm_UnMap(PT);
-				vmm_UnMap(PD);
-				vmm_UnMap(PDP);
+				unmap(PT);
+				unmap(PD);
+				unmap(PDP);
 				return 0; //Wird die PT noch benötigt, sind wir fertig
 			}
 		}
@@ -1054,8 +961,8 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 				PD->PDE[PDi] &= ~0x1C0;
 				PDP->PDPE[PDPi] &= ~0x1C0;
 				PML4->PML4E[PML4i] &= ~0x1C0;
-				vmm_UnMap(PD);
-				vmm_UnMap(PDP);
+				unmap(PD);
+				unmap(PDP);
 				return 0; //Wid die PD noch benötigt, sind wir fertig
 			}
 		}
@@ -1073,7 +980,7 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 			{
 				PDP->PDPE[PDPi] &= ~0x1C0;
 				PML4->PML4E[PML4i] &= ~0x1C0;
-				vmm_UnMap(PDP);
+				unmap(PDP);
 				return 0;
 			}
 		}
@@ -1093,9 +1000,9 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 		PD->PDE[PDi] &= ~0x1C0;
 		PDP->PDPE[PDPi] &= ~0x1C0;
 		PML4->PML4E[PML4i] &= ~0x1C0;
-		vmm_UnMap(PT);
-		vmm_UnMap(PD);
-		vmm_UnMap(PDP);
+		unmap(PT);
+		unmap(PD);
+		unmap(PDP);
 		return 1;
 	}
 }
@@ -1137,36 +1044,23 @@ bool vmm_getPageStatus(void *Address)
 	const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
 	const PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
-	//PML4 Eintrag überprüfen
-	if((PML4->PML4E[PML4i] & PG_P) == 0)	//Wenn PML4-Eintrag vorhanden ist
-		return true;
-	//Ansonsten überprüfe PDP-Eintrag
-	else if((PDP->PDPE[PDPi] & PG_P) == 0)	//Wenn PDP-Eintrag vorhanden ist
-		return true;
-	//Ansonsten überprüfe PD-Eintrag
-	else if((PD->PDE[PDi] & PG_P) == 0)		//Wenn PD-Eintrag vorhanden ist
-		return true;
-	//Ansonsten überprüfe PT-Eintrag
-	else if((PT->PTE[PTi] & PG_P) == 0 && !(PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))		//Wenn PT-Eintrag vorhanden ist
-		return true;
-	else									//Ansonsten ist die Page schon belegt
-		return false;
+	return isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]);
 }
 
 paddr_t vmm_getPhysAddress(void *virtualAddress)
 {
-	if(vmm_getPageStatus(virtualAddress))
-		return 0;
-
 	//Einträge in die Page Tabellen
 	const uint16_t PML4i = PML4_INDEX(virtualAddress);
 	const uint16_t PDPi = PDP_INDEX(virtualAddress);
 	const uint16_t PDi = PD_INDEX(virtualAddress);
 	const uint16_t PTi = PT_INDEX(virtualAddress);
 
+	const PML4_t *const PML4 = PML4_ADDRESS();
+	const PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
 	const PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
-	return (paddr_t)(PT->PTE[PTi] & PG_ADDRESS);
+	return isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) ? 0 : (paddr_t)(PT->PTE[PTi] & PG_ADDRESS);
 }
 
 void vmm_unusePages(void *virt, size_t pages)
@@ -1179,9 +1073,12 @@ void vmm_unusePages(void *virt, size_t pages)
 		const uint16_t PDi = PD_INDEX(address);
 		const uint16_t PTi = PT_INDEX(address);
 
+		const PML4_t *const PML4 = PML4_ADDRESS();
+		const PDP_t *const PDP = PDP_ADDRESS(PML4i);
+		const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
 		PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
-		if(!vmm_getPageStatus(address) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE) == 0)
+		if(!isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE) == 0)
 		{
 			paddr_t entry = PT->PTE[PTi];
 			pmm_Free(entry & PG_ADDRESS);
@@ -1261,30 +1158,27 @@ void deleteContext(context_t *context)
 {
 	//Erst alle Pages des Kontextes freigeben
 	PML4_t *PML4 = context->virtualAddress;
-	for(uint16_t PML4i = 1; PML4i < PAGE_ENTRIES - 1; PML4i++)
+	for(uint16_t PML4i = PML4e; PML4i < PAGE_ENTRIES - 1; PML4i++)
 	{
 		//Ist der Eintrag gültig
 		if(PML4->PML4E[PML4i] & PG_P)
 		{
 			//PDP mappen
-			PDP_t *PDP = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-			vmm_Map(PDP, PML4->PML4E[PML4i], VMM_FLAGS_NX, 0);
+			PDP_t *PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX);
 			for(uint16_t PDPi = 0; PDPi < PAGE_ENTRIES; PDPi++)
 			{
 				//Ist der Eintrag gültig
 				if(PDP->PDPE[PDPi] & PG_P)
 				{
 					//PD mappen
-					PD_t *PD = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-					vmm_Map(PD, PDP->PDPE[PDPi], VMM_FLAGS_NX, 0);
+					PD_t *PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX);
 					for(uint16_t PDi = 0; PDi < PAGE_ENTRIES; PDi++)
 					{
 						//Ist der Eintrag gültig
 						if(PD->PDE[PDi] & PG_P)
 						{
 							//PT mappen
-							PT_t *PT = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-							vmm_Map(PT, PD->PDE[PDi], VMM_FLAGS_NX, 0);
+							PT_t *PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX);
 							for(uint16_t PTi = 0; PTi < PAGE_ENTRIES; PTi++)
 							{
 								//Ist die Page alloziiert

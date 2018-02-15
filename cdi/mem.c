@@ -89,6 +89,9 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 			.paddr = {
 					.num = 1,
 					.items = sg_item
+			},
+			.osdep = {
+				.allocated = 1
 			}
 	};
 
@@ -119,14 +122,7 @@ struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
 	struct cdi_mem_sg_item *sgitem;
 
 	size = (size + 0xFFF) & ~0xFFF;
-
-	void *vaddr = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, size / MM_BLOCK_SIZE);
-
-	size_t i;
-	for(i = 0; i < size; i += MM_BLOCK_SIZE)
-	{
-		vmm_Map((uintptr_t)vaddr + i, paddr + i, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NO_CACHE, 0);
-	}
+	void *vaddr = vmm_Map(vaddr, paddr, size / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NO_CACHE);
 
 	area = malloc(sizeof(*area));
 	sgitem = malloc(sizeof(*sgitem));
@@ -142,6 +138,9 @@ struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
 		.paddr = {
 			.num = 1,
 			.items = sgitem
+		},
+		.osdep = {
+			.allocated = 0
 		}
 	};
 
@@ -160,5 +159,12 @@ struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
  */
 void cdi_mem_free(struct cdi_mem_area* p)
 {
-	vmm_SysFree((uintptr_t)p->vaddr, p->size / 4096);
+	if(p->osdep.allocated)
+	{
+		vmm_SysFree((uintptr_t)p->vaddr, p->size / MM_BLOCK_SIZE);
+	}
+	else
+	{
+		vmm_UnMap(p->vaddr, p->size / MM_BLOCK_SIZE, false);
+	}
 }

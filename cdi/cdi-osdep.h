@@ -103,6 +103,7 @@ typedef struct
  * \endenglish
  */
 typedef struct {
+	int allocated;
 } cdi_mem_osdep;
 
 /**

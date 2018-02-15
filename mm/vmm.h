@@ -39,9 +39,32 @@ void vmm_SysFree(void *vAddress, size_t Length);
 void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys);
 list_t vmm_getTables(context_t *context);
 
-uint8_t vmm_Map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
+/**
+ * \brief Maps a memory area.
+ *
+ * If vAddress is NULL then it allocates a virtual memory area big enough to hold pages pages.
+ * If pAddress is 0 it will map the memory area with the VMM_UNUSED_PAGE flag so that a physical page will be allocated on the first access.
+ *
+ * This function locks the vmm_lock lock.
+ *
+ * @param vAddress Virtual address to map the memory area to
+ * @param pAddress Physical address of the memory area
+ * @param pages Number pages the memory area spans
+ * @param flags Flags with access rights
+ * @return NULL on failure otherwise virtual address
+ */
+void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags);
 
-void *getFreePages(void *start, void *end, size_t pages);
+/**
+ * \brief Unmaps a memory area.
+ *
+ * This function locks the vmm_lock lock.
+ *
+ * @param vAddress Virtual address of the start of the memory area
+ * @param pages Number of pages the memory area spans
+ * @param freePages Indicates if the physical memory should be freed
+ */
+void vmm_UnMap(void *vAddress, size_t pages, bool freePages);
 
 paddr_t vmm_getPhysAddress(void *virtualAddress);
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl);
