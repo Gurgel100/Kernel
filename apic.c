@@ -27,8 +27,6 @@
 static paddr_t apic_base_phys;
 void *apic_base_virt;
 
-extern void *getFreePages(void *start, void *end, size_t pages);
-
 bool apic_available()
 {
 	return (cpu_cpuid(0x00000001).edx >> 9) & 1;

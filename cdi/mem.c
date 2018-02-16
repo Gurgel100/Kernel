@@ -122,7 +122,7 @@ struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
 	struct cdi_mem_sg_item *sgitem;
 
 	size = (size + 0xFFF) & ~0xFFF;
-	void *vaddr = vmm_Map(vaddr, paddr, size / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NO_CACHE);
+	void *vaddr = vmm_Map(NULL, paddr, size / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NO_CACHE);
 
 	area = malloc(sizeof(*area));
 	sgitem = malloc(sizeof(*sgitem));
@@ -161,7 +161,7 @@ void cdi_mem_free(struct cdi_mem_area* p)
 {
 	if(p->osdep.allocated)
 	{
-		vmm_SysFree((uintptr_t)p->vaddr, p->size / MM_BLOCK_SIZE);
+		vmm_SysFree(p->vaddr, p->size / MM_BLOCK_SIZE);
 	}
 	else
 	{
