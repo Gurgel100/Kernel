@@ -636,7 +636,7 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 
 	for(size_t i = 0; i < pages; i++)
 	{
-		if((res = map(vAddress + i * VMM_SIZE_PER_PAGE, pAddress + i * VMM_SIZE_PER_PAGE * unused, flags, avl)) != 0)
+		if((res = map(vAddress + i * VMM_SIZE_PER_PAGE, pAddress + i * VMM_SIZE_PER_PAGE * !unused, flags, avl)) != 0)
 		{
 			for(size_t j = 0; j < i; j++)
 			{
