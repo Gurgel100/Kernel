@@ -232,7 +232,7 @@ static void handler_keyDown(void *opaque, KEY_t key)
 		console->inputBufferStart = (console->inputBufferStart + 1 < console->inputBufferSize) ? console->inputBufferStart + 1 : 0;
 	assert(console->inputBufferStart != console->inputBufferEnd);
 
-	key_status->shift = keyboard_isKeyPressed(KEY_LSHIFT) || keyboard_isKeyPressed(KEY_RSHIFT) || keyboard_isKeyPressed(KEY_CAPS);
+	key_status->shift = (keyboard_isKeyPressed(KEY_LSHIFT) || keyboard_isKeyPressed(KEY_RSHIFT)) != keyboard_isKeyPressed(KEY_CAPS);
 	key_status->altgr = keyboard_isKeyPressed(KEY_ALTGR);
 	key_status->key = key;
 
