@@ -429,7 +429,7 @@ static esc_seq_status_t handle_ansi_formatting(console_t *console, uint8_t n)
 	return SUCCESS;
 }
 
-static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_buf, uint8_t ansi_buf_len)
+static esc_seq_status_t console_ansi_parse(console_t *console, const unsigned char *ansi_buf, uint8_t ansi_buf_len)
 {
 	uint8_t i;
 	uint8_t n1 = 0, n2 = 0;
@@ -544,7 +544,7 @@ static esc_seq_status_t console_ansi_parse(console_t *console, const char *ansi_
 	return NEED_MORE;
 }
 
-void console_ansi_write(console_t *console, char c)
+void console_ansi_write(console_t *console, unsigned char c)
 {
 	if(console != NULL)
 	{
@@ -579,7 +579,7 @@ void console_ansi_write(console_t *console, char c)
 	}
 }
 
-void console_write(console_t *console, char c)
+void console_write(console_t *console, unsigned char c)
 {
 	if(console != NULL)
 	{
