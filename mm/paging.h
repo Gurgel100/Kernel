@@ -9,6 +9,7 @@
 #define PAGING_H_
 
 #include "stdint.h"
+#include "stdbool.h"
 #include "pmm.h"
 
 /*Pagingstrukturen
@@ -84,15 +85,15 @@ typedef struct{
 		uint64_t PTE[PAGE_ENTRIES];
 }PT_t;
 
-void setPML4Entry(uint16_t i, PML4_t *PML4, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address);
-void setPDPEntry(uint16_t i, PDP_t *PDP, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address);
-void setPDEntry(uint16_t i, PD_t *PD, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint16_t AVL, uint8_t NX, paddr_t Address);
-void setPTEntry(uint16_t i, PT_t *PT, uint8_t Present, uint8_t RW, uint8_t US, uint8_t PWT,
-		uint8_t PCD, uint8_t A, uint8_t D, uint8_t G, uint16_t AVL,
-		uint8_t PAT, uint8_t NX, paddr_t Address);
+void setPML4Entry(uint16_t i, PML4_t *PML4, bool Present, bool RW, bool US, bool PWT,
+		bool PCD, bool A, uint16_t AVL, bool NX, paddr_t Address);
+void setPDPEntry(uint16_t i, PDP_t *PDP, bool Present, bool RW, bool US, bool PWT,
+		bool PCD, bool A, uint16_t AVL, bool NX, paddr_t Address);
+void setPDEntry(uint16_t i, PD_t *PD, bool Present, bool RW, bool US, bool PWT,
+		bool PCD, bool A, uint16_t AVL, bool NX, paddr_t Address);
+void setPTEntry(uint16_t i, PT_t *PT, bool Present, bool RW, bool US, bool PWT,
+		bool PCD, bool A, bool D, bool G, uint16_t AVL,
+		bool PAT, bool NX, paddr_t Address);
 void clearPML4Entry(uint16_t i, PML4_t *PML4);
 void clearPDPEntry(uint16_t i, PDP_t *PDP);
 void clearPDEntry(uint16_t i, PD_t *PD);
