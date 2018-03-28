@@ -15,9 +15,9 @@
 #include "stdbool.h"
 #include <bits/sys_types.h>
 
-void *AllocPage(size_t Pages);
-void FreePage(void *Address, size_t Pages);
-void syscall_unusePage(void *Address, size_t Pages);
+void *syscall_allocPages(size_t Pages);
+void syscall_freePages(void *Address, size_t Pages);
+void syscall_unusePages(void *Address, size_t Pages);
 
 pid_t syscall_createProcess(const char *path, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);
 void syscall_exit(int status);
@@ -31,8 +31,10 @@ size_t syscall_fread(uint64_t stream, uint64_t start, size_t length, const void 
 size_t syscall_fwrite(uint64_t stream, uint64_t start, size_t length, const void *buffer);
 uint64_t syscall_getStreamInfo(uint64_t stream, vfs_fileinfo_t info);
 void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value);
+int syscall_truncate(const char *path, size_t size);
 int syscall_mount(const char *mountpoint, const char *device);
 int syscall_unmount(const char *mountpoint);
+int syscall_mkdir(const char *path);
 
 time_t syscall_getTimestamp();
 void syscall_sleep(uint64_t msec);

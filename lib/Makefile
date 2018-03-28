@@ -12,7 +12,7 @@ CFLAGS = -nostdinc -gdwarf-4 -Wall -Wextra -fmessage-length=0 -m64 -ffreestandin
 ARFLAGS = -rs
 
 C_SRCS = $(shell find -name '*.c')
-S_SRCS = 
+S_SRCS = $(shell find -name '*.S' ! -name 'start.S')
 
 C_OBJS = $(patsubst ./%,$(OUTPUT_DIR)/%,$(C_SRCS:.c=.o))
 S_OBJS = $(patsubst ./%,$(OUTPUT_DIR)/%,$(S_SRCS:.S=.o))

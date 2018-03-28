@@ -48,13 +48,15 @@ char *path_append(const char *path1, const char *path2);
 
 
 /**
- * \brief Removed the last element of path and returns it
+ * \brief Removes the last element of path and returns the new path
  *
- * This function modifies path so that the last element is removed from path
+ * This function removes the last element which is stored in element if element is not NULL in a newly allocated string.
+ * The returned string is newly allocated and holds the path to the directory in which element is contained.
  *
  * @param path Path of which the last element should be removed
- * @return the last element of path or NULL if path doesn't contain any element
+ * @param element The address to store a newly allocated string holding the removed element
+ * @return a newly allocated string holding the path to the directory in which the removed element is contained
  */
-char *path_removeLast(char *path);
+char *path_removeLast(const char *path, char **element);
 
 #endif /* PATH_H_ */

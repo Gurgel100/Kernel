@@ -67,10 +67,6 @@ static char **real_environ;
 //Global visible
 char **environ;
 
-inline void *AllocPage(size_t Pages);
-inline void FreePage(void *Address, size_t Pages);
-void setupNewHeapEntry(heap_t *old, heap_t *new);
-
 void abort()
 {
 #ifdef BUILD_KERNEL
@@ -745,6 +741,16 @@ static void remove_empty_heap(heap_empty_t *node, bool with_list)
 	}
 }
 
+static void setupNewHeapEntry(heap_t *old, heap_t *new)
+{
+	new->Prev = old;
+	new->Next = old->Next;
+	if(new->Next != NULL)
+		((heap_t*)new->Next)->Prev = new;
+	old->Next = new;
+	new->Flags = HEAP_FLAGS;
+}
+
 void *calloc(size_t nitems, size_t size)
 {
 	void *Address = malloc(nitems * size);
@@ -826,7 +832,7 @@ void free(void *ptr)
 #ifdef BUILD_KERNEL
 					vmm_unusePages((void*)bottom, Pages);
 #else
-					syscall_unusePage((void*)bottom, Pages);
+					syscall_unusePages((void*)bottom, Pages);
 #endif
 				}
 			}
@@ -853,7 +859,11 @@ void *malloc(size_t size)
 	if(node == NULL)
 	{
 		size_t pages = (size + sizeof(heap_t)) / 4096 + 1;
-		node = AllocPage(pages);
+#ifdef BUILD_KERNEL
+		node = mm_SysAlloc(pages);
+#else
+		node = syscall_allocPages(pages);
+#endif
 		if(node == NULL) return NULL;
 		node->heap_base.Next = NULL;
 		if(lastHeap == NULL)
@@ -1034,30 +1044,6 @@ int64_t lrand()
 #endif
 	return Number;
 }
-
-//Hilfsfunktionen
-#ifdef BUILD_KERNEL
-inline void *AllocPage(size_t Pages)
-{
-	return mm_SysAlloc(Pages);
-}
-
-inline void FreePage(void *Address, size_t Pages)
-{
-	mm_SysFree(Address, Pages);
-}
-#endif
-
-void setupNewHeapEntry(heap_t *old, heap_t *new)
-{
-	new->Prev = old;
-	new->Next = old->Next;
-	if(new->Next != NULL)
-		((heap_t*)new->Next)->Prev = new;
-	old->Next = new;
-	new->Flags = HEAP_FLAGS;
-}
-
 
 //Environment variables
 static void check_environ()

@@ -60,27 +60,39 @@ char *path_append(const char *path1, const char *path2)
 	return res_path;
 }
 
-char *path_removeLast(char *path)
+char *path_removeLast(const char *path, char **element)
 {
-	char *last_slash = strrchr(path, '/');
+	char *new_path = strdup(path);
+	char *last_slash = strrchr(new_path, '/');
 	if(last_slash == NULL)
 	{
-		return NULL;
+		if(element != NULL)
+			*element = strdup(new_path);
+		*new_path = '\0';
 	}
 	else
 	{
 		if(*(last_slash + 1) == '\0')
 		{
-			*last_slash = '\0';
-			if(last_slash == path)
-				return path + 1;
+			if(last_slash == new_path)
+			{
+				if(element != NULL)
+					*element = strdup(new_path + 1);
+			}
 			else
-				return path_removeLast(path);
+			{
+				*last_slash = '\0';
+				char *returned_path = path_removeLast(new_path, element);
+				free(new_path);
+				new_path = returned_path;
+			}
 		}
 		else
 		{
 			*last_slash = '\0';
-			return last_slash + 1;
+			if(element != NULL)
+				*element = strdup(last_slash + 1);
 		}
 	}
+	return new_path;
 }

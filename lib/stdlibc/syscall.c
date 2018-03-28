@@ -12,17 +12,17 @@
 
 extern uint64_t (*_syscall)(uint64_t func, ...);
 
-void *AllocPage(size_t Pages)
+void *syscall_allocPages(size_t Pages)
 {
 	return (void*)_syscall(SYSCALL_ALLOC_PAGES, Pages);
 }
 
-void FreePage(void *Address, size_t Pages)
+void syscall_freePages(void *Address, size_t Pages)
 {
 	_syscall(SYSCALL_FREE_PAGES, Address, Pages);
 }
 
-void syscall_unusePage(void *Address, size_t Pages)
+void syscall_unusePages(void *Address, size_t Pages)
 {
 	_syscall(SYSCALL_UNUSE_PAGES, Address, Pages);
 }
@@ -85,6 +85,11 @@ void syscall_setStreamInfo(uint64_t stream, vfs_fileinfo_t info, uint64_t value)
 	_syscall(SYSCALL_INFO_SET, stream, info, value);
 }
 
+int syscall_truncate(const char *path, size_t size)
+{
+	return _syscall(SYSCALL_TRUNCATE, path, size);
+}
+
 int syscall_mount(const char *mountpoint, const char *device)
 {
 	return _syscall(SYSCALL_MOUNT, mountpoint, device);
@@ -93,6 +98,11 @@ int syscall_mount(const char *mountpoint, const char *device)
 int syscall_unmount(const char *mountpoint)
 {
 	return _syscall(SYSCALL_UNMOUNT, mountpoint);
+}
+
+int syscall_mkdir(const char *path)
+{
+	return _syscall(SYSCALL_MKDIR, path);
 }
 
 time_t syscall_getTimestamp()

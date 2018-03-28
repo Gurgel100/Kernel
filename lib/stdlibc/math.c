@@ -134,8 +134,6 @@ double pow(double x, double y)
 double sqrt(double x)
 {
 	double Ergebnis;
-	if(x < 0.0)
-		return NAN;
 	asm("sqrtsd %[x],%[res]": [res]"=x"(Ergebnis): [x]"xm"(x));
 	return Ergebnis;
 }
@@ -144,7 +142,7 @@ double ceil(double x)
 {
 #ifdef __SSE4_1__
 	double Ergebnis;
-	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b10));
+	asm("roundsd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b10));
 	return Ergebnis;
 #else
 	//TODO: funktioniert nur für "normale" Zahlen
@@ -163,7 +161,7 @@ double floor(double x)
 {
 #ifdef __SSE4_1__
 	double Ergebnis;
-	asm("roundpd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b01));
+	asm("roundsd %[mode],%[x],%[res]": [res]"=x"(Ergebnis): [x]"x"(x), [mode]"K"(0b01));
 	return Ergebnis;
 #else
 	//TODO: funktioniert nur für "normale" Zahlen

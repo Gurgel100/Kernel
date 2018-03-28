@@ -28,10 +28,10 @@ void Display_Init()
 	outb(0x3D8, Register);*/
 }
 
-void display_refresh()
+void display_refresh(const uint16_t *buffer, uint8_t cursor_x, uint8_t cursor_y)
 {
-	memcpy((void*)GRAFIKSPEICHER, activeConsole->buffer, activeConsole->width * activeConsole->height * sizeof(uint16_t));
-	setCursor(activeConsole->cursor.x, activeConsole->cursor.y);
+	memcpy((void*)GRAFIKSPEICHER, buffer, DISPLAY_COLS * DISPLAY_ROWS * sizeof(uint16_t));
+	setCursor(cursor_x, cursor_y);
 }
 
 void __attribute__((deprecated)) setColor(uint8_t Color)

@@ -47,6 +47,11 @@ typedef enum{
 	THREAD_BLOCKED_SEMAPHORE,
 
 	/**
+	 * Thread is waiting for mutex
+	 */
+	THREAD_BLOCKED_MUTEX,
+
+	/**
 	 * Thread is waiting for unknown reason
 	 */
 	THREAD_BLOCKED_WAIT,

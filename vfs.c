@@ -20,6 +20,7 @@
 #include "pm.h"
 #include "hashmap.h"
 #include "ctype.h"
+#include "path.h"
 
 #define MAX_RES_BUFFER	100		//Anzahl an Ressourcen, die maximal geladen werden. Wenn der Buffer voll ist werden nicht benötigte Ressourcen überschrieben
 
@@ -595,6 +596,110 @@ static bool check_path(const char *path)
 	return true;
 }
 
+static int createDirEntry(const char *path, vfs_node_type_t type)
+{
+	if(path == NULL || strlen(path) == 0 || !check_path(path))
+		return -1;
+
+	char *name;
+
+	path = path_removeLast(path, &name);
+
+	char *remPath;
+	vfs_node_t *node = resolveLink(getLastNode(path, &remPath));
+
+	free((char*)path);
+
+	switch(node->type)
+	{
+		case TYPE_MOUNT:
+		{
+			cdi_fs_res_class_t res_class;
+			switch(type)
+			{
+				case TYPE_FILE:
+					res_class = CDI_FS_CLASS_FILE;
+					break;
+				case TYPE_DIR:
+					res_class = CDI_FS_CLASS_DIR;
+					break;
+				default:
+					free(name);
+					return -1;
+			}
+
+			struct cdi_fs_stream stream, newStream;
+			stream.fs = &node->fs->fs;
+			stream.res = getRes(&stream, remPath);
+			free(remPath);
+			//Löse symlinks auf
+			while(stream.res != NULL && stream.res->link != NULL)
+			{
+				const char *link_path = stream.res->link->read_link(&stream);
+				stream.res = getRes(&stream, link_path);
+			}
+
+			if(stream.res == NULL || !stream.res->flags.create_child || stream.res->dir == NULL)
+			{
+				free(name);
+				return -1;
+			}
+
+			newStream.fs = stream.fs;
+			newStream.res = NULL;
+
+			if(!stream.res->dir->create_child(&newStream, name, stream.res))
+			{
+				freeRes(stream.res);
+				free(name);
+				return -1;
+			}
+
+			if(!stream.res->res->assign_class(&newStream, res_class))
+			{
+				stream.res->res->remove(&newStream);
+				freeRes(stream.res);
+				free(name);
+				return -1;
+			}
+			freeRes(stream.res);
+		}
+		break;
+		case TYPE_DIR:
+			free(remPath);
+			if(remPath != NULL)
+			{
+				free(name);
+				return -1;
+			}
+			switch (type)
+			{
+				case TYPE_DIR:
+					createDirNode(node, name);
+					break;
+				default:
+					return -1;
+			}
+		break;
+		case TYPE_DEV:
+			free(remPath);
+			free(name);
+			return -1;
+		break;
+		case TYPE_LINK:
+			assert(false);
+		break;
+		case TYPE_FILE:
+			free(remPath);
+			free(name);
+			return -1;
+		break;
+	}
+	free(name);
+
+	return 0;
+}
+
 void vfs_Init(void)
 {
 	res_list = list_create();
@@ -631,9 +736,13 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	if(path == NULL || strlen(path) == 0 || !check_path(path) || (!mode.read && !mode.write) || (mode.write && mode.directory))
 		return -1;
 
+	if(mode.create)
+		createDirEntry(path, TYPE_FILE);
+
 	char *remPath;
 	vfs_stream_t *stream;
 	vfs_node_t *node = getLastNode(path, &remPath);
+
 	stream = calloc(1, sizeof(*stream));
 	stream->id = getNextStreamID();
 	stream->mode = mode;
@@ -691,6 +800,8 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 		break;
 	}
 
+	free(remPath);
+
 	if(stream->mode.empty)
 	{
 		if(stream->stream.fs->read_only || !stream->stream.res->flags.write)
@@ -701,8 +812,6 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 		}
 		stream->stream.res->file->truncate(&stream->stream, 0);
 	}
-	if(remPath)
-		free(remPath);
 
 	//In Hashtable einfügen
 	LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)stream->id, stream));
@@ -1174,6 +1283,63 @@ void vfs_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
 	}
 }
 
+int vfs_truncate(const char *path, size_t size)
+{
+	if(path == NULL || strlen(path) == 0 || !check_path(path))
+		return -1;
+
+	char *remPath;
+	vfs_node_t *node = resolveLink(getLastNode(path, &remPath));
+
+	switch(node->type)
+	{
+		case TYPE_MOUNT:
+		{
+			struct cdi_fs_stream stream;
+			stream.fs = &node->fs->fs;
+			stream.res = getRes(&stream, remPath);
+			free(remPath);
+			//Löse symlinks auf
+			while(stream.res != NULL && stream.res->link != NULL)
+			{
+				const char *link_path = stream.res->link->read_link(&stream);
+				stream.res = getRes(&stream, link_path);
+			}
+
+			if(stream.res == NULL || !stream.res->flags.write || stream.res->dir == NULL)
+				return -1;
+
+			if(!stream.res->file->truncate(&stream, size))
+				return -1;
+		}
+		break;
+		case TYPE_DIR:
+			free(remPath);
+			return -1;
+		break;
+		case TYPE_DEV:
+			free(remPath);
+			return -1;
+		break;
+		case TYPE_LINK:
+			assert(false);
+		break;
+		case TYPE_FILE:
+			//TODO
+			//Not supported
+			free(remPath);
+			return -1;
+		break;
+	}
+
+	return 0;
+}
+
+int vfs_createDir(const char *path)
+{
+	return createDirEntry(path, TYPE_DIR);
+}
+
 /*
  * Mountet ein Dateisystem (fs) an den entsprechenden Mountpoint (Mount)
  * Parameter:	Mount = Mountpoint (Pfad)
@@ -1364,6 +1530,20 @@ void vfs_syscall_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t 
 	if(!LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)streamid, (void**)&stream)))
 		return;
 	vfs_setFileinfo(stream->stream, info, value);
+}
+
+int vfs_syscall_truncate(const char *path, size_t size)
+{
+	if(path == NULL || !vmm_userspacePointerValid(path, strlen(path)))
+		return -1;
+	return vfs_truncate(path, size);
+}
+
+int vfs_syscall_mkdir(const char *path)
+{
+	if(path == NULL || !vmm_userspacePointerValid(path, strlen(path)))
+		return -1;
+	return vfs_createDir(path);
 }
 
 int vfs_syscall_mount(const char *mountpoint, const char *device)
