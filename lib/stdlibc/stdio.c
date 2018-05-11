@@ -1247,15 +1247,6 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						}
 						pos += jprintf_putc(args, (char)va_arg(arg, int));
 					break;
-					case 'p':	//Pointer
-						i2hex((uintptr_t)va_arg(arg, void*), buffer, sizeof(void*) * 2);
-
-						for(size_t i = 0; i < strlen(buffer); i++)
-							buffer[i] = (char)tolower(buffer[i]);
-
-						pos += jprintf_putsn(args, "0x", 2);
-						pos += jprintf_putsn(args, buffer, -1);
-					break;
 					default:	//Ansonsten ungültig
 						format--;
 						//pos--;
