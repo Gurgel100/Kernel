@@ -102,6 +102,7 @@ void pm_Init()
 	cleaner_Init();
 
 	kernel_process.threads = list_create();
+	kernel_process.next_tid = 1;
 	idleThread = thread_create(&kernel_process, idle, 0, NULL, true);
 	cleanerThread = thread_create(&kernel_process, cleaner, 0, NULL, true);
 
@@ -137,6 +138,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	}
 
 	newProcess->PID = __sync_fetch_and_add(&nextPID, 1);
+	newProcess->next_tid = 1;
 	newProcess->parent = parent;
 
 	newProcess->Context = createContext();

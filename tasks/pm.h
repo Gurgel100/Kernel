@@ -17,6 +17,7 @@
 #include <bits/types.h>
 
 typedef _pid_t pid_t;
+typedef _tid_t tid_t;
 
 typedef struct{
 		uint64_t mmx[6];
@@ -30,6 +31,7 @@ typedef enum{
 typedef struct process_t{
 		context_t *Context;
 		pid_t PID;
+		tid_t next_tid;
 		struct process_t *parent;
 		char *cmd;
 		pm_status_t Status;
