@@ -141,7 +141,7 @@ struct cdi_cache_block* cdi_cache_block_get(struct cdi_cache* cache,
 	{
 		//Nach einem Block suchen, der nicht mehr verwendet wird
 		size_t i = 0;
-		while((b = cdi_list_get(c->blocks, i)))
+		while((b = cdi_list_get(c->blocks, i++)))
 		{
 			if(!b->ref_count)
 				break;

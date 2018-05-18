@@ -24,25 +24,25 @@
 #define APIC_REG_LVT_LINT1 0x360
 #define APIC_REG_LVT_ERROR 0x370
 
-static paddr_t apic_base_phys;
-void *apic_base_virt;
+typedef struct{
+	paddr_t physBase;
+	void *virtBase;
+}apic_info_t;
 
-extern void *getFreePages(void *start, void *end, size_t pages);
+static apic_info_t apic_info;
 
 bool apic_available()
 {
-	return (cpu_CPUID(0x00000001, CR_EDX) >> 9) & 1;
+	return (cpu_cpuid(0x00000001).edx >> 9) & 1;
 }
 
 void apic_Init()
 {
 	//Basisaddresse auslesen
-	apic_base_phys = cpu_MSRread(APIC_BASE_MSR);
+	apic_info.physBase = cpu_MSRread(APIC_BASE_MSR);
 
 	//Speicherbereich mappen
-	apic_base_virt = getFreePages((void*)KERNELSPACE_START, (void*)KERNELSPACE_END, 1);
-	vmm_Map(apic_base_virt, apic_base_phys,
-			VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_NO_CACHE, 0);
+	apic_info.virtBase = vmm_Map(NULL, apic_info.physBase, 1, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_NO_CACHE);
 
 	//APIC aktivieren
 	apic_Write(APIC_REG_SPIV, 1 << 8);
@@ -57,7 +57,7 @@ void apic_Init()
  */
 uint32_t apic_Read(uintptr_t offset)
 {
-	uint32_t *ptr = apic_base_virt + offset;
+	uint32_t *ptr = apic_info.virtBase + offset;
 	return *ptr;
 }
 
@@ -69,6 +69,6 @@ uint32_t apic_Read(uintptr_t offset)
  */
 void apic_Write(uintptr_t offset, uint32_t value)
 {
-	uint32_t *ptr = apic_base_virt + offset;
+	uint32_t *ptr = apic_info.virtBase + offset;
 	*ptr = value;
 }

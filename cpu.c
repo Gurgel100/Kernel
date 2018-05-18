@@ -20,7 +20,6 @@
 void cpu_Init()
 {
 	uint64_t Result;
-	uint32_t volatile Temp;
 	//Überprüfe, ob CPU CPUID unterstützt
 	asm volatile(
 			"pushfq;"
@@ -37,22 +36,20 @@ void cpu_Init()
 	);
 	cpuInfo.cpuidAvailable = (Result == 0) ? false : true;
 
-	cpuInfo.maxstdCPUID = cpu_CPUID(0x00000000, EAX);
-	Temp = cpu_CPUID(0x00000000, EBX);
-	cpuInfo.VendorID[0] = (uint8_t)Temp;
-	cpuInfo.VendorID[1] = (uint8_t)(Temp >> 8);
-	cpuInfo.VendorID[2] = (uint8_t)(Temp >> 16);
-	cpuInfo.VendorID[3] = (uint8_t)(Temp >> 24);
-	Temp = cpu_CPUID(0x00000000, EDX);
-	cpuInfo.VendorID[4] = (uint8_t)Temp;
-	cpuInfo.VendorID[5] = (uint8_t)(Temp >> 8);
-	cpuInfo.VendorID[6] = (uint8_t)(Temp >> 16);
-	cpuInfo.VendorID[7] = (uint8_t)(Temp >> 24);
-	Temp = cpu_CPUID(0x00000000, ECX);
-	cpuInfo.VendorID[8] = (uint8_t)Temp;
-	cpuInfo.VendorID[9] = (uint8_t)(Temp >> 8);
-	cpuInfo.VendorID[10] = (uint8_t)(Temp >> 16);
-	cpuInfo.VendorID[11] = (uint8_t)(Temp >> 24);
+	cpu_cpuid_result_t cpuid_0 = cpu_cpuid(0x00000000);
+	cpuInfo.maxstdCPUID = cpuid_0.eax;
+	cpuInfo.VendorID[0] = (uint8_t)cpuid_0.ebx;
+	cpuInfo.VendorID[1] = (uint8_t)(cpuid_0.ebx >> 8);
+	cpuInfo.VendorID[2] = (uint8_t)(cpuid_0.ebx >> 16);
+	cpuInfo.VendorID[3] = (uint8_t)(cpuid_0.ebx >> 24);
+	cpuInfo.VendorID[4] = (uint8_t)cpuid_0.edx;
+	cpuInfo.VendorID[5] = (uint8_t)(cpuid_0.edx >> 8);
+	cpuInfo.VendorID[6] = (uint8_t)(cpuid_0.edx >> 16);
+	cpuInfo.VendorID[7] = (uint8_t)(cpuid_0.edx >> 24);
+	cpuInfo.VendorID[8] = (uint8_t)cpuid_0.ecx;
+	cpuInfo.VendorID[9] = (uint8_t)(cpuid_0.ecx >> 8);
+	cpuInfo.VendorID[10] = (uint8_t)(cpuid_0.ecx >> 16);
+	cpuInfo.VendorID[11] = (uint8_t)(cpuid_0.ecx >> 24);
 	cpuInfo.VendorID[12] = '\0';
 	//Herausfinden ob Intel oder AMD Prozessor
 	if(cpuInfo.VendorID[11] == 'l')
@@ -63,109 +60,102 @@ void cpu_Init()
 		cpuInfo.Vendor = UNKN;
 
 	//Prozessor
-	Temp = cpu_CPUID(0x00000001, EAX);
-	cpuInfo.Stepping = Temp & 0xF;
-	cpuInfo.Model = Temp & 0xF0;
-	cpuInfo.Family = Temp & 0xF00;
+	cpu_cpuid_result_t cpuid_1 = cpu_cpuid(0x00000001);
+
+	cpuInfo.Stepping = cpuid_1.eax & 0xF;
+	cpuInfo.Model = cpuid_1.eax & 0xF0;
+	cpuInfo.Family = cpuid_1.eax & 0xF00;
 	if(cpuInfo.Vendor == INTEL)
-		cpuInfo.Type = Temp & 0x3000;
-	cpuInfo.extModel = Temp & 0xF0000;
-	cpuInfo.extFamily = Temp & 0xFF00000;
+		cpuInfo.Type = cpuid_1.eax & 0x3000;
+	cpuInfo.extModel = cpuid_1.eax & 0xF0000;
+	cpuInfo.extFamily = cpuid_1.eax & 0xFF00000;
 
-	Temp = cpu_CPUID(0x00000001, EBX);
-	cpuInfo.NumCores = Temp & 0xFF0000;	//Ungülitg, wenn HyperThreading nicht unterstützt
+	cpuInfo.NumCores = cpuid_1.ebx & 0xFF0000;	//Ungülitg, wenn HyperThreading nicht unterstützt
 
-	Temp = cpu_CPUID(0x00000001, ECX);	//Featureflags Teil 1
-	cpuInfo.sse3 = Temp & 0x1;
-	cpuInfo.ssse3 = Temp & 0x200;
-	cpuInfo.sse4_1 = Temp & 0x80000;
+	//Featureflags Teil 1
+	cpuInfo.sse3 = cpuid_1.ecx & 0x1;
+	cpuInfo.ssse3 = cpuid_1.ecx & 0x200;
+	cpuInfo.sse4_1 = cpuid_1.ecx & 0x80000;
 	if(cpuInfo.Vendor == INTEL)
 	{
-		cpuInfo.sse4_2 = Temp & 0x100000;
-		cpuInfo.aes = Temp & 0x2000000;
-		cpuInfo.avx = Temp & 0x10000000;
-		cpuInfo.rdrand = Temp & 0x40000000;
+		cpuInfo.sse4_2 = cpuid_1.ecx & 0x100000;
+		cpuInfo.aes = cpuid_1.ecx & 0x2000000;
+		cpuInfo.avx = cpuid_1.ecx & 0x10000000;
+		cpuInfo.rdrand = cpuid_1.ecx & 0x40000000;
 	}
 
-	Temp = cpu_CPUID(0x00000001, EDX);	//Featureflags Teil 2
-	cpuInfo.msrAvailable = Temp & 0x20;
-	cpuInfo.GlobalPage = Temp & 0x2000;
-	cpuInfo.mmx = Temp & 0x800000;
-	cpuInfo.sse = Temp & 0x2000000;
-	cpuInfo.sse2 = Temp & 0x4000000;
-	cpuInfo.HyperThreading = Temp & 0x10000000;
-	cpuInfo.fxsr = Temp & (1 << 24);
+	//Featureflags Teil 2
+	cpuInfo.msrAvailable = cpuid_1.edx & 0x20;
+	cpuInfo.GlobalPage = cpuid_1.edx & 0x2000;
+	cpuInfo.mmx = cpuid_1.edx & 0x800000;
+	cpuInfo.sse = cpuid_1.edx & 0x2000000;
+	cpuInfo.sse2 = cpuid_1.edx & 0x4000000;
+	cpuInfo.HyperThreading = cpuid_1.edx & 0x10000000;
+	cpuInfo.fxsr = cpuid_1.edx & (1 << 24);
 
 	//Erweiterte Funktionen
-	cpuInfo.maxextCPUID = cpu_CPUID(0x80000000, EAX);
+	cpuInfo.maxextCPUID = cpu_cpuid(0x80000000).eax;
 
-	Temp = cpu_CPUID(0x80000001, EDX);
-	cpuInfo.nx = Temp & (1 << 20);
-	cpuInfo.syscall = Temp & (1 << 11);
+	cpu_cpuid_result_t cpuid_80000001 = cpu_cpuid(0x80000001);
+	cpuInfo.nx = cpuid_80000001.edx & (1 << 20);
+	cpuInfo.syscall = cpuid_80000001.edx & (1 << 11);
 
 	//Namen des Prozessors
 	if(cpuInfo.maxextCPUID >= 0x80000003 && cpuInfo.Vendor == INTEL)
 	{
-		Temp = cpu_CPUID(0x80000002, EAX);
-		cpuInfo.Name[0] = (uint8_t)Temp;
-		cpuInfo.Name[1] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[2] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[3] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000002, EBX);
-		cpuInfo.Name[4] = (uint8_t)Temp;
-		cpuInfo.Name[5] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[6] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[7] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000002, ECX);
-		cpuInfo.Name[8] = (uint8_t)Temp;
-		cpuInfo.Name[9] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[10] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[11] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000002, EDX);
-		cpuInfo.Name[12] = (uint8_t)Temp;
-		cpuInfo.Name[13] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[14] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[15] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000003, EAX);
-		cpuInfo.Name[16] = (uint8_t)Temp;
-		cpuInfo.Name[17] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[18] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[19] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000003, EBX);
-		cpuInfo.Name[20] = (uint8_t)Temp;
-		cpuInfo.Name[21] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[22] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[23] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000003, ECX);
-		cpuInfo.Name[24] = (uint8_t)Temp;
-		cpuInfo.Name[25] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[26] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[27] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000003, EDX);
-		cpuInfo.Name[28] = (uint8_t)Temp;
-		cpuInfo.Name[29] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[30] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[31] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000004, EAX);
-		cpuInfo.Name[32] = (uint8_t)Temp;
-		cpuInfo.Name[33] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[34] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[35] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000004, EBX);
-		cpuInfo.Name[36] = (uint8_t)Temp;
-		cpuInfo.Name[37] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[38] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[39] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000004, ECX);
-		cpuInfo.Name[40] = (uint8_t)Temp;
-		cpuInfo.Name[41] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[42] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[43] = (uint8_t)(Temp >> 24);
-		Temp = cpu_CPUID(0x80000004, EDX);
-		cpuInfo.Name[44] = (uint8_t)Temp;
-		cpuInfo.Name[45] = (uint8_t)(Temp >> 8);
-		cpuInfo.Name[46] = (uint8_t)(Temp >> 16);
-		cpuInfo.Name[47] = (uint8_t)(Temp >> 24);
+		cpu_cpuid_result_t cpuid_80000002 = cpu_cpuid(0x80000002);
+		cpuInfo.Name[0] = (uint8_t)cpuid_80000002.eax;
+		cpuInfo.Name[1] = (uint8_t)(cpuid_80000002.eax >> 8);
+		cpuInfo.Name[2] = (uint8_t)(cpuid_80000002.eax >> 16);
+		cpuInfo.Name[3] = (uint8_t)(cpuid_80000002.eax >> 24);
+		cpuInfo.Name[4] = (uint8_t)cpuid_80000002.ebx;
+		cpuInfo.Name[5] = (uint8_t)(cpuid_80000002.ebx >> 8);
+		cpuInfo.Name[6] = (uint8_t)(cpuid_80000002.ebx >> 16);
+		cpuInfo.Name[7] = (uint8_t)(cpuid_80000002.ebx >> 24);
+		cpuInfo.Name[8] = (uint8_t)cpuid_80000002.ecx;
+		cpuInfo.Name[9] = (uint8_t)(cpuid_80000002.ecx >> 8);
+		cpuInfo.Name[10] = (uint8_t)(cpuid_80000002.ecx >> 16);
+		cpuInfo.Name[11] = (uint8_t)(cpuid_80000002.ecx >> 24);
+		cpuInfo.Name[12] = (uint8_t)cpuid_80000002.edx;
+		cpuInfo.Name[13] = (uint8_t)(cpuid_80000002.edx >> 8);
+		cpuInfo.Name[14] = (uint8_t)(cpuid_80000002.edx >> 16);
+		cpuInfo.Name[15] = (uint8_t)(cpuid_80000002.edx >> 24);
+
+		cpu_cpuid_result_t cpuid_80000003 = cpu_cpuid(0x80000003);
+		cpuInfo.Name[16] = (uint8_t)cpuid_80000003.eax;
+		cpuInfo.Name[17] = (uint8_t)(cpuid_80000003.eax >> 8);
+		cpuInfo.Name[18] = (uint8_t)(cpuid_80000003.eax >> 16);
+		cpuInfo.Name[19] = (uint8_t)(cpuid_80000003.eax >> 24);
+		cpuInfo.Name[20] = (uint8_t)cpuid_80000003.ebx;
+		cpuInfo.Name[21] = (uint8_t)(cpuid_80000003.ebx >> 8);
+		cpuInfo.Name[22] = (uint8_t)(cpuid_80000003.ebx >> 16);
+		cpuInfo.Name[23] = (uint8_t)(cpuid_80000003.ebx >> 24);
+		cpuInfo.Name[24] = (uint8_t)cpuid_80000003.ecx;
+		cpuInfo.Name[25] = (uint8_t)(cpuid_80000003.ecx >> 8);
+		cpuInfo.Name[26] = (uint8_t)(cpuid_80000003.ecx >> 16);
+		cpuInfo.Name[27] = (uint8_t)(cpuid_80000003.ecx >> 24);
+		cpuInfo.Name[28] = (uint8_t)cpuid_80000003.edx;
+		cpuInfo.Name[29] = (uint8_t)(cpuid_80000003.edx >> 8);
+		cpuInfo.Name[30] = (uint8_t)(cpuid_80000003.edx >> 16);
+		cpuInfo.Name[31] = (uint8_t)(cpuid_80000003.edx >> 24);
+
+		cpu_cpuid_result_t cpuid_80000004 = cpu_cpuid(0x80000004);
+		cpuInfo.Name[32] = (uint8_t)cpuid_80000004.eax;
+		cpuInfo.Name[33] = (uint8_t)(cpuid_80000004.eax >> 8);
+		cpuInfo.Name[34] = (uint8_t)(cpuid_80000004.eax >> 16);
+		cpuInfo.Name[35] = (uint8_t)(cpuid_80000004.eax >> 24);
+		cpuInfo.Name[36] = (uint8_t)cpuid_80000004.ebx;
+		cpuInfo.Name[37] = (uint8_t)(cpuid_80000004.ebx >> 8);
+		cpuInfo.Name[38] = (uint8_t)(cpuid_80000004.ebx >> 16);
+		cpuInfo.Name[39] = (uint8_t)(cpuid_80000004.ebx >> 24);
+		cpuInfo.Name[40] = (uint8_t)cpuid_80000004.ecx;
+		cpuInfo.Name[41] = (uint8_t)(cpuid_80000004.ecx >> 8);
+		cpuInfo.Name[42] = (uint8_t)(cpuid_80000004.ecx >> 16);
+		cpuInfo.Name[43] = (uint8_t)(cpuid_80000004.ecx >> 24);
+		cpuInfo.Name[44] = (uint8_t)cpuid_80000004.edx;
+		cpuInfo.Name[45] = (uint8_t)(cpuid_80000004.edx >> 8);
+		cpuInfo.Name[46] = (uint8_t)(cpuid_80000004.edx >> 16);
+		cpuInfo.Name[47] = (uint8_t)(cpuid_80000004.edx >> 24);
 		cpuInfo.Name[48] = '\0';
 		printf("%s\n", cpuInfo.Name);
 	}
@@ -211,44 +201,16 @@ void cpu_Init()
 	SysLog("CPU", "Initialisierung abgeschlossen");
 }
 
-/*
- * Führt CPUID mit der angegebenen Funktion aus.
- * Rückgabewert: Das angebene Register
- */
-uint32_t cpu_CPUID(uint32_t Funktion, CPU_REGISTER Register)
+cpu_cpuid_result_t cpu_cpuidSubleaf(uint32_t function, uint32_t subleaf)
 {
-	register uint32_t Temp;
-	if(!cpuInfo.cpuidAvailable) return 0;
+	cpu_cpuid_result_t result;
+	asm volatile("cpuid": "=a"(result.eax), "=b"(result.ebx), "=c"(result.ecx), "=d"(result.edx): "a"(function), "c"(subleaf));
+	return result;
+}
 
-	switch(Register)
-	{
-		case CR_EAX:
-			asm volatile(
-					"cpuid;"
-					:"=a"(Temp) :"a"(Funktion)
-			);
-			return Temp;
-		case CR_EBX:
-			asm volatile(
-					"cpuid;"
-					:"=b"(Temp) :"a"(Funktion)
-			);
-			return Temp;
-		case CR_ECX:
-			asm volatile(
-					"cpuid;"
-					:"=c"(Temp) :"a"(Funktion)
-			);
-			return Temp;
-		case CR_EDX:
-			asm volatile(
-					"cpuid;"
-					:"=d"(Temp) :"a"(Funktion)
-			);
-			return Temp;
-		default:
-			return 0;
-	}
+cpu_cpuid_result_t cpu_cpuid(uint32_t function)
+{
+	return cpu_cpuidSubleaf(function, 0);
 }
 
 /*

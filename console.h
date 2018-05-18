@@ -45,7 +45,7 @@ typedef struct{
 	uint8_t color;
 	cursor_t cursor;
 
-	char ansi_buf[16];
+	unsigned char ansi_buf[16];
 	uint8_t ansi_buf_ofs;
 	cursor_t saved_cursor;
 
@@ -64,8 +64,8 @@ extern console_t initConsole;
 void console_Init();
 console_t *console_create(char *name, uint8_t color);
 console_t *console_getByName(char *name);
-void console_ansi_write(console_t *console, char c);
-void console_write(console_t *console, char c);
+void console_ansi_write(console_t *console, unsigned char c);
+void console_write(console_t *console, unsigned char c);
 void console_switch(uint8_t page);
 void console_changeColor(console_t *console, uint8_t color);
 void console_setCursor(console_t *console, cursor_t cursor);
