@@ -21,6 +21,7 @@
 #define VMM_FLAGS_NX		(1 << 3)	//Bestimmt, ob in der Page ausführbare Daten sind
 #define VMM_FLAGS_PWT		(1 << 4)	//Bestimmt, ob die Page mit write-through policy gecacht werden soll
 #define VMM_FLAGS_NO_CACHE	(1 << 5)	//Bestimmt, ob die Page nicht gecacht werden soll
+#define VMM_FLAGS_ALLOCATE	(1 << 6)	//Bestimmt, ob der physikalische Speicher schon alloziiert sein soll
 
 #define VMM_UNUSED_PAGE		0x4		//Marks page as unused by process
 
