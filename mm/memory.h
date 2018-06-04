@@ -17,6 +17,8 @@
 #define USERSPACE_END		0xFFFFFF7FFFFFFFFF		//Userspace Ende
 #define MAX_ADDRESS			0xFFFFFFFFFFFFFFFF		//Maximale Adresse
 
+#define MM_KERN_STACK_SIZE	(1 * MM_BLOCK_SIZE)		//Stackgrösse für einen Thread im Kernelspace
+
 #define MM_USER_STACK		USERSPACE_END			//Stackaddresse für Prozesse
 #define MM_USER_STACK_SIZE	(4 * MM_BLOCK_SIZE)		//Stackgrösse
 
