@@ -236,7 +236,7 @@ int avl_visit(avl_tree* root, avl_visiting_method method, void (*visiter)(const 
 	return avl_visit_s(root, method, _avl_visiterh, visiter);
 }
 
-void avl_free(avl_tree* tree) {
+void avl_free(avl_tree* tree, void (*action)(void*)) {
 	while (tree) {
 		if (tree->left) {
 			tree = tree->left;
@@ -249,6 +249,7 @@ void avl_free(avl_tree* tree) {
 			}
 			avl_tree* tmp = tree;
 			tree = _avl_parent(tree);
+			if (action) action(tmp->value);
 			free(tmp);
 		}
 	}

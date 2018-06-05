@@ -55,6 +55,6 @@ int avl_visit(avl_tree* root, avl_visiting_method method, void (*visiter)(const 
 /*
  * Löscht den gesamten Baum
  */
-void avl_free(avl_tree* tree);
+void avl_free(avl_tree* tree, void (*action)(void*));
 
 #endif /* AVL_H_ */
