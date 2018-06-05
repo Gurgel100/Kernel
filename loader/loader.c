@@ -31,7 +31,7 @@ pid_t loader_load(const char *path, const char *cmd, const char **env, const cha
 	strcat(binpath, cmdline);
 
 	//Jetzt können wir die Datei öffnen
-	vfs_file_t file = vfs_Open(binpath, (vfs_mode_t){.read = true});
+	vfs_file_t file = vfs_Open(binpath, VFS_MODE_READ);
 	if(file == (vfs_file_t)-1)
 		return 0;
 
