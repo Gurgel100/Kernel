@@ -228,14 +228,14 @@ static ihs_t *exception_DeviceNotAvailable(ihs_t *ihs)
 		fpuThread = currentThread;
 
 		//FPU Status laden
-		if(fpuThread->fpuState == NULL)
+		asm volatile("fxrstor (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
+
+		if(!currentThread->fpuInitialised)
 		{
-			//Speicher reservieren, um Status speichern zu können
-			fpuThread->fpuState = malloc(512 + 16);
-		}
-		else
-		{
-			asm volatile("fxrstor (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
+			const uint32_t initMXCSR = 0x1F80;
+			asm volatile("fninit;"
+						"ldmxcsr %0":: "m"(initMXCSR));
+			currentThread->fpuInitialised = true;
 		}
 	}
 	return ihs;

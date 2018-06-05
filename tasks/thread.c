@@ -71,7 +71,8 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
 
-	thread->fpuState = NULL;
+	thread->fpuState = vmm_Map(NULL, 0, 1, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	thread->fpuInitialised = false;
 
 	//Stack mappen
 	if(!kernel)
@@ -131,7 +132,9 @@ void thread_destroy(thread_t *thread)
 	//Userstack freigeben
 	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
 
-	free(thread->fpuState);
+	extern thread_t *fpuThread;
+	fpuThread = NULL;
+	vmm_UnMap(thread->fpuState, 1, true);
 	free(thread);
 }
 
