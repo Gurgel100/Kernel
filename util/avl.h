@@ -22,14 +22,7 @@ typedef enum avl_visiting_method_e {
 	avl_visiting_post_order
 } avl_visiting_method;
 
-typedef struct avl_tree_s {
-	struct avl_tree_s* left;
-	struct avl_tree_s* right;
-	struct avl_tree_s* parent;
-	void* value;
-	int8_t balance; // right height - left height
-
-} avl_tree;
+typedef struct avl_tree_s avl_tree;
 
 /*
  * Fügt Element element in *root ein. Gibt zurück ob eingefügt
