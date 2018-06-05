@@ -13,6 +13,7 @@
 #include "vmm.h"
 #include "list.h"
 #include "hashmap.h"
+#include "avl.h"
 #include "lock.h"
 #include <bits/types.h>
 
@@ -35,7 +36,8 @@ typedef struct process_t{
 		struct process_t *parent;
 		char *cmd;
 		pm_status_t Status;
-		list_t threads, terminated_childs, waiting_threads, waiting_threads_pid;
+		avl_tree *threads;
+		list_t terminated_childs, waiting_threads, waiting_threads_pid;
 		hashmap_t *streams;
 		void *nextThreadStack;
 		lock_t lock;

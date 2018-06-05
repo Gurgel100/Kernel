@@ -6,7 +6,6 @@
  */
 
 #include "thread.h"
-#include "list.h"
 #include "memory.h"
 #include "tss.h"
 #include "vmm.h"
@@ -19,11 +18,15 @@
 
 extern context_t kernel_context;
 
-list_t threadList;
+static int tid_cmp(const void *a, const void *b)
+{
+	const thread_t *const t1 = a;
+	const thread_t *const t2 = b;
+	return (t1->tid < t2->tid) ? -1 : ((t1->tid == t2->tid) ? 0 : 1);
+}
 
 void thread_Init()
 {
-	threadList = list_create();
 }
 
 thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
@@ -93,10 +96,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
 
-	list_push(process->threads, thread);
-
-	//Thread in Liste eintragen
-	list_push(threadList, thread);
+	avl_add(&process->threads, thread, tid_cmp);
 
 	return thread;
 }
@@ -105,29 +105,8 @@ void thread_destroy(thread_t *thread)
 {
 	vmm_UnMap(thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
 
-	//Thread aus Listen entfernen
-	thread_t *t;
-	size_t i = 0;
-	while((t = list_get(thread->process->threads, i)))
-	{
-		if(t == thread)
-		{
-			list_remove(thread->process->threads, i);
-			break;
-		}
-		i++;
-	}
-
-	i = 0;
-	while((t = list_get(threadList, i)))
-	{
-		if(t == thread)
-		{
-			list_remove(threadList, i);
-			break;
-		}
-		i++;
-	}
+	//Thread aus Liste entfernen
+	LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
 
 	//Userstack freigeben
 	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
