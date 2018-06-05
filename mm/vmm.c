@@ -660,7 +660,11 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 			error = true;
 			break;
 		}
+
+		if(allocate)
+			clearPage(vAddress + currentOffset);
 	}
+
 	if(error)
 	{
 		for(size_t j = 0; j < i; j++)
