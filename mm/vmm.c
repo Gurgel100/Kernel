@@ -621,7 +621,8 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 {
 	uint8_t res;
 	bool unused = pAddress == 0;
-	uint16_t avl = unused ? VMM_UNUSED_PAGE : 0;
+	bool allocate = flags & VMM_FLAGS_ALLOCATE;
+	uint16_t avl = (unused && !allocate) ? VMM_UNUSED_PAGE : 0;
 
 	if(pages == 0)
 		return NULL;
@@ -634,15 +635,39 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 		vAddress = getFreePages(start, end, pages);
 	}
 
-	for(size_t i = 0; i < pages; i++)
+	bool error = false;
+	size_t i;
+	for(i = 0; i < pages; i++)
 	{
-		if((res = map(vAddress + i * VMM_SIZE_PER_PAGE, pAddress + i * VMM_SIZE_PER_PAGE * !unused, flags, avl)) != 0)
+		paddr_t paddr;
+		uintptr_t currentOffset = i * VMM_SIZE_PER_PAGE;
+		if(allocate)
 		{
-			for(size_t j = 0; j < i; j++)
+			paddr = pmm_Alloc();
+			if(paddr == 1)
 			{
-				unmap(vAddress + j * VMM_SIZE_PER_PAGE);
+				error = true;
+				break;
 			}
+		}
+		else
+		{
+			paddr = pAddress + currentOffset * !unused;
+		}
+
+		if((res = map(vAddress + currentOffset, paddr, flags, avl)) != 0)
+		{
+			error = true;
 			break;
+		}
+	}
+	if(error)
+	{
+		for(size_t j = 0; j < i; j++)
+		{
+			paddr_t paddr = unmap(vAddress + j * VMM_SIZE_PER_PAGE);
+			if(allocate)
+				pmm_Free(paddr);
 		}
 	}
 	unlock(&vmm_lock);

@@ -10,10 +10,10 @@
 #ifndef ELF_H_
 #define ELF_H_
 
-#include "stdio.h"
+#include "vfs.h"
 #include "pm.h"
 
 //Funktionen
-pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);	//Par.: Datei = Addresse der Datei im Speicher; Segment = Segment in das kopiert werden soll (GDT)
+pid_t elfLoad(vfs_file_t file, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr);	//Par.: Datei = Addresse der Datei im Speicher; Segment = Segment in das kopiert werden soll (GDT)
 
 #endif /* ELF_H_ */

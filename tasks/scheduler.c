@@ -16,7 +16,8 @@ extern context_t kernel_context;
 
 process_t kernel_process = {
 		.Context = &kernel_context,
-		.cmd = "kernel"
+		.cmd = "kernel",
+		.next_tid = 1
 };
 thread_t* idleThread;
 

@@ -82,10 +82,10 @@ static interrupt_handler interrupt_handlers[NUM_INTERRUPTS] = {
 /*12*/			exception_StackFault,
 /*13*/			exception_GeneralProtection,
 /*14*/			exception_PageFault,
-/*16*/			exception_MF,
-/*17*/			exception_AlignmentCheck,
-/*18*/			exception_MachineCheck,
-/*19*/			exception_XF,
+[16]			exception_MF,
+[17]			exception_AlignmentCheck,
+[18]			exception_MachineCheck,
+[19]			exception_XF,
 [32 ... 47]		irq_handler,
 [48]			syscall_Handler,
 [255]			scheduler_schedule
@@ -215,29 +215,24 @@ static ihs_t *exception_InvalidOpcode(ihs_t *ihs)
 //Device not available
 static ihs_t *exception_DeviceNotAvailable(ihs_t *ihs)
 {
-	//XXX: Because malloc does not align to 16-byte boundary we have to do it manually
 	//Reset TS-Flag
 	asm volatile("clts");
 
-	if(cpuInfo.fxsr)
+	if(fpuThread != NULL)
+		cpu_saveXState(fpuThread->fpuState);
+
+	fpuThread = currentThread;
+
+	cpu_restoreXState(fpuThread->fpuState);
+
+	if(!currentThread->fpuInitialised)
 	{
-		//Speichere aktuellen FPU Status, wenn ein Prozess gelaufen ist
-		if(fpuThread != NULL)
-			asm volatile("fxsave (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
-
-		fpuThread = currentThread;
-
-		//FPU Status laden
-		if(fpuThread->fpuState == NULL)
-		{
-			//Speicher reservieren, um Status speichern zu können
-			fpuThread->fpuState = malloc(512 + 16);
-		}
-		else
-		{
-			asm volatile("fxrstor (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
-		}
+		const uint32_t initMXCSR = 0x1F80;
+		asm volatile("fninit;"
+					"ldmxcsr %0":: "m"(initMXCSR));
+		currentThread->fpuInitialised = true;
 	}
+
 	return ihs;
 }
 

@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <string.h>
+#include "avl.h"
 
 static int _avl_cmph(const void* a, const void* b, void* cmp) {
 	int (*lcmp)(const void*, const void*) = cmp;
@@ -17,12 +18,6 @@ static void _avl_visiterh(const void* val, void* visiter) {
 	void (*lvisiter)(const void*) = visiter;
 	lvisiter(val);
 }
-
-typedef enum avl_visiting_method_e {
-	avl_visiting_pre_order,
-	avl_visiting_in_order,
-	avl_visiting_post_order
-} avl_visiting_method;
 
 typedef struct avl_tree_s {
 	struct avl_tree_s* left;
@@ -241,7 +236,7 @@ int avl_visit(avl_tree* root, avl_visiting_method method, void (*visiter)(const 
 	return avl_visit_s(root, method, _avl_visiterh, visiter);
 }
 
-void avl_free(avl_tree* tree) {
+void avl_free(avl_tree* tree, void (*action)(void*)) {
 	while (tree) {
 		if (tree->left) {
 			tree = tree->left;
@@ -254,6 +249,7 @@ void avl_free(avl_tree* tree) {
 			}
 			avl_tree* tmp = tree;
 			tree = _avl_parent(tree);
+			if (action) action(tmp->value);
 			free(tmp);
 		}
 	}
