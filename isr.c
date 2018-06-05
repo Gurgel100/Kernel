@@ -215,29 +215,24 @@ static ihs_t *exception_InvalidOpcode(ihs_t *ihs)
 //Device not available
 static ihs_t *exception_DeviceNotAvailable(ihs_t *ihs)
 {
-	//XXX: Because malloc does not align to 16-byte boundary we have to do it manually
 	//Reset TS-Flag
 	asm volatile("clts");
 
-	if(cpuInfo.fxsr)
+	if(fpuThread != NULL)
+		cpu_saveXState(fpuThread->fpuState);
+
+	fpuThread = currentThread;
+
+	cpu_restoreXState(fpuThread->fpuState);
+
+	if(!currentThread->fpuInitialised)
 	{
-		//Speichere aktuellen FPU Status, wenn ein Prozess gelaufen ist
-		if(fpuThread != NULL)
-			asm volatile("fxsave (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
-
-		fpuThread = currentThread;
-
-		//FPU Status laden
-		asm volatile("fxrstor (%0)": :"r"((((uintptr_t)fpuThread->fpuState) + 15) & ~0xF));
-
-		if(!currentThread->fpuInitialised)
-		{
-			const uint32_t initMXCSR = 0x1F80;
-			asm volatile("fninit;"
-						"ldmxcsr %0":: "m"(initMXCSR));
-			currentThread->fpuInitialised = true;
-		}
+		const uint32_t initMXCSR = 0x1F80;
+		asm volatile("fninit;"
+					"ldmxcsr %0":: "m"(initMXCSR));
+		currentThread->fpuInitialised = true;
 	}
+
 	return ihs;
 }
 

@@ -10,14 +10,15 @@
 #include "cpu.h"
 #include "config.h"
 #include "display.h"
+#include "bit.h"
+#include "assert.h"
 
 #define NULL (void*)0
 
 /*
- * Initialisiert die CPU
+ * Gets information of a cpu
  */
-//TODO
-void cpu_Init()
+static void cpu_initInfo()
 {
 	uint64_t Result;
 	//Überprüfe, ob CPU CPUID unterstützt
@@ -73,25 +74,25 @@ void cpu_Init()
 	cpuInfo.NumCores = cpuid_1.ebx & 0xFF0000;	//Ungülitg, wenn HyperThreading nicht unterstützt
 
 	//Featureflags Teil 1
-	cpuInfo.sse3 = cpuid_1.ecx & 0x1;
-	cpuInfo.ssse3 = cpuid_1.ecx & 0x200;
-	cpuInfo.sse4_1 = cpuid_1.ecx & 0x80000;
-	if(cpuInfo.Vendor == INTEL)
-	{
-		cpuInfo.sse4_2 = cpuid_1.ecx & 0x100000;
-		cpuInfo.aes = cpuid_1.ecx & 0x2000000;
-		cpuInfo.avx = cpuid_1.ecx & 0x10000000;
-		cpuInfo.rdrand = cpuid_1.ecx & 0x40000000;
-	}
+	cpuInfo.sse3 = BIT_EXTRACT(cpuid_1.ecx, 0);
+	cpuInfo.ssse3 = BIT_EXTRACT(cpuid_1.ecx, 9);
+	cpuInfo.sse4_1 = BIT_EXTRACT(cpuid_1.ecx, 19);
+	cpuInfo.sse4_2 = BIT_EXTRACT(cpuid_1.ecx, 20);
+	cpuInfo.avx = BIT_EXTRACT(cpuid_1.ecx, 28);
+	cpuInfo.aes = BIT_EXTRACT(cpuid_1.ecx, 25);
+	cpuInfo.rdrand = BIT_EXTRACT(cpuid_1.ecx, 30);
+	cpuInfo.xsave = BIT_EXTRACT(cpuid_1.ecx, 26);
 
 	//Featureflags Teil 2
-	cpuInfo.msrAvailable = cpuid_1.edx & 0x20;
-	cpuInfo.GlobalPage = cpuid_1.edx & 0x2000;
-	cpuInfo.mmx = cpuid_1.edx & 0x800000;
-	cpuInfo.sse = cpuid_1.edx & 0x2000000;
-	cpuInfo.sse2 = cpuid_1.edx & 0x4000000;
-	cpuInfo.HyperThreading = cpuid_1.edx & 0x10000000;
-	cpuInfo.fxsr = cpuid_1.edx & (1 << 24);
+	//RDMSR and WRMSR are supported because else we wouldn't be in long mode
+	//SSE and SSE2 are supported in long mode
+	//FXRSTOR and FXSAVE are supported in long mode
+	assert(BIT_EXTRACT(cpuid_1.edx, 5) && "RDMSR/WRMSR not supported");
+	assert(BIT_EXTRACT(cpuid_1.edx, 24) && "FXRSTOR/FXSAVE not supported");
+	assert(BIT_EXTRACT(cpuid_1.edx, 25) && "SSE not supported");
+	assert(BIT_EXTRACT(cpuid_1.edx, 26) && "SSE2 not supported");
+	cpuInfo.GlobalPage = BIT_EXTRACT(cpuid_1.edx, 13);
+	cpuInfo.HyperThreading = BIT_EXTRACT(cpuid_1.edx, 28);
 
 	//Erweiterte Funktionen
 	cpuInfo.maxextCPUID = cpu_cpuid(0x80000000).eax;
@@ -157,48 +158,49 @@ void cpu_Init()
 		cpuInfo.Name[46] = (uint8_t)(cpuid_80000004.edx >> 16);
 		cpuInfo.Name[47] = (uint8_t)(cpuid_80000004.edx >> 24);
 		cpuInfo.Name[48] = '\0';
-		printf("%s\n", cpuInfo.Name);
 	}
+}
 
-	//Wenn AVX verfügbar ist, dann aktivieren wir es jetzt
-	if(cpuInfo.avx)
+void cpu_init(bool isBSP)
+{
+	if(isBSP)
+		cpu_initInfo();
+
+	uint64_t cr0 = cpu_readControlRegister(CPU_CR0);
+	uint64_t cr4 = cpu_readControlRegister(CPU_CR4);
+
+	//Activate caching
+	cr0 = BIT_CLEAR(cr0, 29);	//clear CD (cache disable)
+	cr0 = BIT_CLEAR(cr0, 30);	//clear NW (not write-through)
+
+	cr0 = BIT_SET(cr0, 1);		//set CR0.MP
+	cr0 = BIT_CLEAR(cr0, 2);	//delete CR0.EM
+
+	cr4 = BIT_SET(cr4, 9);		//set CR4.OSFXSR
+	//TODO: support OSXMMEXCPT
+	//cr4 = BIT_SET(cr4, 10);	//set CR4.OSXMMEXCPT
+
+	//Activate XGETBV, XRSTOR, XSAVE, XSETBV support
+	if(cpuInfo.xsave)
+		cr4 = BIT_SET(cr4, 18);
+
+	//Activate global pages
+	if(cpuInfo.GlobalPage)
+		cr4 = BIT_SET(cr4, 7);
+
+	cpu_writeControlRegister(CPU_CR0, cr0);
+	cpu_writeControlRegister(CPU_CR4, cr4);
+
+	if(cpuInfo.xsave)
 	{
-		asm volatile(
-				"mov %%cr4,%%rax;"
-				"or $0x40000,%%rax;"
-				"mov %%rax,%%cr4;"
-				: : :"rax"
-				);
-		asm volatile(
-				"xor %%ecx,%%ecx;"
-				"xor %%edx,%%edx;"
-				"mov $0x7,%%eax;"
-				"xsetbv;"
-				: : :"rax", "rcx", "rdx"
-				);
+		//Activate all supported features
+		uint64_t mask = 0b11 | (cpuInfo.avx << 2);
+		cpu_writeControlRegister(CPU_XCR0, mask);
 	}
 
 	//Setze NX-Bit (Bit 11 im EFER), wenn verfügbar
 	if(cpuInfo.nx)
 		cpu_MSRwrite(0xC0000080, cpu_MSRread(0xC0000080) | 0x800);
-
-	//Wenn verfügbar Global Pages aktivieren
-	if(cpuInfo.GlobalPage)
-		asm volatile(
-				"mov %%cr4,%%rax;"
-				"or $1<<7,%%rax;"
-				"mov %%rax,%%cr4;"
-				: : :"rax");
-
-	//Caching aktivieren
-	asm volatile(
-			"mov %%cr0,%%rax;"
-			"btr $30,%%rax;"	//Cache disable bit deaktivieren
-			"btr $29,%%rax;"	//Write through auch deaktivieren sonst gibt es eine #GP-Exception
-			"mov %%rax,%%cr0;"
-			: : :"rax");
-
-	SysLog("CPU", "Initialisierung abgeschlossen");
 }
 
 cpu_cpuid_result_t cpu_cpuidSubleaf(uint32_t function, uint32_t subleaf)
@@ -220,8 +222,6 @@ cpu_cpuid_result_t cpu_cpuid(uint32_t function)
 uint64_t cpu_MSRread(uint32_t msr)
 {
 	uint32_t low, high;
-	if(!cpuInfo.msrAvailable) return 0;
-
 	asm volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr));
 	return ((uint64_t)high << 32) | low;
 }
@@ -235,8 +235,6 @@ void cpu_MSRwrite(uint32_t msr, uint64_t Value)
 {
 	uint32_t low = Value &0xFFFFFFFF;
 	uint32_t high = Value >> 32;
-	if(!cpuInfo.msrAvailable) return;
-
 	asm volatile("wrmsr" : : "a" (low), "c" (msr), "d" (high));
 }
 
