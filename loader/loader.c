@@ -6,7 +6,7 @@
  */
 
 #include "loader.h"
-#include "stdio.h"
+#include "vfs.h"
 #include "elf.h"
 #include "string.h"
 
@@ -31,12 +31,12 @@ pid_t loader_load(const char *path, const char *cmd, const char **env, const cha
 	strcat(binpath, cmdline);
 
 	//Jetzt können wir die Datei öffnen
-	FILE *fp = fopen(binpath, "rb");
-	if(fp == NULL)
+	vfs_file_t file = vfs_Open(binpath, (vfs_mode_t){.read = true});
+	if(file == (vfs_file_t)-1)
 		return 0;
 
-	pid = elfLoad(fp, cmd, env, stdin, stdout, stderr);
-	fclose(fp);
+	pid = elfLoad(file, cmd, env, stdin, stdout, stderr);
+	vfs_Close(file);
 	return pid;
 }
 

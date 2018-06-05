@@ -174,14 +174,11 @@ static char elfCheck(elf_header *ELFHeader)
 	return -1;
 }
 
-pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
+pid_t elfLoad(vfs_file_t file, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
 
-	//Zurücksetzen des Dateizeigers
-	fseek(fp, 0, SEEK_SET);
-
-	if(fread(&Header, 1, sizeof(elf_header), fp) < sizeof(elf_header))
+	if(vfs_Read(file, 0, sizeof(elf_header), &Header) < sizeof(elf_header))
 		return -1;
 
 	//Header überprüfen
@@ -193,13 +190,14 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 		return -1;
 	}
 
-	elf_program_header_entry *ProgramHeader = malloc(Header.e_phnum * sizeof(elf_program_header_entry));
+	size_t program_header_size = Header.e_phnum * sizeof(elf_program_header_entry);
+	elf_program_header_entry *ProgramHeader = malloc(program_header_size);
 	if(ProgramHeader == NULL)
 	{
 		return -1;
 	}
-	fseek(fp, Header.e_phoff, SEEK_SET);
-	if(fread(ProgramHeader, sizeof(elf_program_header_entry), Header.e_phnum, fp) < Header.e_phnum)
+
+	if(vfs_Read(file, Header.e_phoff, program_header_size, ProgramHeader) < program_header_size)
 	{
 		free(ProgramHeader);
 		return -1;
@@ -224,8 +222,7 @@ pid_t elfLoad(FILE *fp, const char *cmd, const char **env, const char *stdin, co
 		void *dest = mm_SysAlloc(pages);
 		assert(dest != NULL);
 		uintptr_t dest_off = ProgramHeader[i].p_vaddr % 0x1000;
-		fseek(fp, ProgramHeader[i].p_offset, SEEK_SET);						//Position der Daten in der Datei
-		fread(dest + dest_off, 1, ProgramHeader[i].p_filesz, fp);
+		vfs_Read(file, ProgramHeader[i].p_offset, ProgramHeader[i].p_filesz, dest + dest_off);
 
 		//Eventuell mit nullen auffüllen
 		memset(dest + dest_off + ProgramHeader[i].p_filesz, 0, ProgramHeader[i].p_memsz - ProgramHeader[i].p_filesz);

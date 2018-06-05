@@ -17,7 +17,6 @@
 #include "cpu.h"
 #include "pic.h"
 #include "keyboard.h"
-#include "fpu.h"
 #include "pm.h"
 #include "debug.h"
 #include "elf.h"
@@ -73,8 +72,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 void Init()
 {
 	Display_Init();		//Anzeige Intialisieren
-	cpu_Init();			//CPU Initialisieren
-	fpu_Init();			//FPU Initialisieren
+	cpu_init(true);		//CPU Initialisieren
 	GDT_Init();			//GDT initialisieren
 	IDT_Init();			//IDT initialisieren
 	TSS_Init();			//TSS initialisieren

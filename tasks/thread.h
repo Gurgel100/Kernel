@@ -143,6 +143,11 @@ typedef struct{
 	 * Determines if the thread is the main thread of the process.
 	 */
 	bool isMainThread;
+
+	/**
+	 * Determines if the fpu is initialised
+	 */
+	bool fpuInitialised;
 }thread_t;
 
 typedef void(*thread_bail_out_t)(void*);
