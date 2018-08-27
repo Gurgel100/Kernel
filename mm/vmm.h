@@ -83,4 +83,7 @@ context_t *createContext(void);
 void deleteContext(context_t *context);
 void activateContext(context_t *context);
 
+//Interrupt handler
+bool vmm_handlePageFault(void *page, uint64_t errorcode);
+
 #endif /* VMM_H_ */
