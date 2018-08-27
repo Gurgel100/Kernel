@@ -40,7 +40,7 @@ void system_panic()
 	printf("\e[37;41mSystem panic\t\t");
 	if(currentThread != NULL)
 		printf("process: %lu(%.20s), tid: %lu", currentProcess->PID, currentProcess->cmd, currentThread->tid);
-	printf("\n\nThe following error occurred:\n%s\n", system_panic_buffer);
+	printf("\n\nThe following error occurred:\n%s", system_panic_buffer);
 	asm volatile("cli;hlt");
 	__builtin_unreachable();
 }
