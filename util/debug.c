@@ -231,72 +231,76 @@ uint64_t atou(char *s)
 
 #endif
 
-void traceRegisters(ihs_t *ihs)
+uint64_t traceRegistersToString(ihs_t *ihs, char *out)
 {
-	setColor(BG_BLACK | CL_WHITE);
+	uint64_t offset = 0;
 	//RAX
-	printf("RAX: 0x%X%X                ", ihs->rax >> 32, ihs->rax & 0xFFFFFFFF);
+	offset += sprintf(out, "RAX: 0x%08lX                ", ihs->rax >> 32, ihs->rax & 0xFFFFFFFF);
 
 	//RBX
-	printf("RBX: 0x%X%X\n", ihs->rbx >> 32, ihs->rbx & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RBX: 0x%08lX\n", ihs->rbx >> 32, ihs->rbx & 0xFFFFFFFF);
 
 	//RCX
-	printf("RCX: 0x%X%X                ", ihs->rcx >> 32, ihs->rcx & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RCX: 0x%08lX                ", ihs->rcx >> 32, ihs->rcx & 0xFFFFFFFF);
 
 	//RDX
-	printf("RDX: 0x%X%X\n", ihs->rdx >> 32, ihs->rdx & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RDX: 0x%08lX\n", ihs->rdx >> 32, ihs->rdx & 0xFFFFFFFF);
 
 	//RSI
-	printf("RSI: 0x%X%X                ", ihs->rsi >> 32, ihs->rsi & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RSI: 0x%08lX                ", ihs->rsi >> 32, ihs->rsi & 0xFFFFFFFF);
 
 	//RDI
-	printf("RDI: 0x%X%X\n", ihs->rdi >> 32, ihs->rdi & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RDI: 0x%08lX\n", ihs->rdi >> 32, ihs->rdi & 0xFFFFFFFF);
 
 	//RSP
-	printf("RSP: 0x%X%X                ", ihs->rsp >> 32, ihs->rsp & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RSP: 0x%08lX                ", ihs->rsp >> 32, ihs->rsp & 0xFFFFFFFF);
 
 	//RBP
-	printf("RBP: 0x%X%X\n", ihs->rbp >> 32, ihs->rbp & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RBP: 0x%08lX\n", ihs->rbp >> 32, ihs->rbp & 0xFFFFFFFF);
 
 	//R8
-	printf("R8 : 0x%X%X                ", ihs->r8 >> 32, ihs->r8 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R8 : 0x%08lX                ", ihs->r8 >> 32, ihs->r8 & 0xFFFFFFFF);
 
 	//R9
-	printf("R9 : 0x%X%X\n", ihs->r9 >> 32, ihs->r9 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R9 : 0x%08lX\n", ihs->r9 >> 32, ihs->r9 & 0xFFFFFFFF);
 
 	//R10
-	printf("R10: 0x%X%X                ", ihs->r10 >> 32, ihs->r10 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R10: 0x%08lX                ", ihs->r10 >> 32, ihs->r10 & 0xFFFFFFFF);
 
 	//R11
-	printf("R11: 0x%X%X\n", ihs->r11 >> 32, ihs->r11 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R11: 0x%08lX\n", ihs->r11 >> 32, ihs->r11 & 0xFFFFFFFF);
 
 	//R12
-	printf("R12: 0x%X%X                ", ihs->r12 >> 32, ihs->r12 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R12: 0x%08lX                ", ihs->r12 >> 32, ihs->r12 & 0xFFFFFFFF);
 
 	//R13
-	printf("R13: 0x%X%X\n", ihs->r13 >> 32, ihs->r13 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R13: 0x%08lX\n", ihs->r13 >> 32, ihs->r13 & 0xFFFFFFFF);
 
 	//R14
-	printf("R14: 0x%X%X                ", ihs->r14 >> 32, ihs->r14 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R14: 0x%08lX                ", ihs->r14 >> 32, ihs->r14 & 0xFFFFFFFF);
 
 	//R15
-	printf("R15: 0x%X%X\n", ihs->r15 >> 32, ihs->r15 & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "R15: 0x%08lX\n", ihs->r15 >> 32, ihs->r15 & 0xFFFFFFFF);
 
 	//RIP
-	printf("RIP: 0x%X%X\n", ihs->rip >> 32, ihs->rip & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RIP: 0x%08lX\n", ihs->rip >> 32, ihs->rip & 0xFFFFFFFF);
+	return offset;
 }
 
-void traceStack(uint64_t rsp, uint64_t *rbp, uint8_t length)
+uint64_t traceStackToString(uint64_t rsp, uint64_t *rbp, uint8_t length, char *out)
 {
-	uint64_t rip, size, i;
-	i = 0;
+	uint64_t rip, size;
+	uint64_t i = 0;
+	uint64_t offset = 0;
+
 	while(rbp != NULL &&  i++ < length)
 	{
 		rip = *(rbp + 1);
 		rsp = *rbp;
 		size = rsp - (uintptr_t)rbp;
-		printf("0x%08lX(%zu)%s", rip, size, (i % 2 == 0) ? "\n" : "                ");
+		offset += sprintf(out + offset, "0x%08lX(%zu)%s", rip, size, (i % 2 == 0) ? "\n" : "                ");
 		rbp = (uint64_t*)rsp;
 	}
-	if(i % 2) printf("\n");
+	if(i % 2) offset += sprintf(out + offset, "\n");
+	return offset;
 }
