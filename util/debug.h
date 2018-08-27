@@ -19,7 +19,7 @@ volatile bool Debugged;
 void Debug_Init(void);
 void Debug_Main(ihs_t *ihs);
 
-void traceRegisters(ihs_t *ihs);
-void traceStack(uint64_t rsp, uint64_t *rbp, uint8_t length);
+uint64_t traceRegistersToString(ihs_t *ihs, char *out);
+uint64_t traceStackToString(uint64_t rsp, uint64_t *rbp, uint8_t length, char *out);
 
 #endif /* DEBUG_H_ */

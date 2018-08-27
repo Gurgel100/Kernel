@@ -20,7 +20,7 @@
 #include "paging.h"
 #include "thread.h"
 #include "cpu.h"
-#include "console.h"
+#include "system.h"
 #include "scheduler.h"
 #include <dispatcher.h>
 
@@ -202,14 +202,13 @@ static ihs_t *exception_BoundRange(ihs_t *ihs)
 //Invalid opcode
 static ihs_t *exception_InvalidOpcode(ihs_t *ihs)
 {
-	Display_Clear();
-	setColor(BG_BLACK | CL_RED);
-	printf("Exception 6: Invalid Opcode\n");
-	traceRegisters(ihs);
-	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, (uint64_t*)ihs->rbp, 22);
-	asm volatile("cli;hlt");
-	return NULL;
+	system_panic_enter();
+	uint64_t offset = 0;
+	offset += sprintf(system_panic_buffer, "Exception 6: Invalid Opcode\n");
+	offset += traceRegistersToString(ihs, system_panic_buffer + offset);
+	offset += sprintf(system_panic_buffer + offset, "Stack-backtrace:\n");
+	traceStackToString(ihs->rsp, (uint64_t*)ihs->rbp, 22, system_panic_buffer + offset);
+	system_panic();
 }
 
 //Device not available
@@ -239,14 +238,13 @@ static ihs_t *exception_DeviceNotAvailable(ihs_t *ihs)
 //Double Fault
 static ihs_t *exception_DoubleFault(ihs_t *ihs)
 {
-	Display_Clear();
-	setColor(BG_BLACK | CL_RED);
-	printf("Exception 8: Double Fault\n\r");
-	traceRegisters(ihs);
-	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, (uint64_t*)ihs->rbp, 22);
-	asm volatile("cli;hlt");
-	return NULL;
+	system_panic_enter();
+	uint64_t offset = 0;
+	offset += sprintf(system_panic_buffer, "Exception 8: Double Fault\n");
+	offset += traceRegistersToString(ihs, system_panic_buffer + offset);
+	offset += sprintf(system_panic_buffer + offset, "Stack-backtrace:\n");
+	traceStackToString(ihs->rsp, (uint64_t*)ihs->rbp, 22, system_panic_buffer + offset);
+	system_panic();
 }
 
 //-
@@ -276,14 +274,14 @@ static ihs_t *exception_StackFault(ihs_t *ihs)
 //General protection
 static ihs_t *exception_GeneralProtection(ihs_t *ihs)
 {
-	console_switch(0);
-	printf("\e[31mException 13: General Protection\e[37m\n");
-	printf("Errorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
-	traceRegisters(ihs);
-	printf("Stack-backtrace:\n");
-	traceStack(ihs->rsp, (uint64_t*)ihs->rbp, 22);
-	asm volatile("cli;hlt");
-	return NULL;
+	system_panic_enter();
+	uint64_t offset = 0;
+	offset += sprintf(system_panic_buffer, "Exception 13: General Protection\n");
+	offset += sprintf(system_panic_buffer + offset, "Errorcode: 0x%lX\n", ihs->error);
+	offset += traceRegistersToString(ihs, system_panic_buffer + offset);
+	offset += sprintf(system_panic_buffer + offset, "Stack-backtrace:\n");
+	traceStackToString(ihs->rsp, (uint64_t*)ihs->rbp, 22, system_panic_buffer + offset);
+	system_panic();
 }
 
 //Page fault
@@ -320,33 +318,32 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 	}
 	else
 	{
-		console_switch(0);
-		printf("\e[31mException 14: Page Fault\e[37m  ");
-		if(currentProcess != NULL && currentThread != NULL)
-		{
-			printf("PID: %lu, TID: %lu ", currentProcess->PID, currentThread->tid);
-		}
-		printf("\nErrorcode: 0x%X%X\n", ihs->error >> 32, ihs->error & 0xFFFFFFFF);
+#ifndef DEBUGMODE
+		system_panic_enter();
+		uint64_t offset = 0;
+		offset += sprintf(system_panic_buffer, "Exception 14: Page Fault  ");
+		offset += sprintf(system_panic_buffer + offset, "\nErrorcode: 0x%lX\n", ihs->error);
 
+		offset += sprintf(system_panic_buffer + offset, "CR2: 0x%lX\n", CR2);
 
-		printf("CR2: 0x%X%X\n", CR2 >> 32, CR2 & 0xFFFFFFFF);
-
-		traceRegisters(ihs);
-		printf("Stack-backtrace:\n");
-		traceStack(ihs->rsp, (uint64_t*)ihs->rbp, 22);
-		printf("PML4e: 0x%lX             ", PML4->PML4E[PML4i]);
+		offset += traceRegistersToString(ihs, system_panic_buffer + offset);
+		offset += sprintf(system_panic_buffer + offset, "Stack-backtrace:\n");
+		offset += traceStackToString(ihs->rsp, (uint64_t*)ihs->rbp, 22, system_panic_buffer + offset);
+		offset += sprintf(system_panic_buffer + offset, "PML4e: 0x%lX             ", PML4->PML4E[PML4i]);
 		if(PML4->PML4E[PML4i] & 1)
 		{
-			printf("PDPe: 0x%lX\n", PDP->PDPE[PDPi]);
+			offset += sprintf(system_panic_buffer + offset, "PDPe: 0x%lX\n", PDP->PDPE[PDPi]);
 			if(PDP->PDPE[PDPi] & 1)
 			{
-				printf("PDe:   0x%lX             ", PD->PDE[PDi]);
+				offset += sprintf(system_panic_buffer + offset, "PDe:   0x%lX             ", PD->PDE[PDi]);
 				if(PD->PDE[PDi] & 1)
-					printf("PTe:  0x%lX", PT->PTE[PTi]);
+					offset += sprintf(system_panic_buffer + offset, "PTe:  0x%lX", PT->PTE[PTi]);
 			}
 		}
-		asm volatile("cli;hlt");
-		return NULL;
+		system_panic();
+#else
+		return Debug_Handler(ihs);
+#endif
 	}
 	return ihs;
 }
