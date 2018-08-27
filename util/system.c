@@ -31,7 +31,11 @@ void getSystemInformation(SIS *Struktur)
 
 void system_panic_enter()
 {
-	lock(&panic_buffer_lock);
+	if(!try_lock(&panic_buffer_lock))
+	{
+		asm volatile("cli;hlt");
+		__builtin_unreachable();
+	}
 }
 
 void system_panic()
