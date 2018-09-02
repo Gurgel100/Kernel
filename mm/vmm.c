@@ -660,7 +660,11 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 			error = true;
 			break;
 		}
+
+		if(allocate)
+			clearPage(vAddress + currentOffset);
 	}
+
 	if(error)
 	{
 		for(size_t j = 0; j < i; j++)
@@ -1234,4 +1238,25 @@ void deleteContext(context_t *context)
 inline void activateContext(context_t *context)
 {
 	asm volatile("mov %0,%%cr3" : : "r"(context->physAddress));
+}
+
+bool vmm_handlePageFault(void *page, uint64_t errorcode)
+{
+	uint16_t PML4i = PML4_INDEX(page);
+	uint16_t PDPi = PDP_INDEX(page);
+	uint16_t PDi = PD_INDEX(page);
+	uint16_t PTi = PT_INDEX(page);
+
+	PML4_t *const PML4 = PML4_ADDRESS();
+	PDP_t *const PDP = PDP_ADDRESS(PML4i);
+	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+
+	//Activate unused pages
+	if(!isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
+	{
+		vmm_usePages(page, 1);
+		return true;
+	}
+	return false;
 }

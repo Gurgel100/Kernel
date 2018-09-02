@@ -20,11 +20,6 @@
 typedef _pid_t pid_t;
 typedef _tid_t tid_t;
 
-typedef struct{
-		uint64_t mmx[6];
-		uint128_t ymm[16][2];		//YMM-Register sind 256-Bit breit
-}__attribute__((aligned(16)))ihs_extended_t;
-
 typedef enum{
 	PM_BLOCKED, PM_RUNNING, PM_TERMINATED
 }pm_status_t;

@@ -112,7 +112,8 @@ void thread_destroy(thread_t *thread)
 	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
 
 	extern thread_t *fpuThread;
-	fpuThread = NULL;
+	if(fpuThread == thread)
+		fpuThread = NULL;
 	vmm_UnMap(thread->fpuState, 1, true);
 	free(thread);
 }
