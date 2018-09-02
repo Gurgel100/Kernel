@@ -24,7 +24,13 @@
 #define VMM_MAX_ADDRESS		MAX_ADDRESS
 
 //Flags für AVL Bits
+//3+11=14 bits (index 9-11, 52-62)
 #define VMM_PAGE_FULL			(1 << 0)
+#define VMM_UNUSED_PAGE			(1 << 2)		//Marks page as unused by process
+#define VMM_PAGE_HANDLER_OFFSET	10
+#define VMM_PAGE_HANDLER_MASK	0xF
+#define VMM_PAGE_HANDLER		(VMM_PAGE_HANDLER_MASK << VMM_PAGE_HANDLER_OFFSET)
+#define VMM_GET_PAGE_HANDLER(e)	((PG_AVL(e) & VMM_PAGE_HANDLER) >> VMM_PAGE_HANDLER_OFFSET)
 
 #define VMM_PAGES_PER_PML4		VMM_PAGES_PER_PDP * PAGE_ENTRIES
 #define VMM_PAGES_PER_PDP		VMM_PAGES_PER_PD * PAGE_ENTRIES
@@ -53,6 +59,8 @@ const uint16_t PTe = PT_INDEX(KERNELSPACE_END) + 1;
 static lock_t vmm_lock = LOCK_UNLOCKED;
 
 context_t kernel_context;
+
+static const vmm_pagehandler_handles_t *page_handlers[VMM_PAGE_HANDLER_MASK + 1];
 
 //Funktionen, die nur in dieser Datei aufgerufen werden sollen
 uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
@@ -506,7 +514,7 @@ bool vmm_Init()
  */
 void *vmm_Alloc(size_t Length)
 {
-	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
+	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, VMM_PAGEHANDLER_DEFAULT);
 }
 
 /*
@@ -533,7 +541,7 @@ void vmm_Free(void *vAddress, size_t Pages)
  */
 void *vmm_SysAlloc(size_t Length)
 {
-	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX);
+	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX, VMM_PAGEHANDLER_DEFAULT);
 }
 
 /*
@@ -563,7 +571,7 @@ void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
 	*Phys = pmm_AllocDMA(maxAddress, Size);
 		if(*Phys == 1) return NULL;
 
-	return vmm_Map(NULL, *Phys, Pages, VMM_FLAGS_NO_CACHE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	return vmm_Map(NULL, *Phys, Pages, VMM_FLAGS_NO_CACHE | VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 }
 
 list_t vmm_getTables(context_t *context)
@@ -617,12 +625,13 @@ list_t vmm_getTables(context_t *context)
 }
 
 //----------------------Allgemeine Funktionen------------------------
-void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
+void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags, vmm_pagehandler_t handler)
 {
 	uint8_t res;
 	bool unused = pAddress == 0;
 	bool allocate = flags & VMM_FLAGS_ALLOCATE;
 	uint16_t avl = (unused && !allocate) ? VMM_UNUSED_PAGE : 0;
+	avl |= (handler & VMM_PAGE_HANDLER_MASK) << VMM_PAGE_HANDLER_OFFSET;
 
 	if(pages == 0)
 		return NULL;
@@ -811,13 +820,13 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//Eintrag in die PML4S
 		setPML4Entry(PML4i, PML4, 1, 1, (PML4->PML4E[PML4i] & PG_US) || US, 1, 0, 0, 0, 0, Address);
 		//PDP mappen
-		PDP = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		PDP = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 		clearPage(PDP);
 	}
 	else
 	{
 		//PDP mappen
-		PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 	}
 
 	//PDP Tabelle bearbeiten
@@ -832,13 +841,13 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//Eintrag in die PDP
 		setPDPEntry(PDPi, PDP, 1, 1, (PDP->PDPE[PDPi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
 		//PD mappen
-		PD = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		PD = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 		clearPage(PD);
 	}
 	else
 	{
 		//PD mappen
-		PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 	}
 
 	//PD Tabelle bearbeiten
@@ -854,13 +863,13 @@ uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uin
 		//Eintrag in die PDP
 		setPDEntry(PDi, PD, 1, 1, (PD->PDE[PDi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
 		//PT mappen
-		PT = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		PT = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 		clearPage(PT);
 	}
 	else
 	{
 		//PT mappen
-		PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+		PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 	}
 
 	//PT Tabelle bearbeiten
@@ -923,7 +932,7 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 	}
 
 	//PDP mappen
-	PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 
 	//PDP Tabelle bearbeiten
 	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
@@ -935,7 +944,7 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 	}
 
 	//PD mappen
-	PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 
 	//PD Tabelle bearbeiten
 	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
@@ -949,7 +958,7 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
 	}
 
 	//PT mappen
-	PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE, VMM_PAGEHANDLER_DEFAULT);
 
 	//PT Tabelle bearbeiten
 	if((PT->PTE[PTi] & PG_P) == 1)			//Wenn PT Eintrag vorhanden
@@ -1193,21 +1202,21 @@ void deleteContext(context_t *context)
 		if(PML4->PML4E[PML4i] & PG_P)
 		{
 			//PDP mappen
-			PDP_t *PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX);
+			PDP_t *PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX, VMM_PAGEHANDLER_DEFAULT);
 			for(uint16_t PDPi = 0; PDPi < PAGE_ENTRIES; PDPi++)
 			{
 				//Ist der Eintrag gültig
 				if(PDP->PDPE[PDPi] & PG_P)
 				{
 					//PD mappen
-					PD_t *PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX);
+					PD_t *PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX, VMM_PAGEHANDLER_DEFAULT);
 					for(uint16_t PDi = 0; PDi < PAGE_ENTRIES; PDi++)
 					{
 						//Ist der Eintrag gültig
 						if(PD->PDE[PDi] & PG_P)
 						{
 							//PT mappen
-							PT_t *PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX);
+							PT_t *PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX, VMM_PAGEHANDLER_DEFAULT);
 							for(uint16_t PTi = 0; PTi < PAGE_ENTRIES; PTi++)
 							{
 								//Ist die Page alloziiert
@@ -1240,6 +1249,18 @@ inline void activateContext(context_t *context)
 	asm volatile("mov %0,%%cr3" : : "r"(context->physAddress));
 }
 
+vmm_pagehandler_t vmm_registerPageHandler(const vmm_pagehandler_handles_t *handler)
+{
+	//the page handler with id 0 is the default one (not stored)
+	vmm_pagehandler_t id = 1;
+	while(id < VMM_PAGE_HANDLER_MASK + 1 && page_handlers[id] != NULL) id++;
+	if(id >= VMM_PAGE_HANDLER_MASK + 1)
+		return 0;
+	page_handlers[id] = handler;
+
+	return id;
+}
+
 bool vmm_handlePageFault(void *page, uint64_t errorcode)
 {
 	uint16_t PML4i = PML4_INDEX(page);
@@ -1252,10 +1273,20 @@ bool vmm_handlePageFault(void *page, uint64_t errorcode)
 	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
 	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
 
+	vmm_pagehandler_t pagehandler = VMM_GET_PAGE_HANDLER(PT->PTE[PTi]);
+
 	//Activate unused pages
 	if(!isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
 	{
 		vmm_usePages(page, 1);
+
+		if(pagehandler != 0)
+		{
+			if(page_handlers[pagehandler] == NULL)
+				return false;
+			if(page_handlers[pagehandler]->load(page, errorcode) != 0)
+				return false;
+		}
 		return true;
 	}
 	return false;

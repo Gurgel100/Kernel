@@ -23,14 +23,22 @@
 #define VMM_FLAGS_NO_CACHE	(1 << 5)	//Bestimmt, ob die Page nicht gecacht werden soll
 #define VMM_FLAGS_ALLOCATE	(1 << 6)	//Bestimmt, ob der physikalische Speicher schon alloziiert sein soll
 
-#define VMM_UNUSED_PAGE		0x4		//Marks page as unused by process
+#define VMM_PAGEHANDLER_DEFAULT	0
 
 typedef struct{
 	paddr_t physAddress;
 	void *virtualAddress;
 }context_t;
 
+typedef uint8_t vmm_pagehandler_t;
+
+typedef struct{
+	int(*load)(void *page, uint64_t errorcode);
+	int(*unload)(void *page, bool dirty);
+}vmm_pagehandler_handles_t;
+
 bool vmm_Init();									//Initialisiert virtuelle Speicherverw.
+
 void *vmm_Alloc(size_t Size);						//Reserviert eine virtuelle Speicherst.
 void vmm_Free(void *Address, size_t Size);		//Gibt eine Speicherstelle frei
 
@@ -54,7 +62,7 @@ list_t vmm_getTables(context_t *context);
  * @param flags Flags with access rights
  * @return NULL on failure otherwise virtual address
  */
-void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags);
+void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags, vmm_pagehandler_t handler);
 
 /**
  * \brief Unmaps a memory area.
@@ -82,6 +90,11 @@ bool vmm_userspacePointerValid(const void *ptr, const size_t size);
 context_t *createContext(void);
 void deleteContext(context_t *context);
 void activateContext(context_t *context);
+
+/**
+ * \brief Registers a page handler
+ */
+vmm_pagehandler_t vmm_registerPageHandler(const vmm_pagehandler_handles_t *handler);
 
 //Interrupt handler
 bool vmm_handlePageFault(void *page, uint64_t errorcode);
