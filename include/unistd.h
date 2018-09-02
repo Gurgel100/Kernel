@@ -34,4 +34,6 @@
 #define STDIN_FILENO	0	//File number of stdin.
 #define STDOUT_FILENO	1	//File number of stdout.
 
+unsigned sleep(unsigned seconds);
+
 #endif /* UNISTD_H_ */
