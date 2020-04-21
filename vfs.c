@@ -63,7 +63,7 @@ typedef struct{
 static vfs_node_t root;
 static list_t res_list;
 static hashmap_t *streams = NULL;	//geöffnete Streams
-static lock_t vfs_lock = LOCK_LOCKED;
+static lock_t vfs_lock = LOCK_INIT;
 
 static size_t getDirs(char ***Dirs, const char *Path)
 {
@@ -403,7 +403,8 @@ static void deleteNode(vfs_node_t *node)
 	{
 		assert(node != &root);	//Rootnode darf nicht gelöscht werden
 
-		lock(&vfs_lock);
+		lock_node_t lock_node;
+		lock(&vfs_lock, &lock_node);
 		vfs_node_t *parentNode;
 		parentNode = node->parent;
 		if(parentNode->childs == node)
@@ -421,11 +422,12 @@ static void deleteNode(vfs_node_t *node)
 			}
 			if(tmp == NULL)
 			{
-				unlock(&vfs_lock);
+				// TODO: is this a memory leak?
+				unlock(&vfs_lock, &lock_node);
 				return;
 			}
 		}
-		unlock(&vfs_lock);
+		unlock(&vfs_lock, &lock_node);
 
 		free(node->name);
 		free(node);
@@ -440,21 +442,15 @@ static void deleteNode(vfs_node_t *node)
  */
 static vfs_node_t *createDirNode(vfs_node_t *parent, const char *name)
 {
-	lock(&vfs_lock);
+	return LOCKED_RESULT(vfs_lock, {
+		vfs_node_t *node = createBaseNode(parent, name);
 
-	vfs_node_t *node = createBaseNode(parent, name);
-
-	if(node == NULL)
-	{
-		unlock(&vfs_lock);
-		return NULL;
-	}
-
-	node->type = TYPE_DIR;
-
-	unlock(&vfs_lock);
-
-	return node;
+		if(node != NULL)
+		{
+			node->type = TYPE_DIR;
+		}
+		node;
+	});
 }
 
 /*
@@ -466,22 +462,16 @@ static vfs_node_t *createDirNode(vfs_node_t *parent, const char *name)
  */
 static vfs_node_t *createFileNode(vfs_node_t *parent, const char *name, size_t (*handler)(char*, uint64_t, size_t, const void*))
 {
-	lock(&vfs_lock);
+	return LOCKED_RESULT(vfs_lock, {
+		vfs_node_t *node = createBaseNode(parent, name);
 
-	vfs_node_t *node = createBaseNode(parent, name);
-
-	if(node == NULL)
-	{
-		unlock(&vfs_lock);
-		return NULL;
-	}
-
-	node->type = TYPE_FILE;
-	node->handler = handler;
-
-	unlock(&vfs_lock);
-
-	return node;
+		if(node != NULL)
+		{
+			node->type = TYPE_FILE;
+			node->handler = handler;
+		}
+		node;
+	});
 }
 
 /*
@@ -493,22 +483,16 @@ static vfs_node_t *createFileNode(vfs_node_t *parent, const char *name, size_t (
  */
 static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, vfs_filesystem_t *fs)
 {
-	lock(&vfs_lock);
+	return LOCKED_RESULT(vfs_lock, {
+		vfs_node_t *node = createBaseNode(parent, name);
 
-	vfs_node_t *node = createBaseNode(parent, name);
-
-	if(node == NULL)
-	{
-		unlock(&vfs_lock);
-		return NULL;
-	}
-
-	node->type = TYPE_MOUNT;
-	node->fs = fs;
-
-	unlock(&vfs_lock);
-
-	return node;
+		if(node != NULL)
+		{
+			node->type = TYPE_MOUNT;
+			node->fs = fs;
+		}
+		node;
+	});
 }
 
 /*
@@ -520,22 +504,16 @@ static vfs_node_t *createMountNode(vfs_node_t *parent, const char *name, vfs_fil
  */
 static vfs_node_t *createLinkNode(vfs_node_t *parent, const char *name, vfs_node_t *link)
 {
-	lock(&vfs_lock);
+	return LOCKED_RESULT(vfs_lock, {
+		vfs_node_t *node = createBaseNode(parent, name);
 
-	vfs_node_t *node = createBaseNode(parent, name);
-
-	if(node == NULL)
-	{
-		unlock(&vfs_lock);
-		return NULL;
-	}
-
-	node->type = TYPE_LINK;
-	node->childs = link;
-
-	unlock(&vfs_lock);
-
-	return node;
+		if(node != NULL)
+		{
+			node->type = TYPE_LINK;
+			node->childs = link;
+		}
+		node;
+	});
 }
 
 /*
@@ -547,22 +525,16 @@ static vfs_node_t *createLinkNode(vfs_node_t *parent, const char *name, vfs_node
  */
 static vfs_node_t *createDeviceNode(vfs_node_t *parent, const char *name, vfs_device_t *device)
 {
-	lock(&vfs_lock);
+	return LOCKED_RESULT(vfs_lock, {
+		vfs_node_t *node = createBaseNode(parent, name);
 
-	vfs_node_t *node = createBaseNode(parent, name);
-
-	if(node == NULL)
-	{
-		unlock(&vfs_lock);
-		return NULL;
-	}
-
-	node->type = TYPE_DEV;
-	node->dev = device;
-
-	unlock(&vfs_lock);
-
-	return node;
+		if(node != NULL)
+		{
+			node->type = TYPE_DEV;
+			node->dev = device;
+		}
+		node;
+	});
 }
 
 /*
@@ -712,8 +684,6 @@ void vfs_Init(void)
 	root.childs = NULL;
 	root.parent = &root;
 	root.type = TYPE_DIR;
-
-	unlock(&vfs_lock);
 
 	//Virtuelle Ordner anlegen
 	//Unterordner "dev" anlegen: für Gerätedateien

@@ -16,7 +16,7 @@
 extern uint64_t Uptime;
 
 char system_panic_buffer[25 * 80];
-static lock_t panic_buffer_lock = LOCK_UNLOCKED;
+static lock_t panic_buffer_lock = LOCK_INIT;
 
 /*
  * Speichert Systeminformationen in die übergebene Struktur
@@ -31,7 +31,9 @@ void getSystemInformation(SIS *Struktur)
 
 void system_panic_enter()
 {
-	if(!try_lock(&panic_buffer_lock))
+	// Der lock wird nie mehr freigegeben, deshalb können wir das hier so machen
+	static lock_node_t lock_node;
+	if(!try_lock(&panic_buffer_lock, &lock_node))
 	{
 		asm volatile("cli;hlt");
 		__builtin_unreachable();

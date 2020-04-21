@@ -10,34 +10,52 @@
 
 #include "stdint.h"
 #include "stdbool.h"
+#include "stddef.h"
 
-#define LOCK_LOCKED		1
-#define LOCK_UNLOCKED	0
-
-typedef uint64_t lock_t;
+#define LOCK_INIT	NULL
 
 //Führt eine Funktion gelockt aus und gibt deren Resultat zurück
-#define LOCKED_RESULT(lck, task)\
-	({\
-		lock(&lck);\
-		typeof(task) ___result = task;\
-		unlock(&lck);\
-		___result;\
+#define LOCKED_RESULT(lck, task)			\
+	({										\
+        lock_node_t ___lock_node; 			\
+		lock(&lck, &___lock_node);			\
+		typeof((task)) ___result = (task);	\
+		unlock(&lck, &___lock_node);		\
+		___result;							\
 	})
 
 //Führt eine Funktion gelockt aus
-#define LOCKED_TASK(lck, task)\
-	{\
-		lock(&lck);\
-		task;\
-		unlock(&lck);\
+#define LOCKED_TASK(lck, task)				\
+	{										\
+        lock_node_t ___lock_node; 			\
+		lock(&lck, &___lock_node);			\
+		task;								\
+		unlock(&lck, &___lock_node);		\
 	}
 
-bool try_lock(lock_t *l);
-void lock(lock_t *l);
-void unlock(lock_t *l);
-bool locked(lock_t *l);
-void lock_wait(volatile lock_t *l);
+//Versucht den lock zu holen und führt dann den task aus
+#define LOCKED_TRY_TASK(lck, task)			\
+	{										\
+        lock_node_t ___lock_node;			\
+		if (try_lock(&lck, &___lock_node))	\
+		{									\
+			task;							\
+			unlock(&lck, &___lock_node);	\
+		}									\
+	}
+
+typedef struct lock_node {
+    struct lock_node *next;
+    bool locked;
+} lock_node_t __attribute__((aligned(64)));
+
+typedef lock_node_t *lock_t;
+
+bool try_lock(lock_t *lock, lock_node_t *node);
+void lock(volatile lock_t *lock, volatile lock_node_t *node);
+void unlock(volatile lock_t *lock, volatile lock_node_t *node);
+bool locked(const lock_t *lock);
+void lock_wait(volatile lock_t *lock);
 
 //Eine Variable atomar inkrementieren
 void locked_inc(volatile uint64_t *var);
