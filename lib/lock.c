@@ -7,30 +7,47 @@
 
 #include "lock.h"
 
-bool try_lock(lock_t *l)
-{
-	return __sync_bool_compare_and_swap(l, 0, 1);
+#define pause() asm volatile("pause")
+
+bool locked(const lock_t *lock) {
+    return *lock == NULL;
 }
 
-void lock(lock_t *l)
-{
-	while(!try_lock(l))
-		asm volatile("pause");
+void lock(volatile lock_t *lock, volatile lock_node_t *node) {
+    node->next = NULL;
+
+    lock_node_t *prev;
+    do {
+        prev = *lock;
+    } while (!__sync_bool_compare_and_swap(lock, prev, node));
+    if (prev != NULL) {
+        node->locked = true;
+        prev->next = node;
+        while (node->locked) pause();
+    }
 }
 
-void unlock(lock_t *l)
-{
-	*l = 0;
+void unlock(volatile lock_t *lock, volatile lock_node_t *node) {
+    if (node->next == NULL) {
+        if (__sync_bool_compare_and_swap(lock, node, NULL)) {
+            // Nobody waiting
+            return;
+        }
+
+        // Wait until someone is definitely enqueued
+        while (node->next == NULL) pause();
+    }
+    // Release lock
+    node->next->locked = false;
 }
 
-bool locked(lock_t *l)
-{
-	return *l;
+bool try_lock(lock_t *lock, lock_node_t *node) {
+    node->next = NULL;
+    return __sync_bool_compare_and_swap(lock, NULL, node);
 }
 
-void lock_wait(volatile lock_t *l)
-{
-	while(*l);
+void lock_wait(volatile lock_t *lock) {
+    while (*lock != NULL) pause();
 }
 
 //Eine Variable atomar inkrementieren

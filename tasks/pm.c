@@ -39,7 +39,7 @@ extern thread_t* idleThread;				//Handler für idle-Task
 thread_t* cleanerThread;				//Handler für cleaner-Task
 
 static avl_tree *process_list = NULL;	//Liste aller Prozesse
-static lock_t pm_lock = LOCK_UNLOCKED;
+static lock_t pm_lock = LOCK_INIT;
 
 /*
  * Idle-Task
@@ -93,28 +93,28 @@ static void thread_destroy_action(void *a)
 
 static void child_terminated(process_t *parent, process_t *process)
 {
-	lock(&parent->lock);
-	list_push(parent->terminated_childs, process);
+	LOCKED_TASK(parent->lock, {
+		list_push(parent->terminated_childs, process);
 
-	//wakeup any waiting thread
-	pm_wait_entry_t *entry;
-	thread_t *thread;
-	bool found = false;
-	for(size_t i = 0; (entry = list_get(parent->waiting_threads_pid, i)) != NULL; i++)
-	{
-		if(entry->waiting_pid == process->PID)
+		//wakeup any waiting thread
+		pm_wait_entry_t *entry;
+		thread_t *thread;
+		bool found = false;
+		for(size_t i = 0; (entry = list_get(parent->waiting_threads_pid, i)) != NULL; i++)
 		{
-			thread_unblock(entry->thread);
-			free(entry);
-			found = true;
-			break;
+			if(entry->waiting_pid == process->PID)
+			{
+				thread_unblock(entry->thread);
+				free(entry);
+				found = true;
+				break;
+			}
 		}
-	}
-	if(!found && (thread = list_pop(parent->waiting_threads)) != NULL)
-	{
-		thread_unblock(thread);
-	}
-	unlock(&parent->lock);
+		if(!found && (thread = list_pop(parent->waiting_threads)) != NULL)
+		{
+			thread_unblock(thread);
+		}
+	});
 }
 
 /*
@@ -198,7 +198,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	assert(res && "Es gibt schon einen Task mit dieser PID!");
 
 	__sync_fetch_and_add(&numTasks, 1);
-	newProcess->lock = LOCK_UNLOCKED;
+	newProcess->lock = LOCK_INIT;
 
 	return newProcess;
 }
@@ -312,17 +312,18 @@ pid_t pm_WaitChild(pid_t pid, int *status)
 		LOCKED_TASK(pm_lock, avl_visit_s(process_list, avl_visiting_in_order, pid_visit_count_childs, tmp));
 		if(childs > 0)
 		{
-			lock(&currentProcess->lock);
+			lock_node_t lock_node;
+			lock(&currentProcess->lock, &lock_node);
 			child = list_pop(currentProcess->terminated_childs);
 			while(child == NULL)
 			{
 				list_push(currentProcess->waiting_threads, currentThread);
-				unlock(&currentProcess->lock);
+				unlock(&currentProcess->lock, &lock_node);
 				thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT);
-				lock(&currentProcess->lock);
+				lock(&currentProcess->lock, &lock_node);
 				child = list_pop(currentProcess->terminated_childs);
 			}
-			unlock(&currentProcess->lock);
+			unlock(&currentProcess->lock, &lock_node);
 			if(status != NULL) *status = child->exit_status;
 		}
 	}
@@ -333,9 +334,10 @@ pid_t pm_WaitChild(pid_t pid, int *status)
 		if(child != NULL && child->parent == currentProcess)
 		{
 			process_t *item;
+			lock_node_t lock_node;
 			size_t i = 0;
 			bool found = false;
-			lock(&currentProcess->lock);
+			lock(&currentProcess->lock, &lock_node);
 			while(!found)
 			{
 				while((item = list_get(currentProcess->terminated_childs, i)) != NULL)
@@ -354,12 +356,12 @@ pid_t pm_WaitChild(pid_t pid, int *status)
 					entry->thread = currentThread;
 					entry->waiting_pid = pid;
 					list_push(currentProcess->waiting_threads_pid, entry);
-					unlock(&currentProcess->lock);
+					unlock(&currentProcess->lock, &lock_node);
 					thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT);
-					lock(&currentProcess->lock);
+					lock(&currentProcess->lock, &lock_node);
 				}
 			}
-			unlock(&currentProcess->lock);
+			unlock(&currentProcess->lock, &lock_node);
 			if(status != NULL) *status = child->exit_status;
 		}
 	}

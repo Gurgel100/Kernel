@@ -50,7 +50,7 @@ const uint16_t PDPe = PDP_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PDe = PD_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PTe = PT_INDEX(KERNELSPACE_END) + 1;
 
-static lock_t vmm_lock = LOCK_UNLOCKED;
+static lock_t vmm_lock = LOCK_INIT;
 
 context_t kernel_context;
 
@@ -627,67 +627,67 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 	if(pages == 0)
 		return NULL;
 
-	lock(&vmm_lock);
-	if(vAddress == NULL)
-	{
-		void *start = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_START : KERNELSPACE_START);
-		void *end = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_END : KERNELSPACE_END);
-		vAddress = getFreePages(start, end, pages);
-	}
-
-	bool error = false;
-	size_t i;
-	for(i = 0; i < pages; i++)
-	{
-		paddr_t paddr;
-		uintptr_t currentOffset = i * VMM_SIZE_PER_PAGE;
-		if(allocate)
+	return LOCKED_RESULT(vmm_lock, {
+		if(vAddress == NULL)
 		{
-			paddr = pmm_Alloc();
-			if(paddr == 1)
+			void *start = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_START : KERNELSPACE_START);
+			void *end = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_END : KERNELSPACE_END);
+			vAddress = getFreePages(start, end, pages);
+		}
+
+		bool error = false;
+		size_t i;
+		for(i = 0; i < pages; i++)
+		{
+			paddr_t paddr;
+			uintptr_t currentOffset = i * VMM_SIZE_PER_PAGE;
+			if(allocate)
+			{
+				paddr = pmm_Alloc();
+				if(paddr == 1)
+				{
+					error = true;
+					break;
+				}
+			}
+			else
+			{
+				paddr = pAddress + currentOffset * !unused;
+			}
+
+			if((res = map(vAddress + currentOffset, paddr, flags, avl)) != 0)
 			{
 				error = true;
 				break;
 			}
-		}
-		else
-		{
-			paddr = pAddress + currentOffset * !unused;
-		}
 
-		if((res = map(vAddress + currentOffset, paddr, flags, avl)) != 0)
-		{
-			error = true;
-			break;
-		}
-
-		if(allocate)
-			clearPage(vAddress + currentOffset);
-	}
-
-	if(error)
-	{
-		for(size_t j = 0; j < i; j++)
-		{
-			paddr_t paddr = unmap(vAddress + j * VMM_SIZE_PER_PAGE);
 			if(allocate)
-				pmm_Free(paddr);
+				clearPage(vAddress + currentOffset);
 		}
-	}
-	unlock(&vmm_lock);
-	return res == 0 ? vAddress : NULL;
+
+		if(error)
+		{
+			for(size_t j = 0; j < i; j++)
+			{
+				paddr_t paddr = unmap(vAddress + j * VMM_SIZE_PER_PAGE);
+				if(allocate)
+					pmm_Free(paddr);
+			}
+		}
+		res == 0 ? vAddress : NULL;
+	});
 }
 
 void vmm_UnMap(void *vAddress, size_t pages, bool freePages)
 {
-	lock(&vmm_lock);
-	for(size_t i = 0; i < pages; i++)
-	{
-		paddr_t pAddress = unmap(vAddress + i * VMM_SIZE_PER_PAGE);
-		if(freePages)
-			pmm_Free(pAddress);
-	}
-	unlock(&vmm_lock);
+	LOCKED_TASK(vmm_lock, {
+		for(size_t i = 0; i < pages; i++)
+		{
+			paddr_t pAddress = unmap(vAddress + i * VMM_SIZE_PER_PAGE);
+			if(freePages)
+				pmm_Free(pAddress);
+		}
+	});
 }
 
 /*
@@ -720,30 +720,28 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
 	bool PWT = (flags & VMM_FLAGS_PWT);
 
-	lock(&vmm_lock);
-
-	if(isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]))
-	{
-		if(map(vAddress, pAddress, flags, avl) == 1)
+	return LOCKED_RESULT(vmm_lock, {
+		uint8_t res = 0;
+		if(isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]))
 		{
-			unlock(&vmm_lock);
-			return 1;
+			if(map(vAddress, pAddress, flags, avl) == 1)
+			{
+				res = 1;
+			}
 		}
-	}
-	else
-	{
-		setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
+		else
+		{
+			setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
 
-		//Reserved bits zurücksetzen
-		PD->PDE[PDi] &= ~0x1C0;
-		PDP->PDPE[PDPi] &= ~0x1C0;
-		PML4->PML4E[PML4i] &= ~0x1C0;
+			//Reserved bits zurücksetzen
+			PD->PDE[PDi] &= ~0x1C0;
+			PDP->PDPE[PDPi] &= ~0x1C0;
+			PML4->PML4E[PML4i] &= ~0x1C0;
 
-		InvalidateTLBEntry((void*)vAddress);
-	}
-
-	unlock(&vmm_lock);
-	return 0;
+			InvalidateTLBEntry((void*)vAddress);
+		}
+		res;
+	});
 }
 
 /*
