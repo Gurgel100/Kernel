@@ -41,6 +41,11 @@ static uint64_t tmpMap[4096] __attribute__((aligned(MM_BLOCK_SIZE)));
 static uint64_t *Map = tmpMap;
 static size_t mapSize = 4096;			//Grösse der Bitmap
 
+static void markPageReserved(paddr_t address) {
+	pmm_freePages--;
+	Map[address / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE)] &= ~(1ULL << ((address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT));
+}
+
 /*
  * Initialisiert die physikalische Speicherverwaltung
  */
@@ -113,16 +118,7 @@ bool pmm_Init()
 	#endif
 
 	//Liste mit reservierten Pages
-	extern context_t kernel_context;
-	list_t reservedPages = vmm_getTables(&kernel_context);
-	__sync_fetch_and_add(&pmm_freePages, -list_size(reservedPages));
-	//Liste durchgehen und Bits in der BitMap löschen
-	uintptr_t Address;
-	while((Address = (uintptr_t)list_pop(reservedPages)))
-	{
-		Map[Address / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE)] &= ~(1ULL << ((((uintptr_t)Address) / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT));
-	}
-	list_destroy(reservedPages);
+	vmm_getPageTables(markPageReserved);
 
 	SysLog("PMM", "Initialisierung abgeschlossen");
 	return true;

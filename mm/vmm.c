@@ -16,6 +16,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "lock.h"
+#include "cpu.h"
 
 #define NULL (void*)0
 
@@ -463,54 +464,23 @@ void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
 	return vmm_Map(NULL, *Phys, Pages, VMM_FLAGS_NO_CACHE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 }
 
-list_t vmm_getTables(context_t *context)
-{
-	list_t list = list_create();
-	PML4_t *PML4 = context->virtualAddress;
-	PDP_t *PDP;
-	PD_t *PD;
+static void walkPageTable(PageTable_t table, uint32_t level, void(*callback)(paddr_t)) {
+	const uint32_t end = PAGE_ENTRIES - (level == 0);
+	for (uint32_t i = 0; i < end; i++) {
+		if (table[i].P) {
+			callback(table[i].Address << 12);
 
-	//PML4 eintragen
-	list_push(list, (void*)(context->physAddress));
-
-	uint16_t PML4i, PDPi, PDi;
-	//PML4 durchsuchen dabei aber den letzten Eintrag auslassen: er zeigt auf PML4 selber
-	for(PML4i = 0; PML4i < 511; PML4i++)
-	{
-		//Wenn PDP nicht vorhanden dann auch nicht auflisten
-		if(!(PML4->PML4E[PML4i] & PG_P))
-			continue;
-		//PDP auf die Liste setzen
-		list_push(list, (void*)(PML4->PML4E[PML4i] & PG_ADDRESS));
-
-		PDP = PDP_ADDRESS(PML4i);
-
-		//Danach die PDP nach Einträgen durchsuchen
-		for(PDPi = 0; PDPi < 512; PDPi++)
-		{
-			//Wenn PD nicht vorhanden dann auch nicht auflisten
-			if(!(PDP->PDPE[PDPi] & PG_P))
-				continue;
-
-			//PD auf die Liste setzen
-			list_push(list, (void*)(PDP->PDPE[PDPi] & PG_ADDRESS));
-
-			PD = PD_ADDRESS(PML4i, PDPi);
-
-			//Danach PD durchsuchen
-			for(PDi = 0; PDi < 512; PDi++)
-			{
-				//Wenn PT nicht vorhanden dann auch nicht auflisten
-				if(!(PD->PDE[PDi] & PG_P))
-					continue;
-
-				//PT auf die Liste setzen
-				list_push(list, (void*)(PD->PDE[PDi] & PG_ADDRESS));
+			if (level < 2) {	// We don't walk though the PTs as we only want the page tables
+				PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (i << 12));
+				walkPageTable(next_table, level + 1, callback);
 			}
 		}
 	}
+}
 
-	return list;
+void vmm_getPageTables(void(*callback)(paddr_t)) {
+	callback(cpu_readControlRegister(CPU_CR3) & PG_ADDRESS);
+	walkPageTable((PageTable_t)PML4_ADDRESS(), 0, callback);
 }
 
 //----------------------Allgemeine Funktionen------------------------
