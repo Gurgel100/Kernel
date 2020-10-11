@@ -35,10 +35,11 @@
 #define VMM_GET_ADDRESS(PML4i, PDPi, PDi, PTi)	(void*)VMM_EXTEND(((uint64_t)PML4i << 39) | ((uint64_t)PDPi << 30) | (PDi << 21) | (PTi << 12))
 #define VMM_ALLOCATED(entry) ((entry & PG_P) || (PG_AVL(entry) & VMM_UNUSED_PAGE))	//Prüft, ob diese Page schon belegt ist
 
-#define PML4_INDEX(address)				(((uintptr_t)address & PG_PML4_INDEX) >> 39)
-#define PDP_INDEX(address)				(((uintptr_t)address & PG_PDP_INDEX) >> 30)
-#define PD_INDEX(address)				(((uintptr_t)address & PG_PD_INDEX) >> 21)
-#define PT_INDEX(address)				(((uintptr_t)address & PG_PT_INDEX) >> 12)
+#define PAGE_TABLE_INDEX(address, level)	(((uintptr_t)(address) >> (12 + (3 - (level)) * 9)) & 0x1FF)
+#define PML4_INDEX(address)					PAGE_TABLE_INDEX(address, 0)
+#define PDP_INDEX(address)					PAGE_TABLE_INDEX(address, 1)
+#define PD_INDEX(address)					PAGE_TABLE_INDEX(address, 2)
+#define PT_INDEX(address)					PAGE_TABLE_INDEX(address, 3)
 
 #define PML4_ADDRESS()					((PML4_t*)0xFFFFFFFFFFFFF000)
 #define PDP_ADDRESS(PML4i)				((PDP_t*)(0xFFFFFFFFFFE00000 + (PML4i << 12)))
@@ -87,117 +88,63 @@ static bool isPageFree(const uint64_t *const PML4E, const uint64_t *const PDPE, 
 	return !VMM_ALLOCATED(*PTE);
 }
 
-static uint8_t map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
+static uint8_t map_entry(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl, PageTable_t table, uint32_t level)
 {
-	paddr_t Address;
+	uint32_t index = PAGE_TABLE_INDEX(vAddress, level);
+	PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (index << 12));
 
-	//Einträge in die Page Tabellen
-	const uint16_t PML4i = PML4_INDEX(vAddress);
-	const uint16_t PDPi = PDP_INDEX(vAddress);
-	const uint16_t PDi = PD_INDEX(vAddress);
-	const uint16_t PTi = PT_INDEX(vAddress);
+	if(!table[index].P) {
+		table[index].entry = 0;
 
-	PML4_t *const PML4 = PML4_ADDRESS();
-	PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+		if(level == 3) {
+			table[index].P = !(avl & VMM_UNUSED_PAGE);
+			table[index].RW = flags & VMM_FLAGS_WRITE;
+			table[index].US = flags & VMM_FLAGS_USER;
+			table[index].PWT = flags & VMM_FLAGS_PWT;
+			table[index].PCD = flags & VMM_FLAGS_NO_CACHE;
+			table[index].G = flags & VMM_FLAGS_GLOBAL;
+			table[index].AVL1 = avl;
+			table[index].AVL2 = avl >> 3;
+			table[index].Address = pAddress >> 12;
+			table[index].NX = flags & VMM_FLAGS_NX;
+			return 0;
+		} else {
+			paddr_t address = pmm_Alloc();
+			if(address == 1) return 1;
 
-	//Flags auslesen
-	bool US = (flags & VMM_FLAGS_USER);
-	bool G = (flags & VMM_FLAGS_GLOBAL);
-	bool RW = (flags & VMM_FLAGS_WRITE);
-	bool NX = (flags & VMM_FLAGS_NX);
-	bool P = !(avl & VMM_UNUSED_PAGE);
-	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
-	bool PWT = (flags & VMM_FLAGS_PWT);
+			table[index].P = 1;
+			table[index].PWT = 1;
+			table[index].RW = 1;			// Always mark as writable so that this recursive mapping method works
+			table[index].Address = address >> 12;
 
-	//PML4 Tabelle bearbeiten
-	if((PML4->PML4E[PML4i] & PG_P) == 0)		//Eintrag für die PML4 schon vorhanden?
-	{											//Erstelle neuen Eintrag
-		if((Address = pmm_Alloc()) == 1)		//Speicherplatz für die PDP reservieren
-			return 1;							//Kein Speicherplatz vorhanden
-
-		//Eintrag in die PML4
-		setPML4Entry(PML4i, PML4, 1, 1, (PML4->PML4E[PML4i] & PG_US) || US, 1, 0, 0, 0, 0, Address);
-		//Könnte gecacht sein
-		InvalidateTLBEntry(PDP);
-		clearPage(PDP);
+			clearPage(next_table);
+		}
+	} else if (level == 3) {
+		return 2;
 	}
 
-	//PDP Tabelle bearbeiten
-	if((PDP->PDPE[PDPi] & PG_P) == 0)			//Eintrag in die PDP schon vorhanden?
-	{											//Neuen Eintrag erstellen
-		if((Address = pmm_Alloc()) == 1)		//Speicherplatz für die PD reservieren
-			return 1;							//Kein Speicherplatz vorhanden
+	// Potentially relax restriction
+	table[index].US |= flags & VMM_FLAGS_USER;
+	// There is no need for TLB invalidation here as the CPU will rewalk the page tables if it encounters a restriction validation
 
-		//Eintrag in die PDP
-		setPDPEntry(PDPi, PDP, 1, 1, (PDP->PDPE[PDPi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
-		//Könnte gecacht sein
-		InvalidateTLBEntry(PD);
-		clearPage(PD);
-	}
-
-	//PD Tabelle bearbeiten
-	if((PD->PDE[PDi] & PG_P) == 0)			//Eintrag in die PD schon vorhanden?
-	{										//Neuen Eintrag erstellen
-		if((Address = pmm_Alloc()) == 1)	//Speicherplatz für die PT reservieren
-			return 1;						//Kein Speicherplatz vorhanden
-
-		//Eintrag in die PDP
-		setPDEntry(PDi, PD, 1, 1, (PD->PDE[PDi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
-		//Könnte gecacht sein
-		InvalidateTLBEntry(PT);
-		clearPage(PT);
-	}
-
-	//PT Tabelle bearbeiten
-	if((PT->PTE[PTi] & PG_P) == 0)			//Eintrag in die PT schon vorhanden?
-	{										//Neuen Eintrag erstellen
-		//Eintrag in die PT
-		setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
-		//Könnte gecacht sein
-		InvalidateTLBEntry(vAddress);
-	}
-	else
-		return 2;							//virtuelle Addresse schon besetzt
+	uint8_t res = map_entry(vAddress, pAddress, flags, avl, next_table, level + 1);
 
 	//Full flags setzen
 	uint16_t i;
-	for(i = 0; i < PAGE_ENTRIES; i++)
-	{
-		if(!VMM_ALLOCATED(PT->PTE[i]))
+	for(i = 0; i < PAGE_ENTRIES; i++) {
+		if(!VMM_ALLOCATED(table[i].entry))
 			break;
 	}
-	if(i == PAGE_ENTRIES)
-	{
-		setPDEntry(PDi, PD, 1, 1, PD->PDE[PDi] & PG_US, 1, 0, 0, VMM_PAGE_FULL, 0, PD->PDE[PDi] & PG_ADDRESS);
+	if(i == PAGE_ENTRIES) {
+		table[index].AVL1 |= VMM_PAGE_FULL;
+		table[index].AVL2 |= VMM_PAGE_FULL >> 3;
 	}
 
-	for(i = 0; i < PAGE_ENTRIES; i++)
-	{
-		if(!(PG_AVL(PD->PDE[i]) & VMM_PAGE_FULL))
-			break;
-	}
-	if(i == PAGE_ENTRIES)
-	{
-		setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, VMM_PAGE_FULL, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-	}
+	return res;
+}
 
-	for(i = 0; i < PAGE_ENTRIES; i++)
-	{
-		if(!(PG_AVL(PDP->PDPE[i]) & VMM_PAGE_FULL))
-			break;
-	}
-	if(i == PAGE_ENTRIES)
-	{
-		setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PDPi] & PG_US, 1, 0, 0, VMM_PAGE_FULL, 0, PML4->PML4E[PDi] & PG_ADDRESS);
-	}
-
-	//Reserved-Bits zurücksetzen
-	PD->PDE[PDi] &= ~0x1C0;
-	PDP->PDPE[PDPi] &= ~0x1C0;
-	PML4->PML4E[PML4i] &= ~0x1C0;
-	return 0;
+static uint8_t map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl) {
+	return map_entry(vAddress, pAddress, flags, avl, (PageTable_t)PML4_ADDRESS(), 0);
 }
 
 static void *getFreePages(void *start, void *end, size_t pages)
@@ -342,101 +289,51 @@ static void *getFreePages(void *start, void *end, size_t pages)
 	return NULL;
 }
 
+static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, paddr_t *pAddress) {
+	const uint8_t FLAG_CLEAR_FULL_FLAG = 1 << 0;
+	const uint8_t FLAG_DELETE_TABLE = 1 << 1;
+
+	uint32_t index = PAGE_TABLE_INDEX(vAddress, level);
+	PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (index << 12));
+
+	if (!table[index].P)
+		return 0;
+
+	if (level < 3) {
+		uint8_t res = unmap_entry(vAddress, next_table, level + 1, pAddress);
+		if (res & FLAG_DELETE_TABLE) {
+			pmm_Free(table[index].Address << 12);
+		} else {
+			if (res & FLAG_CLEAR_FULL_FLAG) {
+				// Clear full flag
+				table[index].AVL1 &= ~VMM_PAGE_FULL;
+				table[index].AVL2 &= ~(VMM_PAGE_FULL >> 3);
+			}
+			return res;
+		}
+	} else {
+		*pAddress = table[index].Address << 12;
+	}
+
+	table[index].entry = 0;
+	InvalidateTLBEntry(level == 3 ? vAddress : next_table);
+
+	// Check if we still need this page table
+	if (level > 0) {
+		for (uint16_t i = 0; i < PAGE_ENTRIES; i++) {
+			if (table[i].P || (PG_AVL(table[i].entry) & VMM_UNUSED_PAGE)) {
+				return FLAG_CLEAR_FULL_FLAG;
+			}
+		}
+	}
+
+	return FLAG_DELETE_TABLE | FLAG_CLEAR_FULL_FLAG;
+}
+
 static paddr_t unmap(void *vAddress)
 {
-	uint16_t i;
-
-	//Einträge in die Page Tabellen
-	const uint16_t PML4i = PML4_INDEX(vAddress);
-	const uint16_t PDPi = PDP_INDEX(vAddress);
-	const uint16_t PDi = PD_INDEX(vAddress);
-	const uint16_t PTi = PT_INDEX(vAddress);
-
-	PML4_t *const PML4 = PML4_ADDRESS();
-	PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
-
-	InvalidateTLBEntry(vAddress);
-
-	//PML4 Tabelle bearbeiten
-	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
-		return 0;
-
-	//PDP Tabelle bearbeiten
-	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
-		return 0;
-
-	//PD Tabelle bearbeiten
-	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
-		return 0;
-
-	//PT Tabelle bearbeiten
-	if((PT->PTE[PTi] & PG_P) == 0)
-		return 0;
-
-	paddr_t pAddress = PT->PTE[PTi] & PG_ADDRESS;
-	clearPTEntry(PTi, PT);
-
-	//Wird die PT noch benötigt?
-	for(i = 0; i < PAGE_ENTRIES; i++)
-	{
-		if((PT->PTE[i] & PG_P) || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
-		{
-			//Full flags löschen
-			setPDEntry(PDi, PD, 1, 1, PD->PDE[PDi] & PG_US, 1, 0, 0, 0, 0, PD->PDE[PDi] & PG_ADDRESS);
-			setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-			setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-			return pAddress; //Wird die PT noch benötigt, sind wir fertig
-		}
-	}
-	//Ansonsten geben wir den Speicherplatz für die PT frei
-	pmm_Free(PD->PDE[PDi] & PG_ADDRESS);
-	//und löschen den Eintrag für diese PT in der PD
-
-	clearPDEntry(PDi, PD);
-
-	//Wird die PD noch benötigt?
-	for(i = 0; i < PAGE_ENTRIES; i++)
-	{
-		if((PD->PDE[i] & PG_P) == 1)
-		{
-			//Full flags löschen
-			setPDPEntry(PDPi, PDP, 1, 1, PDP->PDPE[PDPi] & PG_US, 1, 0, 0, 0, 0, PDP->PDPE[PDPi] & PG_ADDRESS);
-			setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-			return pAddress; //Wird die PD noch benötigt, sind wir fertig
-		}
-	}
-	//Ansonsten geben wir den Speicherplatz für die PD frei
-	pmm_Free(PDP->PDPE[PDPi] & PG_ADDRESS);
-	//und löschen den Eintrag für diese PD in der PDP
-
-	clearPDPEntry(PDPi, PDP);
-
-	//Wird die PDP noch benötigt?
-	for(i = 0; i < PAGE_ENTRIES; i++)
-	{
-		//Wird die PDP noch benötigt, sind wir fertig
-		if((PDP->PDPE[i] & PG_P) == 1)
-		{
-			//Full flag löschen
-			setPML4Entry(PML4i, PML4, 1, 1, PML4->PML4E[PML4i] & PG_US, 1, 0, 0, 0, 0, PML4->PML4E[PML4i] & PG_ADDRESS);
-			return pAddress;
-		}
-	}
-	//Ansonsten geben wir den Speicherplatz für die PDP frei
-	pmm_Free(PML4->PML4E[PML4i] & PG_ADDRESS);
-	//und löschen den Eintrag für diese PDP in der PML4
-
-	clearPML4Entry(PML4i, PML4);	//PML4 ist immer vorhanden, daher keine Überprüfung
-									//ob sie leer ist (was sehr schlecht sein würde --> PF)
-	//Reserved-Bits zurücksetzen
-	if(PDP->PDPE[PDPi] != 0)
-		PD->PDE[PDi] &= ~0x1C0;
-	if(PML4->PML4E[PML4i] != 0)
-		PDP->PDPE[PDPi] &= ~0x1C0;
-	PML4->PML4E[PML4i] &= ~0x1C0;
-
+	paddr_t pAddress;
+	unmap_entry(vAddress, (PageTable_t)PML4_ADDRESS(), 0, &pAddress);
 	return pAddress;
 }
 
