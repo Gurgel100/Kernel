@@ -145,6 +145,11 @@ typedef struct{
 	 * Determines if the thread is the main thread of the process.
 	 */
 	bool isMainThread;
+
+	/**
+	 * Determines if the fpu is initialised
+	 */
+	bool fpuInitialised;
 }thread_t;
 ERROR_TYPEDEF_POINTER(thread_t);
 

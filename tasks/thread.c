@@ -6,7 +6,6 @@
  */
 
 #include "thread.h"
-#include "list.h"
 #include "memory.h"
 #include "tss.h"
 #include "vmm.h"
@@ -19,17 +18,15 @@
 
 extern context_t kernel_context;
 
-list_t threadList;
-
-static tid_t get_tid()
+static int tid_cmp(const void *a, const void *b)
 {
-	static tid_t nextTID = 1;
-	return __sync_fetch_and_add(&nextTID, 1);
+	const thread_t *const t1 = a;
+	const thread_t *const t2 = b;
+	return (t1->tid < t2->tid) ? -1 : ((t1->tid == t2->tid) ? 0 : 1);
 }
 
 void thread_Init()
 {
-	threadList = list_create();
 }
 
 ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
@@ -40,7 +37,7 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 
 	thread->isMainThread = (process != currentProcess);
 
-	thread->tid = get_tid();
+	thread->tid = __sync_fetch_and_add(&process->next_tid, 1);
 
 	thread->process = process;
 
@@ -70,13 +67,15 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 	//Kernelstack vorbereiten
 	if(!kernel)
 	{
-		thread->kernelStackBottom = mm_SysAlloc(1);
-		thread->kernelStack = thread->kernelStackBottom + MM_BLOCK_SIZE;
+		assert(MM_KERN_STACK_SIZE % MM_BLOCK_SIZE == 0);
+		thread->kernelStackBottom = vmm_Map(NULL, 0, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_ALLOCATE);
+		thread->kernelStack = thread->kernelStackBottom + MM_KERN_STACK_SIZE;
 		thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
 
-	thread->fpuState = NULL;
+	thread->fpuState = vmm_Map(NULL, 0, 1, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	thread->fpuInitialised = false;
 
 	//Stack mappen
 	if(!kernel)
@@ -97,46 +96,25 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
 
-	list_push(process->threads, thread);
-
-	//Thread in Liste eintragen
-	list_push(threadList, thread);
+	avl_add(&process->threads, thread, tid_cmp);
 
 	return ERROR_RETURN_POINTER_VALUE(thread_t, thread);
 }
 
 void thread_destroy(thread_t *thread)
 {
-	mm_SysFree(thread->kernelStackBottom, 1);
+	vmm_UnMap(thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
 
-	//Thread aus Listen entfernen
-	thread_t *t;
-	size_t i = 0;
-	while((t = list_get(thread->process->threads, i)))
-	{
-		if(t == thread)
-		{
-			list_remove(thread->process->threads, i);
-			break;
-		}
-		i++;
-	}
-
-	i = 0;
-	while((t = list_get(threadList, i)))
-	{
-		if(t == thread)
-		{
-			list_remove(threadList, i);
-			break;
-		}
-		i++;
-	}
+	//Thread aus Liste entfernen
+	LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
 
 	//Userstack freigeben
 	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
 
-	free(thread->fpuState);
+	extern thread_t *fpuThread;
+	if(fpuThread == thread)
+		fpuThread = NULL;
+	vmm_UnMap(thread->fpuState, 1, true);
 	free(thread);
 }
 

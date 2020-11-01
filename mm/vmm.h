@@ -13,7 +13,6 @@
 #include "pmm.h"
 #include "stdbool.h"
 #include "stddef.h"
-#include "list.h"
 
 #define VMM_FLAGS_WRITE		(1 << 0)	//Wenn gesetzt, dann kann auf die Page auch geschrieben werden ansonsten nur lesen
 #define VMM_FLAGS_GLOBAL	(1 << 1)	//Bestimmt, ob die Page global ist
@@ -21,6 +20,7 @@
 #define VMM_FLAGS_NX		(1 << 3)	//Bestimmt, ob in der Page ausführbare Daten sind
 #define VMM_FLAGS_PWT		(1 << 4)	//Bestimmt, ob die Page mit write-through policy gecacht werden soll
 #define VMM_FLAGS_NO_CACHE	(1 << 5)	//Bestimmt, ob die Page nicht gecacht werden soll
+#define VMM_FLAGS_ALLOCATE	(1 << 6)	//Bestimmt, ob der physikalische Speicher schon alloziiert sein soll
 
 #define VMM_UNUSED_PAGE		0x4		//Marks page as unused by process
 
@@ -37,7 +37,7 @@ void *vmm_SysAlloc(size_t Length);
 void vmm_SysFree(void *vAddress, size_t Length);
 
 void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys);
-list_t vmm_getTables(context_t *context);
+void vmm_getPageTables(void(*callback)(paddr_t));
 
 /**
  * \brief Maps a memory area.
@@ -81,5 +81,8 @@ bool vmm_userspacePointerValid(const void *ptr, const size_t size);
 context_t *createContext(void);
 void deleteContext(context_t *context);
 void activateContext(context_t *context);
+
+//Interrupt handler
+bool vmm_handlePageFault(void *page, uint64_t errorcode);
 
 #endif /* VMM_H_ */

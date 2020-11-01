@@ -391,7 +391,7 @@ console_t *console_create(char *name, uint8_t color)
 	console->id = nextID++;
 
 	clear(console, 2);
-	unlock(&console->lock);
+	console->lock = LOCK_INIT;
 
 	return console;
 }
@@ -548,34 +548,34 @@ void console_ansi_write(console_t *console, unsigned char c)
 {
 	if(console != NULL)
 	{
-		lock(&console->lock);
-		if(c == ASCII_ESC || console->ansi_buf_ofs > 0)
-		{
-			uint8_t i;
-			console->ansi_buf[console->ansi_buf_ofs++] = c;
-			esc_seq_status_t status = console_ansi_parse(console, console->ansi_buf, console->ansi_buf_ofs);
-			switch(status)
+		LOCKED_TASK(console->lock, {
+			if(c == ASCII_ESC || console->ansi_buf_ofs > 0)
 			{
-				case NEED_MORE:
-					if(console->ansi_buf_ofs <= sizeof(console->ansi_buf))
-						break;
-					/* no break */
-				case INVALID:
-					for(i = 0; i < console->ansi_buf_ofs; i++)
-						console_write(console, console->ansi_buf[i]);
+				uint8_t i;
+				console->ansi_buf[console->ansi_buf_ofs++] = c;
+				esc_seq_status_t status = console_ansi_parse(console, console->ansi_buf, console->ansi_buf_ofs);
+				switch(status)
+				{
+					case NEED_MORE:
+						if(console->ansi_buf_ofs <= sizeof(console->ansi_buf))
+							break;
+						/* no break */
+					case INVALID:
+						for(i = 0; i < console->ansi_buf_ofs; i++)
+							console_write(console, console->ansi_buf[i]);
 
-					console->ansi_buf_ofs = 0;
-				break;
-				case SUCCESS:
-					console->ansi_buf_ofs = 0;
-				break;
+						console->ansi_buf_ofs = 0;
+					break;
+					case SUCCESS:
+						console->ansi_buf_ofs = 0;
+					break;
+				}
 			}
-		}
-		else
-		{
-			console_write(console, c);
-		}
-		unlock(&console->lock);
+			else
+			{
+				console_write(console, c);
+			}
+		});
 	}
 }
 

@@ -16,12 +16,13 @@ extern context_t kernel_context;
 
 process_t kernel_process = {
 		.Context = &kernel_context,
-		.cmd = "kernel"
+		.cmd = "kernel",
+		.next_tid = 1
 };
 thread_t* idleThread;
 
 static ring_t* scheduleList;
-static lock_t schedule_lock = LOCK_LOCKED;
+static lock_t schedule_lock = LOCK_INIT;
 static bool active = false;
 thread_t *currentThread;
 process_t *currentProcess;
@@ -32,8 +33,6 @@ process_t *currentProcess;
 void scheduler_Init()
 {
 	scheduleList = ring_create();
-	//Lock freigeben
-	unlock(&schedule_lock);
 }
 
 /*
@@ -51,13 +50,12 @@ void scheduler_activate()
  */
 bool scheduler_try_add(thread_t *thread)
 {
-	if(try_lock(&schedule_lock))
-	{
+	bool res = false;
+	LOCKED_TRY_TASK(schedule_lock, {
 		ring_add(scheduleList, &thread->ring_entry);
-		unlock(&schedule_lock);
-		return true;
-	}
-	return false;
+		res = true;
+	});
+	return res;
 }
 
 /*
@@ -77,10 +75,10 @@ void scheduler_add(thread_t *thread)
  */
 void scheduler_remove(thread_t *thread)
 {
-	lock(&schedule_lock);
-	if(ring_contains(scheduleList, &thread->ring_entry))
-		ring_remove(scheduleList, &thread->ring_entry);
-	unlock(&schedule_lock);
+	LOCKED_TASK(schedule_lock, {
+		if(ring_contains(scheduleList, &thread->ring_entry))
+			ring_remove(scheduleList, &thread->ring_entry);
+	});
 }
 
 /*
@@ -100,12 +98,13 @@ ihs_t *scheduler_schedule(ihs_t *state)
 		currentThread->State = state;
 	}
 
-	if(try_lock((&schedule_lock)))
+	lock_node_t lock_node;
+	if(try_lock(&schedule_lock, &lock_node))
 	{
 		newThread = (thread_t*)ring_getNext(scheduleList);
 		if(newThread == NULL)
 			newThread = idleThread;
-		unlock(&schedule_lock);
+		unlock(&schedule_lock, &lock_node);
 
 		if(newThread != currentThread)
 		{

@@ -13,17 +13,14 @@
 #include "vmm.h"
 #include "list.h"
 #include "hashmap.h"
+#include "avl.h"
 #include "lock.h"
 #include <bits/types.h>
 #include <bits/error.h>
 
 typedef _pid_t pid_t;
+typedef _tid_t tid_t;
 ERROR_TYPEDEF(pid_t);
-
-typedef struct{
-		uint64_t mmx[6];
-		uint128_t ymm[16][2];		//YMM-Register sind 256-Bit breit
-}__attribute__((aligned(16)))ihs_extended_t;
 
 typedef enum{
 	PM_BLOCKED, PM_RUNNING, PM_TERMINATED
@@ -32,10 +29,12 @@ typedef enum{
 typedef struct process_t{
 		context_t *Context;
 		pid_t PID;
+		tid_t next_tid;
 		struct process_t *parent;
 		char *cmd;
 		pm_status_t Status;
-		list_t threads, terminated_childs, waiting_threads, waiting_threads_pid;
+		avl_tree *threads;
+		list_t terminated_childs, waiting_threads, waiting_threads_pid;
 		hashmap_t *streams;
 		void *nextThreadStack;
 		lock_t lock;

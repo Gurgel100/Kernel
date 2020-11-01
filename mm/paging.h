@@ -54,20 +54,26 @@
 #define MAP				4096	//Anzahl der Bytes pro Map (4kb)
 #define PAGE_ENTRIES	512		//Anzahl der Einträge pro Tabelle
 
-/*typedef struct{
-		unsigned P : 1;
-		unsigned RW : 1;
-		unsigned US : 1;
-		unsigned PWT : 1;
-		unsigned PCD : 1;
-		unsigned A : 1;
-		unsigned IGN : 1;
-		unsigned MBZ : 2;
-		unsigned AVL1 : 3;
-		unsigned long PDP : 40;
-		unsigned AVL2 : 11;
-		unsigned NX : 1;
-}__attribute__((packed)) PML4_t;*/
+typedef union {
+	struct {
+		bool P: 1;
+		bool RW: 1;
+		bool US: 1;
+		bool PWT: 1;
+		bool PCD: 1;
+		bool A: 1;
+		bool D: 1;			// Only valid on last level page table
+		bool PS_PAT: 1;	// PS: valid for PML4 (must be 0), PDP, PD. PAT: valid for PT
+		bool G: 1;
+		uint32_t AVL1: 3;
+		paddr_t Address: 40;
+		uint32_t AVL2: 11;
+		bool NX: 1;
+	}__attribute__((packed));
+	uint64_t entry;
+} PageTableEntry_t;
+
+typedef PageTableEntry_t* PageTable_t;
 
 typedef struct{
 		uint64_t PML4E[PAGE_ENTRIES];
