@@ -128,6 +128,7 @@ void pm_Init()
 
 	idleThread = thread_create(&kernel_process, idle, 0, NULL, true);
 	cleanerThread = thread_create(&kernel_process, cleaner, 0, NULL, true);
+	kernel_process.Status = PM_RUNNING;
 }
 
 /*
