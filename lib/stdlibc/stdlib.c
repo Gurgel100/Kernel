@@ -582,10 +582,12 @@ static void add_empty_heap(heap_empty_t *node)
 static heap_empty_t *search_empty_heap(size_t size)
 {
 	heap_empty_t *node = base_emptyHeap;
+	heap_empty_t *bestNode = NULL;
 	while(node != NULL)
 	{
 		if(size < node->heap_base.Length)
 		{
+			bestNode = node;
 			if(node->smaller != NULL)
 				node = node->smaller;
 			else
@@ -596,7 +598,7 @@ static heap_empty_t *search_empty_heap(size_t size)
 		else
 			return node->list ? : node;
 	}
-	return NULL;
+	return bestNode ? (bestNode->list ? : bestNode) : NULL;
 }
 
 static void remove_empty_heap(heap_empty_t *node, bool with_list)
