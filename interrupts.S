@@ -176,6 +176,12 @@ mov 0x10(%rsp),%r10
 #rip laden
 mov 0x18(%rsp),%rcx
 
+# clear caller saved register to not leak information to the userspace
+xor %esi,%esi
+xor %edi,%edi
+xor %r8,%r8
+xor %r9,%r9
+
 #Interrupts deaktivieren, weil sonst kann das böse enden (Stack)
 cli
 #rsp laden
