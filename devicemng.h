@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef DEVICEMNG_H_
 #define DEVICEMNG_H_
 
@@ -33,5 +31,3 @@ vfs_device_capabilities_t dmng_getCapabilities(void *d);
 size_t dmng_getBlockSize(device_t *dev);
 
 #endif /* DEVICEMNG_H_ */
-
-#endif

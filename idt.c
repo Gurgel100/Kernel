@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "idt.h"
 #include "display.h"
 
@@ -115,5 +113,3 @@ void IDT_SetEntry(uint8_t i, uint16_t Selector, uint16_t Flags, uintptr_t Offset
 	idt[i] |= (uint128_t)Flags << 32;
 	idt[i] |= (uint128_t)(Offset >> 16) << 48;
 }
-
-#endif

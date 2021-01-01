@@ -10,8 +10,6 @@
  * @brief virtual filesystem
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef VFS_H_
 #define VFS_H_
 
@@ -204,5 +202,3 @@ int vfs_syscall_mount(const char *mountpoint, const char *device);
 int vfs_syscall_unmount(const char *mountpoint);
 
 #endif /* VFS_H_ */
-
-#endif

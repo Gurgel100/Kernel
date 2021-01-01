@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "isr.h"
 #include "config.h"
 #include "display.h"
@@ -342,5 +340,3 @@ static ihs_t *nop(ihs_t *ihs)
 	asm volatile("nop");
 	return ihs;
 }
-
-#endif

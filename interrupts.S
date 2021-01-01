@@ -1,4 +1,3 @@
-.ifdef BUILD_KERNEL
 .code64
 .section .text
 .extern isr_Handler
@@ -182,5 +181,3 @@ cli
 #rsp laden
 mov %r10,%rsp
 sysretq
-
-.endif

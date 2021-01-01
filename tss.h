@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef TSS_H_
 #define TSS_H_
 #include "stdint.h"
@@ -38,5 +36,3 @@ void TSS_Init(void);
 void TSS_setStack(void *stack);
 
 #endif /* TSS_H_ */
-
-#endif

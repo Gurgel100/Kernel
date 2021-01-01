@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "partition.h"
 #include "storage.h"
 #include "scsi.h"
@@ -256,5 +254,3 @@ int partition_getPartitions(const char *dev_name, vfs_file_t dev_stream, void(*p
 	}
 	return 0;
 }
-
-#endif

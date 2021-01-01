@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
 
@@ -61,5 +59,3 @@ void showCursor(void);
 size_t Display_FileHandler(char *name, uint64_t start, size_t length, const void *buffer);
 
 #endif /* DISPLAY_H_ */
-
-#endif

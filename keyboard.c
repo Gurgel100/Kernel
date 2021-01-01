@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "keyboard.h"
 #include "isr.h"
 #include "stdint.h"
@@ -284,5 +282,3 @@ void keyboard_Handler(ihs_t *ihs)
 			dispatcher_enqueue(notify_keyUp, (void*)key);
 	}
 }
-
-#endif

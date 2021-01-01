@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "cmos.h"
 #include "util.h"
 
@@ -167,5 +165,3 @@ time_t cmos_syscall_timestamp()
 
 	return mktime(&t);
 }
-
-#endif

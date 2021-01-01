@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "vfs.h"
 #include "stdint.h"
 #include "stddef.h"
@@ -1531,4 +1529,3 @@ int vfs_syscall_unmount(const char *mountpoint)
 		return -1;
 	return vfs_Unmount(mountpoint);
 }
-#endif

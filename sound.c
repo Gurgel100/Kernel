@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "sound.h"
 #include "pit.h"
 #include "util.h"
@@ -31,5 +29,3 @@ void sound_Play(uint32_t freq, uint64_t sleep)
 	Sleep(sleep);
 	switch_off();
 }
-
-#endif

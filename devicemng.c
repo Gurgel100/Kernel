@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "devicemng.h"
 #include "partition.h"
 #include "lists.h"
@@ -276,4 +274,3 @@ size_t dmng_getBlockSize(device_t *dev)
 		return 0;
 }
 
-#endif

@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "syscalls.h"
 #include "stddef.h"
 #include "stdbool.h"
@@ -125,5 +123,3 @@ static void sleepHandler(uint64_t msec)
 {
 	pit_RegisterTimer(currentThread, msec);
 }
-
-#endif
