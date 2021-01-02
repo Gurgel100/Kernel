@@ -149,20 +149,21 @@ iretq
 #r8  = 4. Parameter
 #r9  = 5. Parameter
 isr_syscall:
-#rsp zwischenspeichern
-mov %rsp,%rax
 #Den Kernelstackpointer laden wir einfach aus der TSS
-movq (tss+0x4),%rsp
+movq (tss+0x4),%rax
 
 #rip sichern
-mov %rcx,-0x8(%rsp)
+mov %rcx,-0x8(%rax)
 #rsp sichern
-mov %rax,-0x10(%rsp)
+mov %rsp,-0x10(%rax)
 #rflags sichern
-mov %r11,-0x18(%rsp)
+mov %r11,-0x18(%rax)
 
 #Stack muss 16-byte aligned sein beim Funktionsaufruf
-sub $0x20,%rsp
+lea -0x20(%rax),%rsp
+
+# It's save to enable interrupts now
+sti
 
 #3. Parameter an die richtige Position verschieben
 mov %r10,%rcx

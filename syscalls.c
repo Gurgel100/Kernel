@@ -71,7 +71,7 @@ void syscall_Init()
 	{
 		cpu_MSRwrite(STAR, (0x8ul << 32) | (0x13ul << 48));	//Segementregister
 		cpu_MSRwrite(LSTAR, (uintptr_t)isr_syscall);		//Einsprungspunkt
-		cpu_MSRwrite(SFMASK, 0);							//Wir setzen keine Bits zurück (Interrupts bleiben auch aktiviert)
+		cpu_MSRwrite(SFMASK, 1ul << 9);						//Wir setzen das interrupt enable bit zurück, wir müssen nämlich den Stack switchen
 
 		//Syscall-Instruktion aktivieren (ansonsten #UD)
 		//Bit 0
