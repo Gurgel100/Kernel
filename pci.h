@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef PCI_H_
 #define PCI_H_
 
@@ -39,5 +37,3 @@ uint32_t pci_readConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, ui
 void pci_writeConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8_t length, uint32_t Data);
 
 #endif /* PCI_H_ */
-
-#endif

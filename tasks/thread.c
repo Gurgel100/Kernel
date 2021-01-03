@@ -109,10 +109,13 @@ void thread_destroy(thread_t *thread)
 	LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
 
 	//Userstack freigeben
-	vmm_ContextUnMap(thread->process->Context, thread->userStackBottom, true);
+	for (size_t i = 0; i < MM_USER_STACK_SIZE / MM_BLOCK_SIZE; i++) {
+		vmm_ContextUnMap(thread->process->Context, thread->userStackBottom + i * MM_BLOCK_SIZE, true);
+	}
 
 	extern thread_t *fpuThread;
-	fpuThread = NULL;
+	if(fpuThread == thread)
+		fpuThread = NULL;
 	vmm_UnMap(thread->fpuState, 1, true);
 	free(thread);
 }

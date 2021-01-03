@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "main.h"
 #include "config.h"
 #include "multiboot.h"
@@ -115,5 +113,3 @@ void Init()
 	asm volatile("sti");	//Interrupts aktivieren
 	cdi_init();			//CDI und -Treiber initialisieren
 }
-
-#endif

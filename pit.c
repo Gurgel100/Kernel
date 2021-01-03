@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "pit.h"
 #include "util.h"
 #include "list.h"
@@ -28,7 +26,7 @@ typedef struct{
 }timer_t;
 
 static list_t Timerlist;
-static lock_t Timerlist_lock = LOCK_UNLOCKED;
+static lock_t Timerlist_lock = LOCK_INIT;
 
 void pit_Init(uint32_t freq)
 {
@@ -60,22 +58,21 @@ void pit_RegisterTimer(thread_t *thread, uint64_t msec)
 		Timer->thread = thread;
 		Timer->timeout = ((t = Uptime + msec) < Uptime) ? -1ul : t;
 
-		lock(&Timerlist_lock);
-		if(Timerlist == NULL)
-			Timerlist = list_create();
+		LOCKED_TASK(Timerlist_lock, {
+			if(Timerlist == NULL)
+				Timerlist = list_create();
 
-		//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
-		//zuerst abläuft
-		timer_t *item;
-		for(i = 0; (item = list_get(Timerlist, i)); i++)
-		{
-			if(item->timeout > Timer->timeout)
-				break;
-		}
+			//Timerliste sortiere, sodass das Element vorne immer das Element ist, welches
+			//zuerst abläuft
+			timer_t *item;
+			for(i = 0; (item = list_get(Timerlist, i)); i++)
+			{
+				if(item->timeout > Timer->timeout)
+					break;
+			}
 
-		list_insert(Timerlist, i, Timer);
-
-		unlock(&Timerlist_lock);
+			list_insert(Timerlist, i, Timer);
+		});
 
 		//Entsprechenden Thread schlafen legen
 		thread_block_self(NULL, NULL, THREAD_BLOCKED_WAIT_TIMER);
@@ -94,8 +91,7 @@ void pit_Handler(void)
 	Uptime++;
 	if(Timerlist)
 	{
-		if(try_lock(&Timerlist_lock))
-		{
+		LOCKED_TRY_TASK(Timerlist_lock,	{
 			while((Timer = list_get(Timerlist, i)))
 			{
 				if(Timer->timeout > Uptime)
@@ -106,9 +102,6 @@ void pit_Handler(void)
 					break;
 				i++;
 			}
-			unlock(&Timerlist_lock);
-		}
+		});
 	}
 }
-
-#endif

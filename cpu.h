@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef CPU_H_
 #define CPU_H_
 
@@ -139,5 +137,3 @@ inline void cpu_restoreXState(void *ptr)
 }
 
 #endif /* CPU_H_ */
-
-#endif

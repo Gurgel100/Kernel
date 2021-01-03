@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "partition.h"
 #include "storage.h"
 #include "scsi.h"
@@ -192,5 +190,3 @@ int partition_getPartitions(const char *dev_name, void(*partition_callback)(void
 
 	return 0;
 }
-
-#endif

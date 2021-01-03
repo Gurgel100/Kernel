@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "pci.h"
 #include "config.h"
 #include "util.h"
@@ -295,5 +293,3 @@ void pci_writeConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t reg, uint8
 		break;
 	}
 }
-
-#endif

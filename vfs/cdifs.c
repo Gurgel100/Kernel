@@ -99,22 +99,19 @@ static int dir_visitChilds(vfs_node_dir_t *node, uint64_t start, vfs_node_dir_ca
 {
 	cdifs_vfs_node_dir_t *cdi_node = CAST_NODE(cdifs_vfs_node_dir_t, node);
 
-	lock(&node->base.lock);
-
-	int status = loadChilds(cdi_node);
-	if(status)
-		return status;
-
 	cdifs_visit_childs_context_t visitContext = {
 		.callback = callback,
 		.context = context,
 		.start = start
 	};
 
-	hashmap_visit(cdi_node->childs, visitChilds, &visitContext);
-
-	unlock(&node->base.lock);
-	return 0;
+	return LOCKED_RESULT(node->base.lock, {
+		int status = loadChilds(cdi_node);
+		if(!status) {
+			hashmap_visit(cdi_node->childs, visitChilds, &visitContext);
+		}
+		status;
+	});
 }
 
 static vfs_node_t *dir_findChild(vfs_node_dir_t *node, const char *name)
@@ -122,10 +119,10 @@ static vfs_node_t *dir_findChild(vfs_node_dir_t *node, const char *name)
 	cdifs_vfs_node_dir_t *cdi_node = CAST_NODE(cdifs_vfs_node_dir_t, node);
 	vfs_node_t *child = NULL;
 
-	lock(&node->base.lock);
-	loadChilds(cdi_node);
-	hashmap_search(cdi_node->childs, name, (void**)&child);
-	unlock(&node->base.lock);
+	LOCKED_TASK(node->base.lock, {
+		loadChilds(cdi_node);
+		hashmap_search(cdi_node->childs, name, (void**)&child);
+	});
 
 	return child;
 }
@@ -135,13 +132,14 @@ static int dir_createChild(vfs_node_dir_t *node, vfs_node_type_t type, const cha
 	cdifs_vfs_node_dir_t *cdi_node = CAST_NODE(cdifs_vfs_node_dir_t, node);
 	struct cdi_fs_stream *stream = &cdi_node->base.stream;
 
-	lock(&node->base.lock);
+	lock_node_t lock_node;
+	lock(&node->base.lock, &lock_node);
 
 	loadRes(&cdi_node->base.stream);
 
 	if(!stream->res->flags.create_child)
 	{
-		unlock(&node->base.lock);
+		unlock(&node->base.lock, &lock_node);
 		return 1;
 	}
 
@@ -158,7 +156,7 @@ static int dir_createChild(vfs_node_dir_t *node, vfs_node_type_t type, const cha
 			res_class = CDI_FS_CLASS_LINK;
 			break;
 		default:
-			unlock(&node->base.lock);
+			unlock(&node->base.lock, &lock_node);
 			return 1;
 	}
 
@@ -168,14 +166,14 @@ static int dir_createChild(vfs_node_dir_t *node, vfs_node_type_t type, const cha
 
 	if(!stream->res->dir->create_child(&newStream, name, stream->res))
 	{
-		unlock(&node->base.lock);
+		unlock(&node->base.lock, &lock_node);
 		return -1;
 	}
 
 	if(!stream->res->res->assign_class(&newStream, res_class))
 	{
 		stream->res->res->remove(&newStream);
-		unlock(&node->base.lock);
+		unlock(&node->base.lock, &lock_node);
 		return -1;
 	}
 
@@ -188,7 +186,7 @@ static int dir_createChild(vfs_node_dir_t *node, vfs_node_type_t type, const cha
 			hashmap_set(cdi_node->childs, child->name, child);
 	}
 
-	unlock(&node->base.lock);
+	unlock(&node->base.lock, &lock_node);
 
 	return 0;
 }

@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef CMOS_H_
 #define CMOS_H_
 
@@ -31,5 +29,3 @@ void cmos_Reboot(void);
 time_t cmos_syscall_timestamp();
 
 #endif /* CMOS_H_ */
-
-#endif

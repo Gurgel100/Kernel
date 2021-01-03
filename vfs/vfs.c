@@ -48,7 +48,7 @@ typedef struct
 
 static vfs_node_dir_t root;
 static hashmap_t *streams = NULL;	//geöffnete Streams
-static lock_t vfs_lock = LOCK_LOCKED;
+static lock_t vfs_lock = LOCK_INIT;
 static hashmap_t *filesystem_drivers;
 
 static size_t getDirs(char ***Dirs, const char *Path)
@@ -278,8 +278,6 @@ void vfs_Init(void)
 
 	vfs_node_dir_init(&root, VFS_ROOT);
 
-	unlock(&vfs_lock);
-
 	devfs_init();
 }
 
@@ -325,17 +323,15 @@ vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
 	if(node == NULL || !checkMode(node, mode))
 		return -1;
 
-	lock(&node->lock);
+	LOCKED_TASK(node->lock, {
+		if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
+		{
+			stream = createStream(node, mode);
 
-	if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
-	{
-		stream = createStream(node, mode);
-
-		//In Hashtable einfügen
-		LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)stream->id, stream));
-	}
-
-	unlock(&node->lock);
+			//In Hashtable einfügen
+			LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)stream->id, stream));
+		}
+	});
 
 	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
 
@@ -359,12 +355,10 @@ vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
 
 	REFCOUNT_RELEASE(stream);
 
-	lock(&node->lock);
-
-	if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
-		stream = createStream(node, mode);
-
-	unlock(&node->lock);
+	LOCKED_TASK(node->lock, {
+		if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
+			stream = createStream(node, mode);
+	});
 
 	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
 
@@ -793,12 +787,9 @@ int vfs_Unmount(const char *mountpath)
 	if(!mount || mount->base.type != VFS_NODE_DIR)
 		return 1;
 
-	lock(&mount->base.lock);
-	vfs_filesystem_t *fs = list_pop(mount->mounts);
+	vfs_filesystem_t *fs = LOCKED_RESULT(mount->base.lock, list_pop(mount->mounts));
 	if(fs == NULL)
 		return 2;
-
-	unlock(&mount->base.lock);
 
 	REFCOUNT_RELEASE(fs);
 

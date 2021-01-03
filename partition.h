@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef PARTITION_H_
 #define PARTITION_H_
 
@@ -15,5 +13,3 @@
 int partition_getPartitions(const char *dev_name, void(*partition_callback)(void *context, void*), void *context);
 
 #endif /* PARTITION_H_ */
-
-#endif

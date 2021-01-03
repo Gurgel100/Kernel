@@ -32,7 +32,7 @@ static bool mode_equal(const void *a, const void *b, __attribute__((unused)) voi
 int vfs_node_init(vfs_node_t *node, const char *name)
 {
 	node->name = strdup(name);
-	node->lock = LOCK_UNLOCKED;
+	node->lock = LOCK_INIT;
 	node->parent = NULL;
 	node->streams = hashmap_create(mode_hash, mode_hash, mode_equal, NULL, NULL, NULL, NULL, 0);
 	if(node->streams == NULL)
@@ -52,7 +52,8 @@ void vfs_node_deinit(vfs_node_t *node)
 {
 	assert(node != NULL);
 
-	lock(&node->lock);
+	lock_node_t lock_node;
+	lock(&node->lock, &lock_node);
 	free((char*)node->name);
 	hashmap_destroy(node->streams);
 	free(node);

@@ -234,56 +234,15 @@ uint64_t atou(char *s)
 uint64_t traceRegistersToString(ihs_t *ihs, char *out)
 {
 	uint64_t offset = 0;
-	//RAX
-	offset += sprintf(out, "RAX: 0x%08lX                ", ihs->rax >> 32, ihs->rax & 0xFFFFFFFF);
-
-	//RBX
-	offset += sprintf(out + offset, "RBX: 0x%08lX\n", ihs->rbx >> 32, ihs->rbx & 0xFFFFFFFF);
-
-	//RCX
-	offset += sprintf(out + offset, "RCX: 0x%08lX                ", ihs->rcx >> 32, ihs->rcx & 0xFFFFFFFF);
-
-	//RDX
-	offset += sprintf(out + offset, "RDX: 0x%08lX\n", ihs->rdx >> 32, ihs->rdx & 0xFFFFFFFF);
-
-	//RSI
-	offset += sprintf(out + offset, "RSI: 0x%08lX                ", ihs->rsi >> 32, ihs->rsi & 0xFFFFFFFF);
-
-	//RDI
-	offset += sprintf(out + offset, "RDI: 0x%08lX\n", ihs->rdi >> 32, ihs->rdi & 0xFFFFFFFF);
-
-	//RSP
-	offset += sprintf(out + offset, "RSP: 0x%08lX                ", ihs->rsp >> 32, ihs->rsp & 0xFFFFFFFF);
-
-	//RBP
-	offset += sprintf(out + offset, "RBP: 0x%08lX\n", ihs->rbp >> 32, ihs->rbp & 0xFFFFFFFF);
-
-	//R8
-	offset += sprintf(out + offset, "R8 : 0x%08lX                ", ihs->r8 >> 32, ihs->r8 & 0xFFFFFFFF);
-
-	//R9
-	offset += sprintf(out + offset, "R9 : 0x%08lX\n", ihs->r9 >> 32, ihs->r9 & 0xFFFFFFFF);
-
-	//R10
-	offset += sprintf(out + offset, "R10: 0x%08lX                ", ihs->r10 >> 32, ihs->r10 & 0xFFFFFFFF);
-
-	//R11
-	offset += sprintf(out + offset, "R11: 0x%08lX\n", ihs->r11 >> 32, ihs->r11 & 0xFFFFFFFF);
-
-	//R12
-	offset += sprintf(out + offset, "R12: 0x%08lX                ", ihs->r12 >> 32, ihs->r12 & 0xFFFFFFFF);
-
-	//R13
-	offset += sprintf(out + offset, "R13: 0x%08lX\n", ihs->r13 >> 32, ihs->r13 & 0xFFFFFFFF);
-
-	//R14
-	offset += sprintf(out + offset, "R14: 0x%08lX                ", ihs->r14 >> 32, ihs->r14 & 0xFFFFFFFF);
-
-	//R15
-	offset += sprintf(out + offset, "R15: 0x%08lX\n", ihs->r15 >> 32, ihs->r15 & 0xFFFFFFFF);
-
-	//RIP
-	offset += sprintf(out + offset, "RIP: 0x%08lX\n", ihs->rip >> 32, ihs->rip & 0xFFFFFFFF);
+	offset += sprintf(out + offset, "RAX: 0x%08lX                RBX: 0x%08lX\n", ihs->rax, ihs->rbx);
+	offset += sprintf(out + offset, "RCX: 0x%08lX                RDX: 0x%08lX\n", ihs->rcx, ihs->rdx);
+	offset += sprintf(out + offset, "RSI: 0x%08lX                RDI: 0x%08lX\n", ihs->rsi, ihs->rdi);
+	offset += sprintf(out + offset, "RSP: 0x%08lX                RBP: 0x%08lX\n", ihs->rsp, ihs->rbp);
+	offset += sprintf(out + offset, "R8 : 0x%08lX                R9 : 0x%08lX\n", ihs->r8, ihs->r9);
+	offset += sprintf(out + offset, "R10: 0x%08lX                R11: 0x%08lX\n", ihs->r10, ihs->r11);
+	offset += sprintf(out + offset, "R12: 0x%08lX                R13: 0x%08lX\n", ihs->r12, ihs->r13);
+	offset += sprintf(out + offset, "R14: 0x%08lX                R15: 0x%08lX\n", ihs->r14, ihs->r15);
+	offset += sprintf(out + offset, "RIP: 0x%08lX\n", ihs->rip);
 	return offset;
 }
 

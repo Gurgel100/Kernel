@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "devicemng.h"
 #include "partition.h"
 #include "lists.h"
@@ -268,4 +266,3 @@ void dmng_registerDevice(struct cdi_device *dev)
 	list_push(devices, device);
 }
 
-#endif

@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef ISR_H_
 #define ISR_H_
 
@@ -33,5 +31,3 @@ interrupt_handler isr_setHandler(uint8_t num, interrupt_handler handler);
 ihs_t *isr_Handler(ihs_t *ihs);
 
 #endif /* ISR_H_ */
-
-#endif

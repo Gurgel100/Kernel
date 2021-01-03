@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #ifndef KEYBOARD_H_
 #define KEYBOARD_H_
 
@@ -61,5 +59,3 @@ void keyboard_registerKeyupHandler(key_handler handler, void *opaque);
 bool keyboard_isKeyPressed(KEY_t key);
 
 #endif /* KEYBOARD_H_ */
-
-#endif

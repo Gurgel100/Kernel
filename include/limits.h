@@ -35,6 +35,9 @@ extern "C" {
 #define	LONG_MAX	9223372036854775807ll		//Grösster Wert eines long int
 #define	ULONG_MAX	18446744073709551615ull	//Grösster Wert eines unsigned long int
 
+//Posix
+#define NAME_MAX	255						//Maximale Länge eines Dateinamens ohne Nullzeichen
+
 #ifdef __cplusplus
 }
 #endif

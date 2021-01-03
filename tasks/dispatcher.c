@@ -17,7 +17,7 @@ typedef struct{
 	void *opaque;
 }dispatcher_task_t;
 
-static lock_t dispatcher_lock = LOCK_LOCKED;
+static lock_t dispatcher_lock = LOCK_INIT;
 static dispatcher_task_t *queue;
 static size_t queue_size;
 static uint64_t queue_start, queue_end;
@@ -27,24 +27,21 @@ void dispatcher_init(size_t max_count)
 	queue_size = max_count;
 	queue = calloc(queue_size, sizeof(dispatcher_task_t));
 	queue_start = queue_end = 0;
-	unlock(&dispatcher_lock);
 }
 
 void dispatcher_enqueue(dispatcher_task_handler_t handler, void *opaque)
 {
-	lock(&dispatcher_lock);
-
-	if((queue_end >= queue_start && queue_end < queue_size)
-			|| (queue_end < queue_start && queue_start > 0))
-	{
-		dispatcher_task_t *task = &queue[queue_end++];
-		task->func = handler;
-		task->opaque = opaque;
-	}
-	if(queue_end == queue_size && queue_start > 0)
-		queue_end = 0;
-
-	unlock(&dispatcher_lock);
+	LOCKED_TASK(dispatcher_lock, {
+		if((queue_end >= queue_start && queue_end < queue_size)
+				|| (queue_end < queue_start && queue_start > 0))
+		{
+			dispatcher_task_t *task = &queue[queue_end++];
+			task->func = handler;
+			task->opaque = opaque;
+		}
+		if(queue_end == queue_size && queue_start > 0)
+			queue_end = 0;
+	});
 }
 
 static ihs_t *dispatch_wrapper(ihs_t *state, uintptr_t ret, dispatcher_task_handler_t func, void *opaque)
@@ -73,8 +70,7 @@ ihs_t *dispatcher_dispatch(ihs_t *state)
 	};
 	static ihs_t new_state;
 
-	if(try_lock(&dispatcher_lock))
-	{
+	LOCKED_TRY_TASK(dispatcher_lock, {
 		if(queue_start != queue_end)
 		{
 			dispatcher_task_t *task = &queue[queue_start++];
@@ -92,8 +88,7 @@ ihs_t *dispatcher_dispatch(ihs_t *state)
 			new_state.rcx = (uintptr_t)task->opaque;
 			state = &new_state;
 		}
-		unlock(&dispatcher_lock);
-	}
+	});
 
 	return state;
 }

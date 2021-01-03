@@ -5,8 +5,6 @@
  *      Author: pascal
  */
 
-#ifdef BUILD_KERNEL
-
 #include "tss.h"
 #include "gdt.h"
 #include "string.h"
@@ -36,5 +34,3 @@ void TSS_setStack(void *stack)
 {
 	tss.rsp0 = (uint64_t)stack;
 }
-
-#endif

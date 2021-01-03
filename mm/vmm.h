@@ -13,7 +13,6 @@
 #include "pmm.h"
 #include "stdbool.h"
 #include "stddef.h"
-#include "list.h"
 
 #define VMM_FLAGS_WRITE		(1 << 0)	//Wenn gesetzt, dann kann auf die Page auch geschrieben werden ansonsten nur lesen
 #define VMM_FLAGS_GLOBAL	(1 << 1)	//Bestimmt, ob die Page global ist
@@ -38,7 +37,7 @@ void *vmm_SysAlloc(size_t Length);
 void vmm_SysFree(void *vAddress, size_t Length);
 
 void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys);
-list_t vmm_getTables(context_t *context);
+void vmm_getPageTables(void(*callback)(paddr_t));
 
 /**
  * \brief Maps a memory area.

@@ -1,4 +1,3 @@
-.ifdef BUILD_KERNEL
 .code64
 .extern main
 .global _start
@@ -23,4 +22,3 @@ jmp _stop
 .align 0x10
 .space 0x10000		#64KB Platz für den Kernelstack
 stack:
-.endif
