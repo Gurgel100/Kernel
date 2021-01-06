@@ -57,9 +57,4 @@ void unlock(lock_t *lock, lock_node_t *node);
 bool locked(const lock_t *lock);
 void lock_wait(lock_t *lock);
 
-//Eine Variable atomar inkrementieren
-void locked_inc(volatile uint64_t *var);
-//Eine Variable atomar inkrementieren
-void locked_dec(volatile uint64_t *var);
-
 #endif /* LOCK_H_ */

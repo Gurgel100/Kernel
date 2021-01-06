@@ -48,15 +48,3 @@ bool try_lock(lock_t *lock, lock_node_t *node) {
 void lock_wait(lock_t *lock) {
     while (__atomic_load_n(lock, __ATOMIC_RELAXED) != NULL) pause();
 }
-
-//Eine Variable atomar inkrementieren
-void locked_inc(volatile uint64_t *var)
-{
-	asm volatile("lock incq (%0)" : : "r"(var));
-}
-
-//Eine Variable atomar inkrementieren
-void locked_dec(volatile uint64_t *var)
-{
-	asm volatile("lock decq (%0)" : : "r"(var));
-}
