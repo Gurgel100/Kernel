@@ -52,10 +52,10 @@ typedef struct lock_node {
 typedef lock_node_t *lock_t;
 
 bool try_lock(lock_t *lock, lock_node_t *node);
-void lock(volatile lock_t *lock, volatile lock_node_t *node);
-void unlock(volatile lock_t *lock, volatile lock_node_t *node);
+void lock(lock_t *lock, lock_node_t *node);
+void unlock(lock_t *lock, lock_node_t *node);
 bool locked(const lock_t *lock);
-void lock_wait(volatile lock_t *lock);
+void lock_wait(lock_t *lock);
 
 //Eine Variable atomar inkrementieren
 void locked_inc(volatile uint64_t *var);
