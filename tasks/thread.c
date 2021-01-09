@@ -29,11 +29,11 @@ void thread_Init()
 {
 }
 
-thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
+ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
 {
 	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
 	if(thread == NULL || data_length >= MM_USER_STACK_SIZE)
-		return NULL;
+		return ERROR_RETURN_POINTER_ERROR(thread_t, E_NO_MEMORY);
 
 	thread->isMainThread = (process != currentProcess);
 
@@ -98,7 +98,7 @@ thread_t *thread_create(process_t *process, void *entry, size_t data_length, voi
 
 	avl_add(&process->threads, thread, tid_cmp);
 
-	return thread;
+	return ERROR_RETURN_POINTER_VALUE(thread_t, thread);
 }
 
 void thread_destroy(thread_t *thread)
