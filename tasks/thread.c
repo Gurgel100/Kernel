@@ -11,7 +11,6 @@
 #include "vmm.h"
 #include "stdlib.h"
 #include "string.h"
-#include "cpu.h"
 #include "scheduler.h"
 #include "pmm.h"
 #include "assert.h"
@@ -51,8 +50,6 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 			.ds = 0x10,
 			.gs = 0x10,
 			.fs = 0x10,
-
-			.rdi = cpuInfo.syscall,
 
 			.rip = (uint64_t)entry,	//Einsprungspunkt des Programms
 

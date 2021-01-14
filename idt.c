@@ -48,7 +48,6 @@ extern int45;
 extern int46;
 extern int47;
 //Syscalls
-extern int48;
 extern int255;
 void IDT_Init(void)
 {
@@ -94,7 +93,6 @@ void IDT_Init(void)
 	IDT_SetEntry(47, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int47);
 
 	//Syscall
-	IDT_SetEntry(48, 0x8, IDT_TYPE_TRAP_GATE | IDT_DPL_USER | IDT_PRESENT, (uintptr_t)&int48);
 	IDT_SetEntry(255, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_USER | IDT_PRESENT, (uintptr_t)&int255);
 
 	idtr.limit = sizeof(idt) - 1;

@@ -33,7 +33,6 @@ typedef struct{
 }irqHandlers;
 
 extern void keyboard_Handler(ihs_t *ihs);
-extern ihs_t *syscall_Handler(ihs_t *ihs);
 extern void cdi_irq_handler(uint8_t irq);
 extern void pit_Handler(void);
 
@@ -85,7 +84,6 @@ static interrupt_handler interrupt_handlers[NUM_INTERRUPTS] = {
 [18]			exception_MachineCheck,
 [19]			exception_XF,
 [32 ... 47]		irq_handler,
-[48]			syscall_Handler,
 [255]			scheduler_schedule
 };
 
