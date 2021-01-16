@@ -92,15 +92,6 @@ uint64_t syscall_syscallHandler(uint64_t func, uint64_t arg1, uint64_t arg2, uin
 	return syscalls[func](arg1, arg2, arg3, arg4, arg5);
 }
 
-/*
- * Funktionsnummer wird im Register rdi übergeben
- */
-ihs_t *syscall_Handler(ihs_t *ihs)
-{
-	ihs->rax = syscall_syscallHandler(ihs->rdi, ihs->rsi, ihs->rdx, ihs->rcx, ihs->r8, ihs->r9);
-	return ihs;
-}
-
 static void nop()
 {
 	asm volatile("nop");
