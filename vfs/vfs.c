@@ -254,15 +254,15 @@ static vfs_stream_t *getOrCreateStream(vfs_node_t *node, vfs_mode_t mode)
 		if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
 		{
 			stream = calloc(1, sizeof(*stream));
-	if(stream == NULL)
-		return NULL;
+			if(stream == NULL)
+				return NULL;
 
-	stream->mode = mode;
-	stream->node = node;
-	REFCOUNT_INIT(stream, vfs_stream_closed);
+			stream->mode = mode;
+			stream->node = node;
+			REFCOUNT_INIT(stream, vfs_stream_closed);
 
-	hashmap_set(stream->node->streams, &stream->mode, stream);
-}
+			hashmap_set(stream->node->streams, &stream->mode, stream);
+		}
 		stream;
 	});
 }
@@ -293,7 +293,7 @@ vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 		return NULL;
 
 	return getOrCreateStream(node, mode);
-		}
+}
 
 vfs_stream_t *vfs_Reopen(vfs_stream_t *stream, vfs_mode_t mode)
 {
@@ -320,7 +320,7 @@ void vfs_Close(vfs_stream_t *stream)
 	REFCOUNT_RELEASE(stream);
 }
 
-static int visitChildsCallback(vfs_node_t *node, void *context)
+static bool visitChildsCallback(vfs_node_t *node, void *context)
 {
 	vfs_visit_childs_context_t *info = context;
 	size_t name_len = strlen(node->name);
@@ -347,7 +347,7 @@ static int visitChildsCallback(vfs_node_t *node, void *context)
 			entry->type = UDT_UNKNOWN;
 	}
 	entry->size = entry_size;
-	strcpy(&entry->name, node->name);
+	strcpy(entry->name, node->name);
 
 	*info->bytesWritten += entry_size;
 
@@ -382,7 +382,7 @@ size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, void *buffe
 				.size = length,
 				.bytesWritten = &sizeRead
 			};
-			((vfs_node_dir_t*)node)->visitChilds(node, start, visitChildsCallback, &info);
+			((vfs_node_dir_t*)node)->visitChilds(((vfs_node_dir_t*)node), start, visitChildsCallback, &info);
 		}
 		break;
 		case VFS_NODE_FILE:
@@ -412,10 +412,10 @@ size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void
 	switch(node->type)
 	{
 		case VFS_NODE_FILE:
-			sizeWritten = ((vfs_node_file_t*)node)->write(node, start, length, buffer);
+			sizeWritten = ((vfs_node_file_t*)node)->write(((vfs_node_file_t*)node), start, length, buffer);
 		break;
 		case VFS_NODE_DEV:
-			sizeWritten = ((vfs_node_dev_t*)node)->write(node, start, length, buffer);
+			sizeWritten = ((vfs_node_dev_t*)node)->write(((vfs_node_dev_t*)node), start, length, buffer);
 		break;
 	}
 
@@ -649,7 +649,7 @@ int vfs_Mount(const char *mountpath, const char *devpath, const char *filesystem
 			if(devNode->type != VFS_NODE_DEV)
 				return 3;
 
-			vfs_node_dev_t *dnode = devNode;
+			vfs_node_dev_t *dnode = (vfs_node_dev_t*)devNode;
 			if((dnode->type & VFS_DEVICE_CHARACTER))
 				return 3;
 
