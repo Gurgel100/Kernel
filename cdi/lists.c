@@ -170,20 +170,19 @@ void* cdi_list_get(cdi_list_t list, size_t index)
  */
 void* cdi_list_remove(cdi_list_t list, size_t index)
 {
-	struct cdi_list_node *prevNode, *Node;
-	void *value;
-
-	if(index == 0)
-		return cdi_list_pop(list);
-
-	Node = cdi_list_get(list, index);
-	if(Node == NULL)
+	if (list == NULL || index >= list->Size)
 		return NULL;
 
-	prevNode = cdi_list_get(list, index - 1);
+	struct cdi_list_node **prevNodePtr = &list->Anchor;
+	struct cdi_list_node *Node = list->Anchor;
 
-	prevNode->Next = Node->Next;
-	value = Node->Value;
+	for (size_t i = 0; i < index; i++) {
+		prevNodePtr = &Node->Next;
+		Node = Node->Next;
+	}
+
+	*prevNodePtr = Node->Next;
+	void *value = Node->Value;
 	free(Node);
 
 	list->Size--;

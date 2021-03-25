@@ -9,6 +9,7 @@
 #define PATH_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 
 /**
  * \brief Returns if a path is relative or absolute
@@ -58,5 +59,19 @@ char *path_append(const char *path1, const char *path2);
  * @return a newly allocated string holding the path to the directory in which the removed element is contained
  */
 char *path_removeLast(const char *path, char **element);
+
+/**
+ * \brief Split the path into its elements
+ * 
+ * This function splits the path into its elements. The elements are returned as an array of strings with a size of \p count.
+ * The \p elements array has to be freed by the caller. The array is always allocated if no error occured.
+ * 
+ * @param[in]   path Path of which to extract the elements
+ * @param[out]  elements An array of strings containing copies of the elements. The caller is responsible for freeing it
+ * @param[out]  count The number of valid elements in the \p elements array
+ * 
+ * @return non-zero if an error occured else 0
+ */
+int path_split(const char *path, char ***elements, size_t *count);
 
 #endif /* PATH_H_ */

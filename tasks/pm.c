@@ -126,8 +126,8 @@ void pm_Init()
 	scheduler_Init();
 	cleaner_Init();
 
-	idleThread = thread_create(&kernel_process, idle, 0, NULL, true);
-	cleanerThread = thread_create(&kernel_process, cleaner, 0, NULL, true);
+	idleThread = ERROR_GET_VALUE(thread_create(&kernel_process, idle, 0, NULL, true));
+	cleanerThread = ERROR_GET_VALUE(thread_create(&kernel_process, cleaner, 0, NULL, true));
 	kernel_process.Status = PM_RUNNING;
 }
 
@@ -137,16 +137,18 @@ void pm_Init()
  * 				entry = Einsprungspunkt
  */
 
-process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
+ERROR_TYPE_POINTER(process_t) pm_InitTask(process_t *parent, void *entry, char* cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	process_t *newProcess = malloc(sizeof(process_t));
+	if(newProcess == NULL)
+		return ERROR_RETURN_POINTER_ERROR(process_t, E_NO_MEMORY);
 
 	//Argumente kopieren
 	newProcess->cmd = strdup(cmd);
 	if(newProcess->cmd == NULL)
 	{
 		free(newProcess);
-		return 0;
+		return ERROR_RETURN_POINTER_ERROR(process_t, E_NO_MEMORY);
 	}
 
 	newProcess->PID = __sync_fetch_and_add(&nextPID, 1);
@@ -168,7 +170,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 		deleteContext(newProcess->Context);
 		free(newProcess->cmd);
 		free(newProcess);
-		return NULL;
+		return ERROR_RETURN_POINTER_ERROR(process_t, E_CANCELED);	//TODO: better errorcode
 	}
 
 	size_t cmd_size = strlen(newProcess->cmd) + 1;
@@ -191,8 +193,16 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	assert(written_data == cmd_size + sizeof(size_t) + env_size);
 
 	//Mainthread erstellen
-	thread_create(newProcess, entry, written_data, data, false);
+	ERROR_TYPE_POINTER(thread_t) thread_ret = thread_create(newProcess, entry, written_data, data, false);
 	free(data);
+	if(ERROR_DETECT(thread_ret))
+	{
+		vfs_deinitUserspace(newProcess);
+		deleteContext(newProcess->Context);
+		free(newProcess->cmd);
+		free(newProcess);
+		return ERROR_RETURN_POINTER_ERROR(process_t, ERROR_GET_ERROR(thread_ret));
+	}
 
 	//Prozess in Liste eintragen
 	bool res = LOCKED_RESULT(pm_lock, avl_add_s(&process_list, newProcess, pid_cmp, NULL));
@@ -201,7 +211,7 @@ process_t *pm_InitTask(process_t *parent, void *entry, char* cmd, const char **e
 	__sync_fetch_and_add(&numTasks, 1);
 	newProcess->lock = LOCK_INIT;
 
-	return newProcess;
+	return ERROR_RETURN_POINTER_VALUE(process_t, newProcess);
 }
 
 /*

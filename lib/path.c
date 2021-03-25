@@ -96,3 +96,49 @@ char *path_removeLast(const char *path, char **element)
 	}
 	return new_path;
 }
+
+int path_split(const char *path, char ***elements, size_t *count) {
+	if (path == NULL) return -1;
+
+	size_t element_count = 0;
+	size_t allocated_elements = 2;
+	const char *current_element = path;
+	*elements = malloc(allocated_elements * sizeof(*elements));
+	if (*elements == NULL) return -1;
+
+	while (*current_element != '\0') {
+		char *element_end = strchr(current_element, '/');
+		bool last_element = false;
+		if (element_end == NULL) {
+			element_end = strchr(current_element, '\0');
+			last_element = true;
+		}
+		if (element_count + 1 > allocated_elements) {
+			allocated_elements *= 2;
+			char **new_elements = realloc(*elements, allocated_elements * sizeof(*elements));
+			if (new_elements == NULL) goto error;
+			*elements = new_elements;
+		}
+
+		size_t element_len = element_end - current_element;
+
+		// Skip empty elements
+		if (element_len != 0) {
+			(*elements)[element_count] = malloc(element_len + 1);
+			if ((*elements)[element_count] == NULL) goto error;
+			memcpy((*elements)[element_count], current_element, element_len);
+			(*elements)[element_count][element_len] = '\0';
+			element_count++;
+		}
+		current_element = element_end + !last_element;
+	}
+	*count = element_count;
+	return 0;
+
+error:
+	for (size_t i = 0; i <= element_count; i++) {
+		free((*elements)[i]);
+	}
+	free(*elements);
+	return -1;
+}

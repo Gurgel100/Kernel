@@ -146,7 +146,7 @@ paddr_t pmm_Alloc()
 							"setc %1": "=m"(Map[i]), "=r"(status): "r"(j): "cc", "memory");
 				if(status)
 				{
-					locked_dec(&pmm_freePages);
+					__sync_fetch_and_sub(&pmm_freePages, 1);
 					return (i * PMM_BITS_PER_ELEMENT + j) * MM_BLOCK_SIZE;
 				}
 			}
@@ -170,7 +170,7 @@ void pmm_Free(paddr_t Address)
 	asm volatile("lock bts %1,%2;"
 				"setc %0": "=r"(bit_status): "r"(bit & 0xFF), "m"(Map[i]): "cc", "memory");
 	if(bit_status == 0)
-		locked_inc(&pmm_freePages);
+		__sync_fetch_and_add(&pmm_freePages, 1);
 	else
 		printf("\e[33;mWarning:\e[0m Freed page which was already freed (0x%X)\n", Address);
 }

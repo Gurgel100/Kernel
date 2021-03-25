@@ -19,8 +19,10 @@
 #include "stdbool.h"
 #include "ring.h"
 #include <bits/types.h>
+#include <bits/error.h>
 
 typedef _tid_t tid_t;
+ERROR_TYPEDEF(tid_t);
 
 /**
  * \brief Type describing the reason why a thread is blocked
@@ -149,11 +151,12 @@ typedef struct{
 	 */
 	bool fpuInitialised;
 }thread_t;
+ERROR_TYPEDEF_POINTER(thread_t);
 
 typedef void(*thread_bail_out_t)(void*);
 
 void thread_Init();
-thread_t *thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel);
+ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel);
 void thread_destroy(thread_t *thread);
 void thread_prepare(thread_t *thread);
 bool thread_block(thread_t *thread, thread_block_reason_t reason);
