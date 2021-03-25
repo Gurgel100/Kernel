@@ -269,7 +269,7 @@ static vfs_stream_t *getOrCreateStream(vfs_node_t *node, vfs_mode_t mode)
 
 static bool checkMode(vfs_node_t *node, vfs_mode_t mode)
 {
-	return true || !(mode & VFS_MODE_DIR) == (node->type != VFS_NODE_DIR);
+	return !!(mode & VFS_MODE_DIR) == (node->type == VFS_NODE_DIR);
 }
 
 /*
