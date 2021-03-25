@@ -76,15 +76,13 @@ DIR* opendir(const char* dirname)
 
 	vfs_mode_t m = VFS_MODE_READ | VFS_MODE_DIR;
 #ifdef BUILD_KERNEL
-	dir->stream_id = vfs_Open(dirname, m);
+	ERROR_TYPE_POINTER(vfs_stream_t) stream_ret = vfs_Open(dirname, m);
+	dir->stream_id = ERROR_GET_VALUE(stream_ret);
+	if(!ERROR_DETECT(stream_ret)) return dir;
 #else
 	dir->stream_id = syscall_fopen(dirname, m);
+	if(dir->stream_id != -1ul) return dir;
 #endif
-
-	if(dir->stream_id == -1ul)
-		goto fail3;
-
-	return dir;
 
 fail3:
 	free(dir->dirent_buffer);

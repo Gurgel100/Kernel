@@ -158,8 +158,9 @@ FILE *fopen(const char *filename, const char *mode)
 	file->mode.read = m & VFS_MODE_READ;
 	file->mode.write = m & VFS_MODE_WRITE;
 #ifdef BUILD_KERNEL
-	file->stream = vfs_Open(filename, m);
-	if(file->stream == NULL)
+	ERROR_TYPE_POINTER(vfs_stream_t) stream_ret = vfs_Open(filename, m);
+	file->stream = ERROR_GET_VALUE(stream_ret);
+	if(ERROR_DETECT(stream_ret))
 #else
 	file->stream = syscall_fopen(filename, m);
 	if(file->stream == -1ul)

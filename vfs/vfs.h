@@ -18,6 +18,7 @@
 #include <bits/sys_types.h>
 #include "node.h"
 #include <refcount.h>
+#include <bits/error.h>
 
 #define VFS_SEPARATOR	'/'
 #define VFS_ROOT		"/"
@@ -74,10 +75,12 @@ struct vfs_filesystem{
 	void *opaque;
 };
 
+ERROR_TYPEDEF_POINTER(vfs_stream_t);
+
 void vfs_Init(void);
 
-vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode);
-vfs_stream_t *vfs_Reopen(vfs_stream_t *stream, vfs_mode_t mode);
+ERROR_TYPE_POINTER(vfs_stream_t) vfs_Open(const char *path, vfs_mode_t mode);
+ERROR_TYPE_POINTER(vfs_stream_t) vfs_Reopen(vfs_stream_t *stream, vfs_mode_t mode);
 void vfs_Close(vfs_stream_t *stream);
 
 /*

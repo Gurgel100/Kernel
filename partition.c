@@ -115,10 +115,11 @@ int partition_getPartitions(const char *dev_name, void(*partition_callback)(void
 {
 	char *path = NULL;
 	asprintf(&path, ":devfs/%s", dev_name);
-	vfs_stream_t *dev_stream = vfs_Open(path, VFS_MODE_READ);
+	ERROR_TYPE_POINTER(vfs_stream_t) dev_stream_ret = vfs_Open(path, VFS_MODE_READ);
 	free(path);
-	if(dev_stream == NULL)
+	if(ERROR_DETECT(dev_stream_ret))
 		return 1;
+	vfs_stream_t *dev_stream = ERROR_GET_VALUE(dev_stream_ret);
 	//Ersten Sektor auslesen
 	void *buffer = malloc(512);
 	if(vfs_Read(dev_stream, 0, 512, buffer) == 0)

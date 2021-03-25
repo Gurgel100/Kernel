@@ -30,12 +30,12 @@ ERROR_TYPE(pid_t) loader_load(const char *path, const char *cmd, const char **en
 	strcat(binpath, cmdline);
 
 	//Jetzt können wir die Datei öffnen
-	vfs_stream_t *file = vfs_Open(binpath, VFS_MODE_READ);
-	if(file == NULL)
-		return ERROR_RETURN_ERROR(pid_t, E_IO);
+	ERROR_TYPE_POINTER(vfs_stream_t) file = vfs_Open(binpath, VFS_MODE_READ);
+	if(ERROR_DETECT(file))
+		return ERROR_RETURN_ERROR(pid_t, ERROR_GET_ERROR(file));
 
-	ERROR_TYPE(pid_t) elf_ret = elfLoad(file, cmd, env, stdin, stdout, stderr);
-	vfs_Close(file);
+	ERROR_TYPE(pid_t) elf_ret = elfLoad(ERROR_GET_VALUE(file), cmd, env, stdin, stdout, stderr);
+	vfs_Close(ERROR_GET_VALUE(file));
 	return elf_ret;
 }
 
