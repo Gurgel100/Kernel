@@ -52,7 +52,7 @@ typedef struct{
 typedef struct{
 	uint64_t id;
 	char *name;
-	vfs_file_t dev_stream;
+	vfs_stream_t *dev_stream;
 	vfs_filesystem_t *fs;
 	size_t lbaStart, lbaSize, blocksize;
 	part_type_t type;
@@ -115,9 +115,9 @@ int partition_getPartitions(const char *dev_name, void(*partition_callback)(void
 {
 	char *path = NULL;
 	asprintf(&path, ":devfs/%s", dev_name);
-	vfs_file_t dev_stream = vfs_Open(path, VFS_MODE_READ);
+	vfs_stream_t *dev_stream = vfs_Open(path, VFS_MODE_READ);
 	free(path);
-	if(dev_stream == (vfs_file_t)-1)
+	if(dev_stream == NULL)
 		return 1;
 	//Ersten Sektor auslesen
 	void *buffer = malloc(512);

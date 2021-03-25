@@ -174,7 +174,7 @@ static char elfCheck(elf_header *ELFHeader)
 	return -1;
 }
 
-pid_t elfLoad(vfs_file_t file, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
+pid_t elfLoad(vfs_stream_t *file, const char *cmd, const char **env, const char *stdin, const char *stdout, const char *stderr)
 {
 	elf_header Header;
 

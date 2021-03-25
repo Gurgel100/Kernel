@@ -24,18 +24,16 @@
 
 #define MIN(a, b)	((a < b) ? a : b)
 
-typedef struct vfs_stream{
-	vfs_file_t id;
-	vfs_mode_t mode;
-
+struct vfs_stream{
 	vfs_node_t *node;
 	REFCOUNT_FIELD;
-}vfs_stream_t;
+	vfs_mode_t mode;
+};
 
 //Ein Stream vom Userspace hat eine ID, der auf einen Stream des Kernels gemappt ist
 typedef struct{
 	vfs_file_t id;
-	vfs_file_t stream;
+	vfs_stream_t *stream;
 	vfs_mode_t mode;
 }vfs_userspace_stream_t;
 
@@ -47,8 +45,6 @@ typedef struct
 }vfs_visit_childs_context_t;
 
 static vfs_node_dir_t root;
-static hashmap_t *streams = NULL;	//geöffnete Streams
-static lock_t vfs_lock = LOCK_INIT;
 static hashmap_t *filesystem_drivers;
 
 static size_t getDirs(char ***Dirs, const char *Path)
@@ -96,31 +92,16 @@ static bool streamid_equal(const void *a, const void *b, __attribute__((unused))
 }
 
 /*
- * Wird für die Hashtable verwendet. Darf nicht auf vfs_lock locken.
+ * Wird aufgerufen, wenn ein Stream keine Verweise mehr hat.
  */
-static void vfs_stream_free(const void *s)
+static void vfs_stream_closed(const void *s)
 {
 	vfs_stream_t *stream = (vfs_stream_t*)s;
-
-	assert(stream != NULL);
 
 	//Remove stream from opened stream hashmap of node
 	LOCKED_TASK(stream->node->lock, hashmap_delete(stream->node->streams, stream));
 
 	free(stream);
-}
-
-/*
- * Wird aufgerufen, wenn ein Stream keine Verweise mehr hat.
- */
-static void vfs_stream_closed(const void *s)
-{
-	const vfs_stream_t *stream = (const vfs_stream_t*)s;
-	vfs_file_t streamid = stream->id;
-
-	//Stream wird nicht mehr verwendet
-	LOCKED_TASK(vfs_lock, hashmap_delete(streams, (void*)streamid));
-	assert(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, NULL)));
 }
 
 /*
@@ -133,22 +114,10 @@ static void vfs_userspace_stream_free(const void *s)
 	free(stream);
 }
 
-static vfs_file_t getNextStreamID()
-{
-	static vfs_file_t nextFileID = 0;
-	vfs_file_t id;
-	do
-	{
-		id = __sync_fetch_and_add(&nextFileID, 1);
-	}
-	while(id == -1ul || LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)id, NULL)));
-	return id;
-}
-
 static vfs_file_t getNextUserspaceStreamID(process_t *p)
 {
 	vfs_file_t id = 0;
-	while(id == -1ul || LOCKED_RESULT(vfs_lock, hashmap_search(p->streams, (void*)id, NULL)))
+	while(id == -1ul || LOCKED_RESULT(p->lock, hashmap_search(p->streams, (void*)id, NULL)))
 	{
 		id++;
 	}
@@ -270,9 +239,6 @@ static int createDirEntry(const char *path, vfs_node_type_t type)
 
 void vfs_Init(void)
 {
-	streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_stream_free, NULL, NULL, 3);
-	assert(streams != NULL);
-
 	filesystem_drivers = hashmap_create(string_hash, string_hash, string_equal, NULL, NULL, NULL, NULL, 1);
 	assert(filesystem_drivers != NULL);
 
@@ -281,20 +247,24 @@ void vfs_Init(void)
 	devfs_init();
 }
 
-static vfs_stream_t *createStream(vfs_node_t *node, vfs_mode_t mode)
+static vfs_stream_t *getOrCreateStream(vfs_node_t *node, vfs_mode_t mode)
 {
-	vfs_stream_t *stream = calloc(1, sizeof(*stream));
+	return LOCKED_RESULT(node->lock, {
+		vfs_stream_t *stream;
+		if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
+		{
+			stream = calloc(1, sizeof(*stream));
 	if(stream == NULL)
 		return NULL;
 
-	stream->id = getNextStreamID();
 	stream->mode = mode;
-
 	stream->node = node;
 	REFCOUNT_INIT(stream, vfs_stream_closed);
 
 	hashmap_set(stream->node->streams, &stream->mode, stream);
-	return stream;
+}
+		stream;
+	});
 }
 
 static bool checkMode(vfs_node_t *node, vfs_mode_t mode)
@@ -307,74 +277,45 @@ static bool checkMode(vfs_node_t *node, vfs_mode_t mode)
  * Parameter:	path = Pfad zur Datei
  * 				mode = Modus, in der die Datei geöffnet werden soll
  */
-vfs_file_t vfs_Open(const char *path, vfs_mode_t mode)
+vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode)
 {
 	if(path == NULL || strlen(path) == 0 || !check_path(path) || !(mode & (VFS_MODE_READ | VFS_MODE_WRITE))
 		|| (mode & (VFS_MODE_WRITE | VFS_MODE_DIR)) == (VFS_MODE_WRITE | VFS_MODE_DIR)
 		|| (mode & (VFS_MODE_DIR | VFS_MODE_EXEC)) == (VFS_MODE_DIR | VFS_MODE_EXEC)
 		|| (mode & (VFS_MODE_DIR | VFS_MODE_TRUNCATE)) == (VFS_MODE_DIR | VFS_MODE_TRUNCATE))
-		return -1;
+		return NULL;
 
 	if(mode & VFS_MODE_CREATE)
 		createDirEntry(path, VFS_NODE_FILE);
 
-	vfs_stream_t *stream;
 	vfs_node_t *node = getNode(path, true);
 	if(node == NULL || !checkMode(node, mode))
-		return -1;
+		return NULL;
 
-	LOCKED_TASK(node->lock, {
-		if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
-		{
-			stream = createStream(node, mode);
-
-			//In Hashtable einfügen
-			LOCKED_TASK(vfs_lock, hashmap_set(streams, (void*)stream->id, stream));
+	return getOrCreateStream(node, mode);
 		}
-	});
 
-	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
-
-	return stream->id;
-}
-
-vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode)
+vfs_stream_t *vfs_Reopen(vfs_stream_t *stream, vfs_mode_t mode)
 {
-	vfs_stream_t *stream;
-
 	if(!(mode & (VFS_MODE_READ | VFS_MODE_WRITE)) || (mode & (VFS_MODE_WRITE | VFS_MODE_DIR)) == (VFS_MODE_WRITE | VFS_MODE_DIR))
-		return -1;
-
-	assert(streams != NULL);
-	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)) || REFCOUNT_RETAIN(stream) == NULL)
-		return -1;
+		return NULL;
 
 	vfs_node_t *node = stream->node;
-	if(stream->mode == mode)
-		return stream->id;
+	if(stream->mode == mode) {
+		if (REFCOUNT_RETAIN(stream) != NULL) return stream;
+	} else {
+		vfs_Close(stream);
+	}
 
-	REFCOUNT_RELEASE(stream);
-
-	LOCKED_TASK(node->lock, {
-		if(!hashmap_search(node->streams, &mode, (void**)&stream) || REFCOUNT_RETAIN(stream) == NULL)
-			stream = createStream(node, mode);
-	});
-
-	assert(LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)stream->id, NULL)));
-
-	return stream->id;
+	return getOrCreateStream(node, mode);
 }
 
 /*
  * Eine Datei schliessen
  * Parameter:	stream = Stream der geschlossen werden soll
  */
-void vfs_Close(vfs_file_t streamid)
+void vfs_Close(vfs_stream_t *stream)
 {
-	vfs_stream_t *stream;
-	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
-		return;
-
 	//Reservierten Stream freigeben
 	REFCOUNT_RELEASE(stream);
 }
@@ -420,15 +361,9 @@ static int visitChildsCallback(vfs_node_t *node, void *context)
  * 				length = Anzahl der Bytes, die gelesen werden sollen
  * 				Buffer = Buffer in den die Bytes geschrieben werden
  */
-size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer)
+size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, void *buffer)
 {
-	vfs_stream_t *stream;
-
 	if(buffer == NULL)
-		return 0;
-
-	assert(streams != NULL);
-	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
 		return 0;
 
 	size_t sizeRead = 0;
@@ -462,15 +397,10 @@ size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer
 	return sizeRead;
 }
 
-size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer)
+size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer)
 {
-	vfs_stream_t *stream;
-
 	if(buffer == NULL)
 		return 0;
-
-	 if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
-		 return 0;
 
 	size_t sizeWritten = 0;
 
@@ -500,66 +430,66 @@ int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const 
 	if((p->streams = hashmap_create(streamid_hash, streamid_hash, streamid_equal, NULL, vfs_userspace_stream_free, NULL, NULL, 3)) == NULL)
 		return 1;
 
-	vfs_file_t streamid;
+	vfs_stream_t *kstream;
 	vfs_userspace_stream_t *stream;
 	if(parent != NULL && stdin == NULL)
 	{
 		LOCKED_TASK(parent->lock, hashmap_search(parent->streams, (void*)0, (void**)&stream));
 		assert(stream != NULL);
-		streamid = vfs_Reopen(stream->stream, VFS_MODE_READ);
+		kstream = vfs_Reopen(stream->stream, VFS_MODE_READ);
 	}
 	else
 	{
-		streamid = vfs_Open(stdin, VFS_MODE_READ);
+		kstream = vfs_Open(stdin, VFS_MODE_READ);
 	}
-	if(streamid == -1ul)
+	if(kstream == NULL)
 		return 0;
 	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return 0;
 	stream->id = 0;
 	stream->mode = VFS_MODE_READ;
-	stream->stream = streamid;
+	stream->stream = kstream;
 	hashmap_set(p->streams, (void*)0, stream);
 
 	if(parent != NULL && stdout == NULL)
 	{
 		LOCKED_TASK(parent->lock, hashmap_search(parent->streams, (void*)1, (void**)&stream));
 		assert(stream != NULL);
-		streamid = vfs_Reopen(stream->stream, VFS_MODE_WRITE);
+		kstream = vfs_Reopen(stream->stream, VFS_MODE_WRITE);
 	}
 	else
 	{
-		streamid = vfs_Open(stdout, VFS_MODE_WRITE);
+		kstream = vfs_Open(stdout, VFS_MODE_WRITE);
 	}
-	if(streamid == -1ul)
+	if(kstream == NULL)
 		return 0;
 	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return 0;
 	stream->id = 1;
 	stream->mode = VFS_MODE_WRITE;
-	stream->stream = streamid;
+	stream->stream = kstream;
 	hashmap_set(p->streams, (void*)1, stream);
 
 	if(parent != NULL && stderr == NULL)
 	{
 		LOCKED_TASK(parent->lock, hashmap_search(parent->streams, (void*)2, (void**)&stream));
 		assert(stream != NULL);
-		streamid = vfs_Reopen(stream->stream, VFS_MODE_WRITE);
+		kstream = vfs_Reopen(stream->stream, VFS_MODE_WRITE);
 	}
 	else
 	{
-		streamid = vfs_Open(stderr, VFS_MODE_WRITE);
+		kstream = vfs_Open(stderr, VFS_MODE_WRITE);
 	}
-	if(streamid == -1ul)
+	if(kstream == NULL)
 		return 0;
 	stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return 0;
 	stream->id = 2;
 	stream->mode = VFS_MODE_WRITE;
-	stream->stream = streamid;
+	stream->stream = kstream;
 	hashmap_set(p->streams, (void*)2, stream);
 	return 1;
 }
@@ -575,14 +505,9 @@ void vfs_deinitUserspace(process_t *p)
  * Parameter:	stream = stream dessen Grösse abgefragt wird (muss eine Datei sein)
  * Rückgabe:	Grösse des Streams oder 0 bei Fehler
  */
-uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
+uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info)
 {
-	vfs_stream_t *stream;
 	uint64_t value;
-
-	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
-		return 0;
-
 	if(stream->node->getAttribute(stream->node, info, &value))
 		return 0;
 	else
@@ -595,13 +520,8 @@ uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info)
  * \param info Information which should be set
  * \param value Value to be set
  */
-void vfs_setFileinfo(vfs_file_t streamid, vfs_fileinfo_t info, uint64_t value)
+void vfs_setFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info, uint64_t value)
 {
-	vfs_stream_t *stream;
-
-	if(!LOCKED_RESULT(vfs_lock, hashmap_search(streams, (void*)streamid, (void**)&stream)))
-		return;
-
 	stream->node->setAttribute(stream->node, info, value);
 }
 
@@ -669,9 +589,9 @@ int vfs_createDir(const char *path)
 static void findFilesystemDriver(const void *key, const void *obj, void *context)
 {
 	vfs_filesystem_driver_t *driver = (vfs_filesystem_driver_t*)obj;
-	uintptr_t *tmp = context;
+	void **tmp = context;
 	vfs_filesystem_driver_t **outdriver = tmp[0];
-	vfs_file_t dev = tmp[1];
+	vfs_stream_t *dev = tmp[1];
 
 	vfs_filesystem_t fs = {
 		.driver = driver
@@ -702,7 +622,7 @@ int vfs_Mount(const char *mountpath, const char *devpath, const char *filesystem
 	vfs_node_t *devNode;
 	vfs_filesystem_driver_t *driver = NULL;
 	vfs_filesystem_t *fs = NULL;
-	vfs_file_t dev_stream = -1;
+	vfs_stream_t *dev_stream = NULL;
 	bool ignoreDev = false;
 
 	if((mount = (vfs_node_dir_t*)getNode(mountpath, true)) == NULL)
@@ -743,9 +663,11 @@ int vfs_Mount(const char *mountpath, const char *devpath, const char *filesystem
 			}
 
 			dev_stream = vfs_Open(devpath, VFS_MODE_READ | VFS_MODE_WRITE);
+			if (dev_stream == NULL)
+				return 3;
 		}
 
-		uintptr_t tmp[2] = {&driver, dev_stream};
+		void *tmp[2] = {&driver, dev_stream};
 		hashmap_visit(filesystem_drivers, findFilesystemDriver, tmp);
 		if(driver == NULL)
 			return 5;
@@ -807,8 +729,8 @@ static bool findRootDev(vfs_node_t *node, void* context)
 		if(vfs_Mount(VFS_ROOT, path, NULL) == 0)
 		{
 			printf("Mounted device: %s\n", node->name);
-			vfs_file_t file = vfs_Open("/kernel", VFS_MODE_READ);
-			if(file != (vfs_file_t)-1)
+			vfs_stream_t *file = vfs_Open("/kernel", VFS_MODE_READ);
+			if(file != NULL)
 			{
 				vfs_Close(file);
 				printf("Found root device: %s\n", node->name);
@@ -852,15 +774,15 @@ vfs_file_t vfs_syscall_open(const char *path, vfs_mode_t mode)
 	vfs_userspace_stream_t *stream = malloc(sizeof(vfs_userspace_stream_t));
 	if(stream == NULL)
 		return -1;
-	vfs_file_t streamid = vfs_Open(path, mode);
-	if(streamid == -1ul)
+	vfs_stream_t *kstream = vfs_Open(path, mode);
+	if(kstream == NULL)
 	{
 		free(stream);
 		return -1;
 	}
 	stream->id = getNextUserspaceStreamID(currentProcess);
 	stream->mode = mode;
-	stream->stream = streamid;
+	stream->stream = kstream;
 	LOCKED_TASK(currentProcess->lock, hashmap_set(currentProcess->streams, (void*)stream->id, stream));
 	assert(LOCKED_RESULT(currentProcess->lock, hashmap_search(currentProcess->streams, (void*)stream->id, NULL)));
 	return stream->id;

@@ -25,7 +25,11 @@
 #define MAX(x,y) ((x > y) ? x : y)
 
 struct filestream{
-	uint64_t stream_id;
+#ifdef BUILD_KERNEL
+	vfs_stream_t *stream;
+#else
+	uint64_t stream;
+#endif
 
 	char *buffer;
 	unsigned char *ungetch_buffer;
@@ -79,19 +83,19 @@ void init_stdio()
 	stdin = calloc(sizeof(FILE), 1);
 	stdin->error = IO_NO_ERROR;
 	stdin->mode.read = true;
-	stdin->stream_id = 0;
+	stdin->stream = 0;
 	setvbuf(stdin, NULL, _IONBF, BUFSIZ);
 	//stdout
 	stdout = calloc(sizeof(FILE), 1);
 	stdout->error = IO_NO_ERROR;
 	stdout->mode.write = true;
-	stdout->stream_id = 1;
+	stdout->stream = 1;
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 	//stderr
 	stderr = calloc(sizeof(FILE), 1);
 	stderr->error = IO_NO_ERROR;
 	stderr->mode.write = true;
-	stderr->stream_id = 2;
+	stderr->stream = 2;
 	setvbuf(stderr, NULL, _IONBF, BUFSIZ);
 }
 
@@ -154,11 +158,12 @@ FILE *fopen(const char *filename, const char *mode)
 	file->mode.read = m & VFS_MODE_READ;
 	file->mode.write = m & VFS_MODE_WRITE;
 #ifdef BUILD_KERNEL
-	file->stream_id = vfs_Open(filename, m);
+	file->stream = vfs_Open(filename, m);
+	if(file->stream == NULL)
 #else
-	file->stream_id = syscall_fopen(filename, m);
+	file->stream = syscall_fopen(filename, m);
+	if(file->stream == -1ul)
 #endif
-	if(file->stream_id == -1ul)
 	{
 		free(file);
 		return NULL;
@@ -184,9 +189,9 @@ int fclose(FILE *stream)
 		return EOF;
 
 #ifdef BUILD_KERNEL
-	vfs_Close(stream->stream_id);
+	vfs_Close(stream->stream);
 #else
-	syscall_fclose(stream->stream_id);
+	syscall_fclose(stream->stream);
 #endif
 	free(stream);
 
@@ -261,9 +266,9 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream_id, stream->posRead, tmpLength, tmp);
+			size = vfs_Read(stream->stream, stream->posRead, tmpLength, tmp);
 #else
-			size = syscall_fread(stream->stream_id, stream->posRead, tmpLength, tmp);
+			size = syscall_fread(stream->stream, stream->posRead, tmpLength, tmp);
 #endif
 
 			stream->eof = size < tmpLength;
@@ -318,9 +323,9 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 			tmp = malloc(tmpLength + 1);
 			size_t size;
 #ifdef BUILD_KERNEL
-			size = vfs_Read(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
+			size = vfs_Read(stream->stream, stream->posRead + readData, tmpLength, tmp);
 #else
-			size = syscall_fread(stream->stream_id, stream->posRead + readData, tmpLength, tmp);
+			size = syscall_fread(stream->stream, stream->posRead + readData, tmpLength, tmp);
 #endif
 
 			stream->eof = size < tmpLength;
@@ -361,9 +366,9 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 	else
 	{
 #ifdef BUILD_KERNEL
-		readData = vfs_Read(stream->stream_id, stream->posRead, length, ptr);
+		readData = vfs_Read(stream->stream, stream->posRead, length, ptr);
 #else
-		readData = syscall_fread(stream->stream_id, stream->posRead, length, ptr);
+		readData = syscall_fread(stream->stream, stream->posRead, length, ptr);
 #endif
 		stream->posRead += length;
 	}
@@ -388,9 +393,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	if(stream->bufMode == IO_MODE_NO_BUFFER)
 	{
 #ifdef BUILD_KERNEL
-		writeData = vfs_Write(stream->stream_id, stream->posWrite, length, ptr);
+		writeData = vfs_Write(stream->stream, stream->posWrite, length, ptr);
 #else
-		writeData = syscall_fwrite(stream->stream_id, stream->posWrite, length, ptr);
+		writeData = syscall_fwrite(stream->stream, stream->posWrite, length, ptr);
 #endif
 	}
 	else if(stream->bufMode == IO_MODE_LINE_BUFFER)
@@ -405,9 +410,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 			{
 				size_t size = 0;
 #ifdef BUILD_KERNEL
-				size = vfs_Write(stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
+				size = vfs_Write(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
 #else
-				size = syscall_fwrite(stream->stream_id, stream->bufStart, stream->bufPos + 1, stream->buffer);
+				size = syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos + 1, stream->buffer);
 #endif
 				stream->bufPos = 0;
 				stream->bufStart += size;
@@ -434,9 +439,9 @@ int fflush(FILE *stream)
 	if(stream->bufMode != IO_MODE_NO_BUFFER && stream->mode.write && stream->bufStart != EOF && stream->bufDirty)
 	{
 #ifdef BUILD_KERNEL
-		vfs_Write(stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
+		vfs_Write(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
 #else
-		syscall_fwrite(stream->stream_id, stream->bufStart, stream->bufPos, stream->buffer);
+		syscall_fwrite(stream->stream, stream->bufStart, stream->bufPos, stream->buffer);
 #endif
 	}
 
@@ -529,9 +534,9 @@ int fseek(FILE *stream, long int offset, int whence)
 		{	//Klammern müssen da sein, denn sonst kann man keine Variablen definieren
 			//Grösse der Datei ermitteln
 #ifdef BUILD_KERNEL
-			size_t filesize = vfs_getFileinfo(stream->stream_id, VFS_INFO_FILESIZE);
+			size_t filesize = vfs_getFileinfo(stream->stream, VFS_INFO_FILESIZE);
 #else
-			size_t filesize = syscall_getStreamInfo(stream->stream_id, VFS_INFO_FILESIZE);
+			size_t filesize = syscall_getStreamInfo(stream->stream, VFS_INFO_FILESIZE);
 #endif
 			stream->posRead = stream->posWrite = filesize - offset;
 		}

@@ -290,7 +290,7 @@ static vfs_node_t *createNode(cdifs_vfs_node_dir_t *parent, struct cdi_fs_stream
 	return n;
 }
 
-static int probe(vfs_filesystem_t *fs, vfs_file_t dev)
+static int probe(vfs_filesystem_t *fs, vfs_stream_t *dev)
 {
 	cdifs_vfs_filesystem_driver_t *driver = (cdifs_vfs_filesystem_driver_t*)fs->driver;
 	struct cdi_fs_filesystem cdi_fs = {
@@ -303,7 +303,7 @@ static int probe(vfs_filesystem_t *fs, vfs_file_t dev)
 	return 1 - res;
 }
 
-static int mount(vfs_filesystem_t *fs, vfs_file_t dev)
+static int mount(vfs_filesystem_t *fs, vfs_stream_t *dev)
 {
 	cdifs_vfs_filesystem_driver_t *driver = (cdifs_vfs_filesystem_driver_t*)fs->driver;
 	struct cdi_fs_filesystem *cdi_fs = calloc(1, sizeof(struct cdi_fs_filesystem));

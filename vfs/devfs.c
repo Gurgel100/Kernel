@@ -21,12 +21,12 @@ static list_t nodes;
 static vfs_filesystem_driver_t devfs_driver;
 static vfs_node_dir_t root;
 
-static int probe(vfs_filesystem_t *fs __attribute__((unused)), vfs_file_t dev)
+static int probe(vfs_filesystem_t *fs __attribute__((unused)), vfs_stream_t *dev)
 {
-	return dev == (vfs_file_t)-1 ? 0 : 1;
+	return dev == NULL ? 0 : 1;
 }
 
-static int mount(vfs_filesystem_t *fs, vfs_file_t dev __attribute__((unused)))
+static int mount(vfs_filesystem_t *fs, vfs_stream_t *dev __attribute__((unused)))
 {
 	fs->root = &root;
 	return 0;

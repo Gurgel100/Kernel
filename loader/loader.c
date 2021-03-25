@@ -31,8 +31,8 @@ pid_t loader_load(const char *path, const char *cmd, const char **env, const cha
 	strcat(binpath, cmdline);
 
 	//Jetzt können wir die Datei öffnen
-	vfs_file_t file = vfs_Open(binpath, VFS_MODE_READ);
-	if(file == (vfs_file_t)-1)
+	vfs_stream_t *file = vfs_Open(binpath, VFS_MODE_READ);
+	if(file == NULL)
 		return 0;
 
 	pid = elfLoad(file, cmd, env, stdin, stdout, stderr);

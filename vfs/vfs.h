@@ -27,6 +27,7 @@
 #endif
 
 typedef uint64_t vfs_file_t;
+typedef struct vfs_stream vfs_stream_t;
 
 typedef enum{
 	VFS_FILESYSTEM_INFO_VIRTUAL	= 1 << 0,
@@ -42,8 +43,8 @@ typedef struct{
 	const char *name;
 	vfs_filesystem_info_t info;
 
-	int (*probe)(vfs_filesystem_t *fs, vfs_file_t dev);
-	int (*mount)(vfs_filesystem_t *fs, vfs_file_t dev);
+	int (*probe)(vfs_filesystem_t *fs, vfs_stream_t *dev);
+	int (*mount)(vfs_filesystem_t *fs, vfs_stream_t *dev);
 	int (*umount)(vfs_filesystem_t *fs);
 	/**
 	 * If VFS_FILESYSTEM_INFO_MODULE is set
@@ -75,17 +76,17 @@ struct vfs_filesystem{
 
 void vfs_Init(void);
 
-vfs_file_t vfs_Open(const char *path, vfs_mode_t mode);
-vfs_file_t vfs_Reopen(const vfs_file_t streamid, vfs_mode_t mode);
-void vfs_Close(vfs_file_t streamid);
+vfs_stream_t *vfs_Open(const char *path, vfs_mode_t mode);
+vfs_stream_t *vfs_Reopen(vfs_stream_t *stream, vfs_mode_t mode);
+void vfs_Close(vfs_stream_t *stream);
 
 /*
  * Vom Dateisystem lesen/schreiben
  * Parameter:	Path = Pfad zur Datei
  * 				Buffer = Puffer in dem die Daten reingeschrieben werden bzw. gelesen werden
  */
-size_t vfs_Read(vfs_file_t streamid, uint64_t start, size_t length, void *buffer);
-size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void *buffer);
+size_t vfs_Read(vfs_stream_t *stream, uint64_t start, size_t length, void *buffer);
+size_t vfs_Write(vfs_stream_t *stream, uint64_t start, size_t length, const void *buffer);
 
 /*
  * Initialisiert den Userspace des Prozesses p.
@@ -96,7 +97,7 @@ size_t vfs_Write(vfs_file_t streamid, uint64_t start, size_t length, const void 
 int vfs_initUserspace(process_t *parent, process_t *p, const char *stdin, const char *stdout, const char *stderr);
 void vfs_deinitUserspace(process_t *p);
 
-uint64_t vfs_getFileinfo(vfs_file_t streamid, vfs_fileinfo_t info);
+uint64_t vfs_getFileinfo(vfs_stream_t *stream, vfs_fileinfo_t info);
 
 int vfs_truncate(const char *path, size_t size);
 
