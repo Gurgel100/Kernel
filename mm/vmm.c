@@ -297,10 +297,9 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 	uint32_t index = PAGE_TABLE_INDEX(vAddress, level);
 	PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (index << 12));
 
-	if (!table[index].P)
-		return 0;
-
 	if (level < 3) {
+		if (!table[index].P) return FLAG_CLEAR_FULL_FLAG;
+
 		uint8_t res = unmap_entry(vAddress, next_table, level + 1, pAddress);
 		if (res & FLAG_DELETE_TABLE) {
 			pmm_Free(table[index].Address << 12);
@@ -333,7 +332,7 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 
 static paddr_t unmap(void *vAddress)
 {
-	paddr_t pAddress;
+	paddr_t pAddress = 0;
 	unmap_entry(vAddress, (PageTable_t)PML4_ADDRESS(), 0, &pAddress);
 	return pAddress;
 }
