@@ -1231,12 +1231,21 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						const char *str = va_arg(arg, char*);
 						size_t str_len = strlen(str);
 
-						for(; width > str_len; width--)
-						{
-							pos += jprintf_putc(args, lpad);
+						if (!left) {
+							for(; width > str_len; width--)
+							{
+								pos += jprintf_putc(args, lpad);
+							}
 						}
 
 						pos += jprintf_putsn(args, str, precision);
+
+						if (left) {
+							for(; width > str_len; width--)
+							{
+								pos += jprintf_putc(args, lpad);
+							}
+						}
 					}
 					break;
 					case 'c':	//Char
@@ -1983,7 +1992,7 @@ int putsn(size_t n, const char *str)
 	{
 		if (putc(str[i], stdout) == EOF) {
 			return i;
-	}
+		}
 	}
 	return n;
 }
