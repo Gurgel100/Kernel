@@ -1981,9 +1981,11 @@ int putsn(size_t n, const char *str)
 	size_t i;
 	for(i = 0; i < n; i++)
 	{
-		putc(str[i], stdout);
+		if (putc(str[i], stdout) == EOF) {
+			return i;
 	}
-	return 1;
+	}
+	return n;
 }
 
 char *itoa(int64_t x, char *s)
