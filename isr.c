@@ -290,10 +290,17 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 	if(!vmm_handlePageFault(address, ihs->error))
 	{
 #ifndef DEBUGMODE
+		bool present = ihs->error & 1;
+		bool write = ihs->error & (1 << 1);
+		bool userspace = ihs->error & (1 << 2);
+		bool reserved = ihs->error & (1 << 3);
+		bool instruction = ihs->error & (1 << 4);
 		system_panic_enter();
 		uint64_t offset = 0;
 		offset += sprintf(system_panic_buffer, "Exception 14: Page Fault  ");
-		offset += sprintf(system_panic_buffer + offset, "\nErrorcode: 0x%lX\n", ihs->error);
+		offset += sprintf(system_panic_buffer + offset, "\nErrorcode: 0x%lX", ihs->error);
+		offset += sprintf(system_panic_buffer + offset, "\t%c %s %s %c %c\n",
+			present ? 'P' : 'p', write ? "WR" : "RD", userspace ? "US" : "KS", reserved ? 'R' : 'r', instruction ? 'I' : 'D');
 
 		offset += sprintf(system_panic_buffer + offset, "CR2: 0x%lX\n", address);
 
