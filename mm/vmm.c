@@ -365,6 +365,9 @@ bool vmm_Init()
 
 	PML4 = PML4_ADDRESS();
 
+	// Mark all pages tables as reserved
+	vmm_getPageTables(pmm_markPageReserved);
+
 	//Speicher bis 1MB bearbeiten
 	//Addresse 0 ist nicht gemappt
 	unmap(NULL);
