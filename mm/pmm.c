@@ -18,6 +18,8 @@
 
 #define PMM_BITS_PER_ELEMENT	(sizeof(*Map) * 8)
 #define PMM_MAP_ALIGN_SIZE(x)	((x + (sizeof(*Map) - 1)) & ~(sizeof(*Map) - 1))
+#define ROUND_UP_PAGESIZE(x)	(((x) + MM_BLOCK_SIZE - 1) & ~(MM_BLOCK_SIZE - 1))
+#define ROUND_DOWN_PAGESIZE(x)	((x) & ~(MM_BLOCK_SIZE - 1))
 
 #define MAX(a, b)				((a > b) ? a : b)
 #define MIN(a, b)				((a < b) ? a : b)
@@ -97,13 +99,17 @@ bool pmm_Init()
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
 	while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
 	{
-		assert(map->base_addr % MM_BLOCK_SIZE == 0);
-		if(map->type == 1)
-			for(paddr_t i = MAX(0x100000, map->base_addr); i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
+		if(map->type == 1 && map->base_addr >= 0x100000) {
+			paddr_t map_start = ROUND_UP_PAGESIZE(map->base_addr);
+			size_t map_end = ROUND_DOWN_PAGESIZE(map->base_addr + map->length);
+			printf("marking as free: %p - %p\n", map_start, map_end);
+			for(paddr_t i = map_start; i < map_end; i += MM_BLOCK_SIZE) {
 				if(i < (paddr_t)&kernel_start || i > (paddr_t)&kernel_end)
 				{
 					pmm_Free(i);
 				}
+			}
+		}
 		map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
 
