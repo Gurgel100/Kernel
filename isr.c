@@ -287,7 +287,7 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 	asm volatile("mov %%cr2,%0" : "=r"(address));
 
 	//Try to handle page fault else panic
-	if(!vmm_handlePageFault(address, ihs->error))
+	if(!vmm_handlePageFault((currentProcess ?: &kernel_process)->Context, address, ihs->error))
 	{
 #ifndef DEBUGMODE
 		bool present = ihs->error & 1;

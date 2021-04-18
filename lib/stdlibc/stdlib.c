@@ -832,7 +832,8 @@ void free(void *ptr)
 				if(Pages > 0)
 				{
 #ifdef BUILD_KERNEL
-					vmm_unusePages((void*)bottom, Pages);
+					extern context_t kernel_context;
+					vmm_unusePages(&kernel_context, (void*)bottom, Pages);
 #else
 					syscall_unusePages((void*)bottom, Pages);
 #endif

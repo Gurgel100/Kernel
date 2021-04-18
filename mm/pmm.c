@@ -274,3 +274,7 @@ uint64_t pmm_getFreePages()
 {
 	return pmm_freePages;
 }
+
+paddr_t pmm_getHighestAddress() {
+	return mapSize * PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE;
+}

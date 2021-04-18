@@ -11,6 +11,7 @@
 #include "vmm.h"
 #include "pmm.h"
 #include "memory.h"
+#include "scheduler.h"
 
 //Speicherverwaltung
 bool mm_Init()
@@ -24,14 +25,14 @@ bool mm_Init()
  */
 void *mm_Alloc(uint64_t Pages)
 {
-	return vmm_Alloc(Pages);
+	return vmm_Alloc(currentProcess->Context, Pages);
 }
 
 void mm_Free(void *Address, uint64_t Pages)
 {
 	if(Address < (void*)USERSPACE_START || Address > (void*)USERSPACE_END)	//Kontrolle ob richtiger Adress-
 		Panic("MM", "Ungueltiger Adressbereich");			//bereich
-	vmm_Free(Address, Pages);
+	vmm_Free(currentProcess->Context, Address, Pages);
 }
 
 //System

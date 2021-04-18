@@ -42,7 +42,7 @@ void apic_Init()
 	apic_info.physBase = cpu_MSRread(APIC_BASE_MSR);
 
 	//Speicherbereich mappen
-	apic_info.virtBase = vmm_Map(NULL, apic_info.physBase, 1, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_NO_CACHE);
+	apic_info.virtBase = vmm_Map(&kernel_context, NULL, apic_info.physBase, 1, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_NO_CACHE);
 
 	//APIC aktivieren
 	apic_Write(APIC_REG_SPIV, 1 << 8);

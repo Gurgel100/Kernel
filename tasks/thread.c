@@ -15,8 +15,6 @@
 #include "pmm.h"
 #include "assert.h"
 
-extern context_t kernel_context;
-
 static int tid_cmp(const void *a, const void *b)
 {
 	const thread_t *const t1 = a;
@@ -65,13 +63,13 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 	if(!kernel)
 	{
 		assert(MM_KERN_STACK_SIZE % MM_BLOCK_SIZE == 0);
-		thread->kernelStackBottom = vmm_Map(NULL, 0, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_ALLOCATE);
+		thread->kernelStackBottom = vmm_Map(&kernel_context, NULL, 0, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_ALLOCATE);
 		thread->kernelStack = thread->kernelStackBottom + MM_KERN_STACK_SIZE;
 		thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
 		memcpy(thread->State, &new_state, sizeof(ihs_t));
 	}
 
-	thread->fpuState = vmm_Map(NULL, 0, 1, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	thread->fpuState = vmm_Map(&kernel_context, NULL, 0, 1, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	thread->fpuInitialised = false;
 
 	//Stack mappen
@@ -100,20 +98,18 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 
 void thread_destroy(thread_t *thread)
 {
-	vmm_UnMap(thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
+	vmm_UnMap(&kernel_context, thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
 
 	//Thread aus Liste entfernen
 	LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
 
 	//Userstack freigeben
-	for (size_t i = 0; i < MM_USER_STACK_SIZE / MM_BLOCK_SIZE; i++) {
-		vmm_ContextUnMap(thread->process->Context, thread->userStackBottom + i * MM_BLOCK_SIZE, true);
-	}
+	vmm_UnMap(thread->process->Context, thread->userStackBottom, MM_USER_STACK_SIZE / MM_BLOCK_SIZE, true);
 
 	extern thread_t *fpuThread;
 	if(fpuThread == thread)
 		fpuThread = NULL;
-	vmm_UnMap(thread->fpuState, 1, true);
+	vmm_UnMap(&kernel_context, thread->fpuState, 1, true);
 	free(thread);
 }
 

@@ -24,5 +24,6 @@ void pmm_Free(paddr_t Address);		//Gibt eine Speicherstelle frei
 paddr_t pmm_AllocDMA(paddr_t maxAddress, size_t Size);
 uint64_t pmm_getTotalPages();
 uint64_t pmm_getFreePages();
+paddr_t pmm_getHighestAddress();
 
 #endif /* PMM_H_ */
