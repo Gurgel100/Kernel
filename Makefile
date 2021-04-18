@@ -7,8 +7,8 @@ RM = rm -rf
 OUTPUT_DIR = build
 
 CPPFLAGS += -I"./include" -I"./cdi" -I"./driver" -I"./Include" -I"./loader" -I"./mm" -I"./tasks" -I"./util" -I"."
-CFLAGS += -nostdinc -gdwarf-4 -Wall -Wextra -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -mno-red-zone -fno-omit-frame-pointer -std=gnu99 -mcx16
-LDFLAGS += -nostartfiles -nodefaultlibs -nostdlib -static -T./kernel.ld -z max-page-size=0x1000
+CFLAGS += -gdwarf-4 -Wall -Wextra -fmessage-length=0 -ffreestanding -fno-stack-protector -mno-red-zone -fno-omit-frame-pointer -std=gnu99 -mcx16
+LDFLAGS += -nostdlib -static -T./kernel.ld -z max-page-size=0x1000
 C_SRCS = $(shell find -name '*.c')
 S_SRCS = ./interrupts.S ./start.S
 
