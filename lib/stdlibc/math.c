@@ -6,6 +6,30 @@
  */
 
 #include "math.h"
+#include <stdint.h>
+#include <immintrin.h>
+
+#define _CONCAT(x, y)		x##y
+#define CONCAT(x, y)		_CONCAT(x, y)
+#define OP_SUFFIX(op, x)	_Generic((x),					\
+								float: CONCAT(op, _ps),		\
+								double: CONCAT(op, _pd)		\
+							)
+#define TO_SSE(x)			_Generic((x),					\
+								float: _mm_set_ss,			\
+								double: _mm_set_sd			\
+							)(x)
+#define FROM_SSE(x)			_Generic((x),					\
+								__m128: _mm_cvtss_f32,		\
+								__m128d: _mm_cvtsd_f64		\
+							)(x)
+
+#define BINOP(op, x, y)	FROM_SSE(OP_SUFFIX(CONCAT(_mm_, op), x)(TO_SSE(x), TO_SSE(y)))
+
+#define DEFINE_BINOP(name, type, op)	\
+	type name(type x, type y) {			\
+		return BINOP(op, x, y);			\
+	}
 
 double sin(double x)
 {
@@ -152,9 +176,63 @@ double ceil(double x)
 #endif
 }
 
-double fabs(double x)
-{
-	return (x >= 0) ? x : -x;
+float fabsf(float x) {
+	return BINOP(andnot, -0.0f, x);
+}
+
+double fabs(double x) {
+	return BINOP(andnot, -0.0, x);
+}
+
+long double fabsl(long double x) {
+	union {
+		long double f;
+		uint128_t i;
+	} tmp;
+	tmp.f = x;
+	tmp.i &= ~((uint128_t)1 << (sizeof(long double) * CHAR_BIT - 1));
+	return tmp.f;
+}
+
+DEFINE_BINOP(fmaxf, float, max)
+DEFINE_BINOP(fmax, double, max)
+
+long double fmaxl(long double x, long double y) {
+	return x > y ? x : y;
+}
+
+DEFINE_BINOP(fminf, float, min)
+DEFINE_BINOP(fmin, double, min)
+
+long double fminl(long double x, long double y) {
+	return x < y ? x : y;
+}
+
+float fdimf(float x, float y) {
+	if (isnan(x) || isnan(y)) return NAN;
+	return fmaxf(x - y, 0);
+}
+
+double fdim(double x, double y) {
+	if (isnan(x) || isnan(y)) return NAN;
+	return fmax(x - y, 0);
+}
+
+long double fdiml(long double x, long double y) {
+	if (isnan(x) || isnan(y)) return NAN;
+	return fmaxl(x - y, 0);
+}
+
+float nanf(const char *arg) {
+	return __builtin_nanf(arg);
+}
+
+double nan(const char *arg) {
+	return __builtin_nan(arg);
+}
+
+long double nanl(const char *arg) {
+	return __builtin_nanl(arg);
 }
 
 double floor(double x)

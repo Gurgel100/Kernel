@@ -8,6 +8,16 @@
 #ifndef MATH_H_
 #define MATH_H_
 
+#define _DECL_UNARYFUNC(name)									\
+	extern float name##f(float x);								\
+	extern double name(double x);								\
+	extern long double name##l(long double x);
+
+#define _DECL_BINFUNC(name)										\
+	extern float name##f(float x, float y);						\
+	extern double name(double x, double y);						\
+	extern long double name##l(long double x, long double y);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,12 +57,26 @@ extern double pow(double x, double y);
 extern double sqrt(double x);
 
 extern double ceil(double x);
-extern double fabs(double x);
+
+_DECL_UNARYFUNC(fabs)
+
+_DECL_BINFUNC(fmax)
+_DECL_BINFUNC(fmin)
+
+_DECL_BINFUNC(fdim)
+
+extern float nanf(const char *arg);
+extern double nan(const char *arg);
+extern long double nanl(const char *arg);
+
 extern double floor(double x);
 extern double fmod(double x, double y);
 
 #ifdef __cplusplus
 }
 #endif
+
+#undef _DECL_UNARYFUNC
+#undef _DECL_BINFUNC
 
 #endif /* MATH_H_ */
