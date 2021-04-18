@@ -8,8 +8,8 @@
 #ifndef ERRNO_H_
 #define ERRNO_H_
 
-int _errno = 0;
-//TODO: sollte thread local sein
+extern int _errno;
+
 #define errno _errno
 
 #define E2BIG			1	//Argument list too long.
