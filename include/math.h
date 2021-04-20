@@ -39,26 +39,25 @@ extern "C" {
 #define FP_NAN			4
 #define fpclassify(x)	__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, x)
 
-extern double sin(double x);
-extern double cos(double x);
-extern double tan(double x);
-extern double asin(double x);
-extern double acos(double x);
-extern double atan(double x);
-extern double atan2(double x, double y);
-extern double sinh(double x);
-extern double cosh(double x);
-extern double tanh(double x);
-
-extern double exp(double x);
-extern double log(double x);	//Natürlicher Logarithmus von x ln(x)
-extern double log10(double x);	//Logarithmus zur Basis 10 von x lg(x)
-extern double pow(double x, double y);
-extern double sqrt(double x);
-
-extern double ceil(double x);
-
 _DECL_UNARYFUNC(fabs)
+_DECL_BINFUNC(fmod)
+
+_DECL_UNARYFUNC(sin)
+_DECL_UNARYFUNC(cos)
+_DECL_UNARYFUNC(tan)
+_DECL_UNARYFUNC(asin)
+_DECL_UNARYFUNC(acos)
+_DECL_UNARYFUNC(atan)
+_DECL_BINFUNC(atan2)
+_DECL_UNARYFUNC(sinh)
+_DECL_UNARYFUNC(cosh)
+_DECL_UNARYFUNC(tanh)
+
+_DECL_UNARYFUNC(exp)
+_DECL_UNARYFUNC(log)	//Natürlicher Logarithmus von x ln(x)
+_DECL_UNARYFUNC(log10)	//Logarithmus zur Basis 10 von x lg(x)
+_DECL_BINFUNC(pow)
+_DECL_UNARYFUNC(sqrt)
 
 _DECL_BINFUNC(fmax)
 _DECL_BINFUNC(fmin)
@@ -69,8 +68,8 @@ extern float nanf(const char *arg);
 extern double nan(const char *arg);
 extern long double nanl(const char *arg);
 
-extern double floor(double x);
-extern double fmod(double x, double y);
+_DECL_UNARYFUNC(ceil)
+_DECL_UNARYFUNC(floor)
 
 #ifdef __cplusplus
 }
