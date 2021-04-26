@@ -86,6 +86,7 @@ extern double nan(const char *arg);
 extern long double nanl(const char *arg);
 
 _DECL_UNARYFUNC(exp)
+_DECL_UNARYFUNC(exp2)
 _DECL_UNARYFUNC(log)
 _DECL_UNARYFUNC(log10)
 _DECL_UNARYFUNC(log2)

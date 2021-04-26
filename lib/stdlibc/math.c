@@ -203,6 +203,14 @@ long double expl(long double x) {
 	return exp2l(log2ex);
 }
 
+float exp2f(float x) {
+	return exp2l(x);
+}
+
+double exp2(double x) {
+	return exp2l(x);
+}
+
 long double exp2l(long double x) {
     if (isinf(x)) return signbit(x) ? 0 : x;
     // Because f2xm1 can only exponate with -1 <= x <= 1
