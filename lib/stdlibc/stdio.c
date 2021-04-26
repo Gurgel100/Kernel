@@ -717,6 +717,7 @@ static int jprintf_putsn(jprintf_args *args, const char *str, int num)
 	}
 }
 
+#ifndef BUILD_KERNEL
 static int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
@@ -874,6 +875,7 @@ static int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign,
 
 	return n;
 }
+#endif
 
 static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
@@ -1003,10 +1005,12 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						format++;
 						length = 5;
 					break;
+					#ifndef BUILD_KERNEL
 					case 'L':
 						format++;
 						length = 6;
 					break;
+					#endif
 				}
 
 				switch(*format)
@@ -1123,6 +1127,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						}
 					}
 					break;
+					#ifndef BUILD_KERNEL
 					case 'f': case 'F':	//Float
 						if(!precision_spec)
 							precision = 6;
@@ -1137,6 +1142,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							pos += jprintld(args, value, precision, sign, space_sign, alt, width, lpad);
 						}
 					break;
+					#endif
 					case 'x': case 'X':	//Hex
 					{
 						uint64_t value;
@@ -2029,6 +2035,7 @@ char *utoa(uint64_t x, char *s)
 	return s;
 }
 
+#ifndef BUILD_KERNEL
 char *ftoa(float x, char *s)
 {
 	char *buffer = s;
@@ -2047,6 +2054,7 @@ char *ftoa(float x, char *s)
 	*buffer = '\0';
 	return s;
 }
+#endif
 
 char *i2hex(uint64_t val, char* dest, uint64_t len)
 {

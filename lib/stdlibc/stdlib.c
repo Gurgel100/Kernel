@@ -110,6 +110,7 @@ void exit(int status)
 #endif
 }
 
+#ifndef BUILD_KERNEL
 double atof(const char* str)
 {
 	char *s = (char*)str;
@@ -210,6 +211,7 @@ double atof(const char* str)
 
 	return value * sign;
 }
+#endif
 
 int atoi(const char *str)
 {

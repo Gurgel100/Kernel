@@ -134,11 +134,12 @@ static bool formatted_write(char *restrict str, size_t count, size_t *pos, const
 	return true;
 }
 
-
+#ifndef BUILD_KERNEL
 double difftime(time_t time_end, time_t time_beg)
 {
 	return time_end - time_beg;
 }
+#endif
 
 time_t time(time_t *res)
 {
