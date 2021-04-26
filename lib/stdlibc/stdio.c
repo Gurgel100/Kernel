@@ -957,6 +957,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 					}
 					else if(*format == '*')
 					{
+						format++;
 						int prec = va_arg(arg, int);
 						if(prec < 0)
 							precision = 0;
