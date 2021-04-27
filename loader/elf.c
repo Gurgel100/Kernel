@@ -154,8 +154,6 @@ typedef struct{
 	elf64_xword	sh_entsize;		// Grösse der Einträge, wenn Sektion eine Tabelle hat
 }elf_section_header_entry;
 
-extern context_t kernel_context;
-
 static char elfCheck(elf_header *ELFHeader)
 {
 	//zuerst überprüfen wir auf den Magic-String

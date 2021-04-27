@@ -716,6 +716,7 @@ static int jprintf_putsn(jprintf_args *args, const char *str, int num)
 	}
 }
 
+#ifndef BUILD_KERNEL
 static int jprintd(jprintf_args *args, double x, uint64_t prec, bool sign, bool space_sign, bool point, uint64_t width, char lpad)
 {
 	int n = 0;
@@ -873,6 +874,7 @@ static int jprintld(jprintf_args *args, long double x, uint64_t prec, bool sign,
 
 	return n;
 }
+#endif
 
 static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 {
@@ -956,6 +958,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 					}
 					else if(*format == '*')
 					{
+						format++;
 						int prec = va_arg(arg, int);
 						if(prec < 0)
 							precision = 0;
@@ -1001,10 +1004,12 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						format++;
 						length = 5;
 					break;
+					#ifndef BUILD_KERNEL
 					case 'L':
 						format++;
 						length = 6;
 					break;
+					#endif
 				}
 
 				switch(*format)
@@ -1121,6 +1126,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						}
 					}
 					break;
+					#ifndef BUILD_KERNEL
 					case 'f': case 'F':	//Float
 						if(!precision_spec)
 							precision = 6;
@@ -1135,6 +1141,7 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 							pos += jprintld(args, value, precision, sign, space_sign, alt, width, lpad);
 						}
 					break;
+					#endif
 					case 'x': case 'X':	//Hex
 					{
 						uint64_t value;
@@ -1230,12 +1237,21 @@ static int jvprintf(jprintf_args *args, const char *format, va_list arg)
 						const char *str = va_arg(arg, char*);
 						size_t str_len = strlen(str);
 
-						for(; width > str_len; width--)
-						{
-							pos += jprintf_putc(args, lpad);
+						if (!left) {
+							for(; width > str_len; width--)
+							{
+								pos += jprintf_putc(args, lpad);
+							}
 						}
 
 						pos += jprintf_putsn(args, str, precision);
+
+						if (left) {
+							for(; width > str_len; width--)
+							{
+								pos += jprintf_putc(args, lpad);
+							}
+						}
 					}
 					break;
 					case 'c':	//Char
@@ -1980,9 +1996,11 @@ int putsn(size_t n, const char *str)
 	size_t i;
 	for(i = 0; i < n; i++)
 	{
-		putc(str[i], stdout);
+		if (putc(str[i], stdout) == EOF) {
+			return i;
+		}
 	}
-	return 1;
+	return n;
 }
 
 char *itoa(int64_t x, char *s)
@@ -2016,6 +2034,7 @@ char *utoa(uint64_t x, char *s)
 	return s;
 }
 
+#ifndef BUILD_KERNEL
 char *ftoa(float x, char *s)
 {
 	char *buffer = s;
@@ -2034,6 +2053,7 @@ char *ftoa(float x, char *s)
 	*buffer = '\0';
 	return s;
 }
+#endif
 
 char *i2hex(uint64_t val, char* dest, uint64_t len)
 {

@@ -12,8 +12,6 @@
 
 extern thread_t *fpuThread;
 
-extern context_t kernel_context;
-
 process_t kernel_process = {
 		.Context = &kernel_context,
 		.cmd = "kernel",

@@ -23,7 +23,7 @@ SECTIONS
      kernel_code_start = .;
     .text : {
         /*(multiboot) kein Multibootheader vorhanden.*/
-        *(.text)
+        *(.text*)
     }
     kernel_code_end = .;
     .data ALIGN(4096) : {

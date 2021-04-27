@@ -8,7 +8,7 @@ RM = rm -rf
 OUTPUT_DIR = build
 
 CPPFLAGS = -I"../include"
-CFLAGS = -nostdinc -gdwarf-4 -Wall -Wextra -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -fno-omit-frame-pointer -fPIC -std=gnu99
+CFLAGS = -gdwarf-4 -Wall -Wextra -fmessage-length=0 -m64 -ffreestanding -fno-stack-protector -fno-omit-frame-pointer -fPIC -std=gnu99
 ARFLAGS = -rs
 
 C_SRCS = $(shell find -name '*.c')

@@ -98,6 +98,7 @@ static void cpu_initInfo()
 	cpu_cpuid_result_t cpuid_80000001 = cpu_cpuid(0x80000001);
 	cpuInfo.nx = cpuid_80000001.edx & (1 << 20);
 	cpuInfo.syscall = cpuid_80000001.edx & (1 << 11);
+	cpuInfo.page_size_1gb = cpuid_80000001.edx & (1 << 26);
 
 	//Namen des Prozessors
 	if(cpuInfo.maxextCPUID >= 0x80000003 && cpuInfo.Vendor == INTEL)

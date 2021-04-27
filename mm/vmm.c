@@ -17,6 +17,7 @@
 #include "string.h"
 #include "lock.h"
 #include "cpu.h"
+#include <assert.h>
 
 #define NULL (void*)0
 
@@ -42,10 +43,12 @@
 #define PD_INDEX(address)					PAGE_TABLE_INDEX(address, 2)
 #define PT_INDEX(address)					PAGE_TABLE_INDEX(address, 3)
 
-#define PML4_ADDRESS()					((PML4_t*)0xFFFFFFFFFFFFF000)
-#define PDP_ADDRESS(PML4i)				((PDP_t*)(0xFFFFFFFFFFE00000 + (PML4i << 12)))
-#define PD_ADDRESS(PML4i, PDPi)			((PD_t*)(0xFFFFFFFFC0000000 + (((uint64_t)PML4i << 21) | (PDPi << 12))))
-#define PT_ADDRESS(PML4i, PDPi, PDi)	((PT_t*)(0xFFFFFF8000000000 + (((uint64_t)PML4i << 30) | ((uint64_t)PDPi << 21) | (PDi << 12))))
+#define MAPPED_PHYS_MEM_BASE		0xFFFFFF8000000000
+#define MAPPED_PHYS_MEM_GET(addr)	((void*)(MAPPED_PHYS_MEM_BASE + (paddr_t)(addr)))
+
+struct vmm_context {
+	paddr_t physAddress;
+};
 
 const uint16_t PML4e = PML4_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PDPe = PDP_INDEX(KERNELSPACE_END) + 1;
@@ -57,7 +60,7 @@ static lock_t vmm_lock = LOCK_INIT;
 context_t kernel_context;
 
 //Funktionen, die nur in dieser Datei aufgerufen werden sollen
-uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
+uint8_t vmm_ChangeMap(context_t *context, void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
 
 /*
  * Löscht eine (virtuelle) Page.
@@ -92,7 +95,7 @@ static bool isPageFree(const uint64_t *const PML4E, const uint64_t *const PDPE, 
 static uint8_t map_entry(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl, PageTable_t table, uint32_t level)
 {
 	uint32_t index = PAGE_TABLE_INDEX(vAddress, level);
-	PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (index << 12));
+	PageTable_t next_table = MAPPED_PHYS_MEM_GET(table[index].Address << 12);
 
 	if(!table[index].P) {
 		table[index].entry = 0;
@@ -118,6 +121,7 @@ static uint8_t map_entry(void *vAddress, paddr_t pAddress, uint8_t flags, uint16
 			table[index].RW = 1;			// Always mark as writable so that this recursive mapping method works
 			table[index].Address = address >> 12;
 
+			next_table = MAPPED_PHYS_MEM_GET(address);
 			clearPage(next_table);
 		}
 	} else if (level == 3) {
@@ -144,13 +148,13 @@ static uint8_t map_entry(void *vAddress, paddr_t pAddress, uint8_t flags, uint16
 	return res;
 }
 
-static uint8_t map(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl) {
-	return map_entry(vAddress, pAddress, flags, avl, (PageTable_t)PML4_ADDRESS(), 0);
+static uint8_t map(context_t *context, void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl) {
+	return map_entry(vAddress, pAddress, flags, avl, MAPPED_PHYS_MEM_GET(context->physAddress), 0);
 }
 
-static void *getFreePages(void *start, void *end, size_t pages)
+static void *getFreePages(context_t *context, void *start, void *end, size_t pages)
 {
-	PML4_t *const PML4 = PML4_ADDRESS();
+	PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
 
 	size_t found_pages = 0;
 
@@ -177,7 +181,7 @@ static void *getFreePages(void *start, void *end, size_t pages)
 			//Es sind noch Pages frei
 			if(!(PG_AVL(PML4->PML4E[PML4i]) & VMM_PAGE_FULL))
 			{
-				PDP_t *const PDP = PDP_ADDRESS(PML4i);
+				PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
 				uint16_t last_PDPi = (PML4i == end_PML4i) ? end_PDPi : PAGE_ENTRIES - 1;
 				for(uint16_t PDPi = (PML4i == start_PML4i) ? start_PDPi : 0; PDPi <= last_PDPi; PDPi++)
 				{
@@ -186,7 +190,7 @@ static void *getFreePages(void *start, void *end, size_t pages)
 						//Es sind noch Pages frei
 						if(!(PG_AVL(PDP->PDPE[PDPi]) & VMM_PAGE_FULL))
 						{
-							PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
+							PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
 							uint16_t last_PDi = (PML4i == end_PML4i && PDPi == end_PDPi) ? end_PDi : PAGE_ENTRIES - 1;
 							for(uint16_t PDi = (PML4i == start_PML4i && PDPi == start_PDPi) ? start_PDi : 0; PDi <= last_PDi; PDi++)
 							{
@@ -195,7 +199,7 @@ static void *getFreePages(void *start, void *end, size_t pages)
 									//Es sind noch Pages frei
 									if(!(PG_AVL(PD->PDE[PDi]) & VMM_PAGE_FULL))
 									{
-										PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+										PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 										uint16_t last_PTi = (PML4i == end_PML4i && PDPi == end_PDPi && PDi == end_PDi) ? end_PTi : PAGE_ENTRIES - 1;
 										for(uint16_t PTi = (PML4i == start_PML4i && PDPi == start_PDPi && PDi == start_PDi) ? start_PTi : 0;
 												PTi <= last_PTi; PTi++)
@@ -295,12 +299,11 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 	const uint8_t FLAG_DELETE_TABLE = 1 << 1;
 
 	uint32_t index = PAGE_TABLE_INDEX(vAddress, level);
-	PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (index << 12));
-
-	if (!table[index].P)
-		return 0;
 
 	if (level < 3) {
+		if (!table[index].P) return FLAG_CLEAR_FULL_FLAG;
+
+		PageTable_t next_table = MAPPED_PHYS_MEM_GET(table[index].Address << 12);
 		uint8_t res = unmap_entry(vAddress, next_table, level + 1, pAddress);
 		if (res & FLAG_DELETE_TABLE) {
 			pmm_Free(table[index].Address << 12);
@@ -317,7 +320,9 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 	}
 
 	table[index].entry = 0;
-	InvalidateTLBEntry(level == 3 ? vAddress : next_table);
+	if (level == 3) {
+		InvalidateTLBEntry(vAddress);
+	}
 
 	// Check if we still need this page table
 	if (level > 0) {
@@ -331,10 +336,10 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 	return FLAG_DELETE_TABLE | FLAG_CLEAR_FULL_FLAG;
 }
 
-static paddr_t unmap(void *vAddress)
+static paddr_t unmap(context_t *context, void *vAddress)
 {
-	paddr_t pAddress;
-	unmap_entry(vAddress, (PageTable_t)PML4_ADDRESS(), 0, &pAddress);
+	paddr_t pAddress = 0;
+	unmap_entry(vAddress, MAPPED_PHYS_MEM_GET(context->physAddress), 0, &pAddress);
 	return pAddress;
 }
 
@@ -346,48 +351,97 @@ static paddr_t unmap(void *vAddress)
 bool vmm_Init()
 {
 	extern uint8_t kernel_start, kernel_end, kernel_code_start, kernel_code_end;
-	uint64_t cr3;
-	void *i;
 
-	PML4_t *PML4;
-
-	asm volatile("mov %%cr3,%0" : "=r" (cr3));
-	PML4 = (PML4_t*)(cr3 & 0xFFFFFFFFFF000);	//nur die Adresse wollen wir haben
-
-	//Lasse den letzten Eintrag der PML4 auf die PML4 selber zeigen
-	setPML4Entry(511, PML4, 1, 1, 0, 1, 0, 0, 0, 1, (uintptr_t)PML4);
+	PML4_t *PML4 = (PML4_t*)(cpu_readControlRegister(CPU_CR3) & 0xFFFFFFFFFF000);	//nur die Adresse wollen wir haben
 
 	//Ersten Eintrag überarbeiten
-	setPML4Entry(0, PML4, 1, 1, 0, 1, 0, 0, 0, 0, PML4->PML4E[0] & PG_ADDRESS);
+	setPML4Entry(0, PML4, 1, 1, 0, 0, 0, 0, 0, 0, PML4->PML4E[0] & PG_ADDRESS);
+
+	// Map first 512GiB to the end of the virtual memory. For this we are using 2MiB pages initially
+	// Currently the first 16MiB are identity mapped
+	// For this we temporarily map the pml4 as pdp in the second entry of the pml4
+	setPML4Entry(1, PML4, 1, 1, 0, 0, 0, 0, 0, 1, (uintptr_t)PML4);
+	setPML4Entry(PML4_INDEX(MAPPED_PHYS_MEM_BASE), PML4, 1, 1, 0, 0, 0, 0, 0, 1, pmm_Alloc());
+	PageTable_t pdp = (PageTable_t)(((1ul << 27) | (1 << 18) | (1 << 9) | PML4_INDEX(MAPPED_PHYS_MEM_BASE)) << 12);
+	if (cpuInfo.page_size_1gb) {
+		// We use 1GiB pages
+		paddr_t paddr = 0;
+		for (uint32_t i = 0; i < 512; i++) {
+			PageTableEntry_t pdp_entry = {
+				.P = true,
+				.RW = true,
+				.PS_PAT = true,
+				.G = true,
+				.NX = true,
+				.Address = paddr >> 12
+			};
+			*(pdp++) = pdp_entry;
+			paddr += MM_BLOCK_SIZE * 512 * 512;
+		}
+	} else {
+		// We use 2MiB pages
+		paddr_t highest_address = pmm_getHighestAddress();
+		paddr_t paddr = 0;
+		for (uint32_t i = 0; i < 512 && paddr < highest_address; i++) {
+			PageTableEntry_t pdp_entry = {
+				.P = true,
+				.RW = true,
+				.NX = true,
+				.Address = pmm_Alloc() >> 12
+			};
+			*(pdp++) = pdp_entry;
+			PageTable_t pd = (PageTable_t)(((1ul << 27) | (1 << 18) | (PML4_INDEX(MAPPED_PHYS_MEM_BASE) << 9) | i) << 12);
+			for (uint32_t j = 0; j < 512 && paddr < highest_address; j++) {
+				PageTableEntry_t pd_entry = {
+					.P = true,
+					.RW = true,
+					.PS_PAT = true,
+					.G = true,
+					.NX = true,
+					.Address = paddr >> 12
+				};
+				*(pd++) = pd_entry;
+				paddr += MM_BLOCK_SIZE * 512;
+			}
+		}
+	}
+
+	// Unmap PML4 again
+	clearPML4Entry(1, PML4);
+	// Clear TLB
+	cpu_writeControlRegister(CPU_CR3, PML4);
 
 	//PML4 in Kernelkontext eintragen
 	kernel_context.physAddress = (uintptr_t)PML4;
-	kernel_context.virtualAddress = PML4_ADDRESS();
 
-	PML4 = PML4_ADDRESS();
+	PML4 = MAPPED_PHYS_MEM_GET(PML4);
+
+	// Mark all pages tables as reserved
+	vmm_getPageTables(pmm_markPageReserved);
 
 	//Speicher bis 1MB bearbeiten
 	//Addresse 0 ist nicht gemappt
-	unmap(NULL);
-	for(i = (void*)0x1000; i < (void*)0x100000; i += 0x1000)
+	unmap(&kernel_context, NULL);
+	for(uint8_t *i = (uint8_t*)0x1000; i < (uint8_t*)0x100000; i += 0x1000)
 	{
-		vmm_ChangeMap(i, (paddr_t)i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+		vmm_ChangeMap(&kernel_context, i, (paddr_t)i, VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
 	}
-	for(i = (void*)&kernel_start; i <= (void*)&kernel_end; i += 0x1000)
+	uint8_t *i;
+	for(i = &kernel_start; i <= &kernel_end; i += 0x1000)
 	{
-		if(i >= (void*)&kernel_code_start && i <= (void*)&kernel_code_end)
+		if(i >= &kernel_code_start && i <= &kernel_code_end)
 		{
-			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL, 0);
+			vmm_ChangeMap(&kernel_context, i, vmm_getPhysAddress(&kernel_context, i), VMM_FLAGS_GLOBAL, 0);
 		}
 		else
 		{
-			vmm_ChangeMap(i, vmm_getPhysAddress(i), VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
+			vmm_ChangeMap(&kernel_context, i, vmm_getPhysAddress(&kernel_context, i), VMM_FLAGS_GLOBAL | VMM_FLAGS_NX | VMM_FLAGS_WRITE, 0);
 		}
 	}
 	//Den restlichen virtuellen Speicher freigeben
-	while(!vmm_getPageStatus(i))
+	while(!vmm_getPageStatus(&kernel_context, i))
 	{
-		unmap(i);
+		unmap(&kernel_context, i);
 		i += 0x1000;
 	}
 
@@ -402,9 +456,9 @@ bool vmm_Init()
  * Rückgabewerte:	Adresse zum Speicherblock
  * 					NULL = Ein Fehler ist aufgetreten
  */
-void *vmm_Alloc(size_t Length)
+void *vmm_Alloc(context_t *context, size_t Length)
 {
-	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
+	return vmm_Map(context, NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
 }
 
 /*
@@ -412,9 +466,9 @@ void *vmm_Alloc(size_t Length)
  * Parameter:	vAddress = Virtuelle Adresse, an die der Block anfängt
  * 				Pages = Anzahl Pages, die dieser Block umfasst
  */
-void vmm_Free(void *vAddress, size_t Pages)
+void vmm_Free(context_t *context, void *vAddress, size_t Pages)
 {
-	vmm_UnMap(vAddress, Pages, true);
+	vmm_UnMap(context, vAddress, Pages, true);
 }
 
 //------------------------Systemfunktionen---------------------------
@@ -431,7 +485,7 @@ void vmm_Free(void *vAddress, size_t Pages)
  */
 void *vmm_SysAlloc(size_t Length)
 {
-	return vmm_Map(NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX);
+	return vmm_Map(&kernel_context, NULL, 0, Length, VMM_FLAGS_WRITE | VMM_FLAGS_GLOBAL | VMM_FLAGS_NX);
 }
 
 /*
@@ -443,7 +497,7 @@ void *vmm_SysAlloc(size_t Length)
  */
 void vmm_SysFree(void *vAddress, size_t Length)
 {
-	vmm_UnMap(vAddress, Length, true);
+	vmm_UnMap(&kernel_context, vAddress, Length, true);
 }
 
 /*
@@ -461,17 +515,18 @@ void *vmm_AllocDMA(paddr_t maxAddress, size_t Size, paddr_t *Phys)
 	*Phys = pmm_AllocDMA(maxAddress, Size);
 		if(*Phys == 1) return NULL;
 
-	return vmm_Map(NULL, *Phys, Pages, VMM_FLAGS_NO_CACHE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	return vmm_Map(&kernel_context, NULL, *Phys, Pages, VMM_FLAGS_NO_CACHE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 }
 
 static void walkPageTable(PageTable_t table, uint32_t level, void(*callback)(paddr_t)) {
 	const uint32_t end = PAGE_ENTRIES - (level == 0);
 	for (uint32_t i = 0; i < end; i++) {
 		if (table[i].P) {
-			callback(table[i].Address << 12);
+			paddr_t page = table[i].Address << 12;
+			callback(page);
 
 			if (level < 2) {	// We don't walk though the PTs as we only want the page tables
-				PageTable_t next_table = (PageTable_t)(((uintptr_t)table << 9) | (i << 12));
+				PageTable_t next_table = (PageTable_t)MAPPED_PHYS_MEM_GET(page);
 				walkPageTable(next_table, level + 1, callback);
 			}
 		}
@@ -479,14 +534,15 @@ static void walkPageTable(PageTable_t table, uint32_t level, void(*callback)(pad
 }
 
 void vmm_getPageTables(void(*callback)(paddr_t)) {
-	callback(cpu_readControlRegister(CPU_CR3) & PG_ADDRESS);
-	walkPageTable((PageTable_t)PML4_ADDRESS(), 0, callback);
+	paddr_t pml4 = cpu_readControlRegister(CPU_CR3) & PG_ADDRESS;
+	callback(pml4);
+	walkPageTable((PageTable_t)MAPPED_PHYS_MEM_GET(pml4), 0, callback);
 }
 
 //----------------------Allgemeine Funktionen------------------------
-void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
+void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 {
-	uint8_t res;
+	uint8_t res = 1;
 	bool unused = pAddress == 0;
 	bool allocate = flags & VMM_FLAGS_ALLOCATE;
 	uint16_t avl = (unused && !allocate) ? VMM_UNUSED_PAGE : 0;
@@ -499,7 +555,7 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 		{
 			void *start = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_START : KERNELSPACE_START);
 			void *end = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_END : KERNELSPACE_END);
-			vAddress = getFreePages(start, end, pages);
+			vAddress = getFreePages(context, start, end, pages);
 		}
 
 		bool error = false;
@@ -522,7 +578,7 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 				paddr = pAddress + currentOffset * !unused;
 			}
 
-			if((res = map(vAddress + currentOffset, paddr, flags, avl)) != 0)
+			if((res = map(context, vAddress + currentOffset, paddr, flags, avl)) != 0)
 			{
 				error = true;
 				break;
@@ -536,7 +592,7 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 		{
 			for(size_t j = 0; j < i; j++)
 			{
-				paddr_t paddr = unmap(vAddress + j * VMM_SIZE_PER_PAGE);
+				paddr_t paddr = unmap(context, vAddress + j * VMM_SIZE_PER_PAGE);
 				if(allocate)
 					pmm_Free(paddr);
 			}
@@ -545,12 +601,12 @@ void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
 	});
 }
 
-void vmm_UnMap(void *vAddress, size_t pages, bool freePages)
+void vmm_UnMap(context_t *context, void *vAddress, size_t pages, bool freePages)
 {
 	LOCKED_TASK(vmm_lock, {
 		for(size_t i = 0; i < pages; i++)
 		{
-			paddr_t pAddress = unmap(vAddress + i * VMM_SIZE_PER_PAGE);
+			paddr_t pAddress = unmap(context, vAddress + i * VMM_SIZE_PER_PAGE);
 			if(freePages)
 				pmm_Free(pAddress);
 		}
@@ -565,7 +621,7 @@ void vmm_UnMap(void *vAddress, size_t pages, bool freePages)
  * Rückgabewert:	0 = Alles in Ordnung
  * 					1 = zu wenig phys. Speicher vorhanden
  */
-uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
+uint8_t vmm_ChangeMap(context_t *context, void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
 {
 	//Einträge in die Page Tabellen
 	const uint16_t PML4i = PML4_INDEX(vAddress);
@@ -573,10 +629,10 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 	const uint16_t PDi = PD_INDEX(vAddress);
 	const uint16_t PTi = PT_INDEX(vAddress);
 
-	PML4_t *const PML4 = PML4_ADDRESS();
-	PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+	PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
+	PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
+	PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
+	PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 
 	//Flags auslesen
 	bool US = (flags & VMM_FLAGS_USER);
@@ -591,7 +647,7 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
 		uint8_t res = 0;
 		if(isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]))
 		{
-			if(map(vAddress, pAddress, flags, avl) == 1)
+			if(map(context, vAddress, pAddress, flags, avl) == 1)
 			{
 				res = 1;
 			}
@@ -623,7 +679,6 @@ uint8_t vmm_ChangeMap(void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t 
  * 					1 = zu wenig phys. Speicherplatz vorhanden
  * 					2 = Destinationaddresse ist schon belegt
  *///TODO: Bei Fehler alles Rückgängig machen
-//FIXME: getPhysAddress funktioniert nur für kernel_context
 //FIXME: correctly handle pages which are allocated but have not been mapped yet (VMM_UNUSED_PAGE)
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl)
 {
@@ -631,274 +686,11 @@ uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, voi
 	for(i = 0; i < length; i++)
 	{
 		uint8_t r;
-		if((r = vmm_ContextMap(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src + i * VMM_SIZE_PER_PAGE) ? : pmm_Alloc(), flags, avl)) != 0)
+		if((r = map(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src_context, src + i * VMM_SIZE_PER_PAGE) ? : pmm_Alloc(), flags, avl)) != 0)
 			return r;
-		if(vmm_ContextUnMap(src_context, src + i * VMM_SIZE_PER_PAGE, false) == 2)
-			return 1;
+		unmap(src_context, src + i * VMM_SIZE_PER_PAGE);
 	}
 	return 0;
-}
-
-/*
- * Mappt einen Speicherbereich an die vorgegebene Address im entsprechendem Kontext
- */
-uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl)
-{
-	PML4_t *PML4 = context->virtualAddress;
-	PDP_t *PDP;
-	PD_t *PD;
-	PT_t *PT;
-	paddr_t Address;
-
-	//Einträge in die Page Tabellen
-	const uint16_t PML4i = PML4_INDEX(vAddress);
-	const uint16_t PDPi = PDP_INDEX(vAddress);
-	const uint16_t PDi = PD_INDEX(vAddress);
-	const uint16_t PTi = PT_INDEX(vAddress);
-
-	//Flags auslesen
-	bool US = (flags & VMM_FLAGS_USER);
-	bool G = (flags & VMM_FLAGS_GLOBAL);
-	bool RW = (flags & VMM_FLAGS_WRITE);
-	bool NX = (flags & VMM_FLAGS_NX);
-	bool P = !(avl & VMM_UNUSED_PAGE);
-	bool PCD = (flags & VMM_FLAGS_NO_CACHE);
-	bool PWT = (flags & VMM_FLAGS_PWT);
-
-	//PML4 Tabelle bearbeiten
-	if((PML4->PML4E[PML4i] & PG_P) == 0)		//Eintrag für die PML4 schon vorhanden?
-	{											//Erstelle neuen Eintrag
-		if((Address = pmm_Alloc()) == 1)		//Speicherplatz für die PDP reservieren
-		{
-			return 1;							//Kein Speicherplatz vorhanden
-		}
-
-		//Eintrag in die PML4S
-		setPML4Entry(PML4i, PML4, 1, 1, (PML4->PML4E[PML4i] & PG_US) || US, 1, 0, 0, 0, 0, Address);
-		//PDP mappen
-		PDP = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-		clearPage(PDP);
-	}
-	else
-	{
-		//PDP mappen
-		PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-	}
-
-	//PDP Tabelle bearbeiten
-	if((PDP->PDPE[PDPi] & PG_P) == 0)			//Eintrag in die PDP schon vorhanden?
-	{											//Neuen Eintrag erstellen
-		if((Address = pmm_Alloc()) == 1)		//Speicherplatz für die PD reservieren
-		{
-			unmap(PDP);
-			return 1;							//Kein Speicherplatz vorhanden
-		}
-
-		//Eintrag in die PDP
-		setPDPEntry(PDPi, PDP, 1, 1, (PDP->PDPE[PDPi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
-		//PD mappen
-		PD = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-		clearPage(PD);
-	}
-	else
-	{
-		//PD mappen
-		PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-	}
-
-	//PD Tabelle bearbeiten
-	if((PD->PDE[PDi] & PG_P) == 0)			//Eintrag in die PD schon vorhanden?
-	{										//Neuen Eintrag erstellen
-		if((Address = pmm_Alloc()) == 1)	//Speicherplatz für die PT reservieren
-		{
-			unmap(PDP);
-			unmap(PD);
-			return 1;							//Kein Speicherplatz vorhanden
-		}
-
-		//Eintrag in die PDP
-		setPDEntry(PDi, PD, 1, 1, (PD->PDE[PDi] & PG_US) || US, 1, 0, 0, 0, 0, Address);
-		//PT mappen
-		PT = vmm_Map(NULL, Address, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-		clearPage(PT);
-	}
-	else
-	{
-		//PT mappen
-		PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-	}
-
-	//PT Tabelle bearbeiten
-	if((PT->PTE[PTi] & PG_P) == 0)			//Eintrag in die PT schon vorhanden?
-	{										//Neuen Eintrag erstellen
-		//Eintrag in die PT
-		setPTEntry(PTi, PT, P, RW, US, PWT, PCD, 0, 0, G, avl, 0, NX, pAddress);
-	}
-	else
-	{
-		unmap(PDP);
-		unmap(PD);
-		unmap(PT);
-		return 2;							//virtuelle Addresse schon besetzt
-	}
-
-	//Reserved-Bits zurücksetzen
-	PD->PDE[PDi] &= ~0x1C0;
-	PDP->PDPE[PDPi] &= ~0x1C0;
-	PML4->PML4E[PML4i] &= ~0x1C0;
-
-	//Tabellen wieder unmappen
-	unmap(PDP);
-	unmap(PD);
-	unmap(PT);
-
-	return 0;
-}
-
-/*
- * Gibt eine physikalischer Addresse zu einer virtuellen Addresse frei
- * Params:	context = Kontext in dem die Page demapped werden soll
- * 			vAddress = virt. Addresse der freizugebenden Speicherstelle
- *
- * Rückgabewert:	0 = Page wurde freigegeben
- * 					1 = virt. Addresse nicht belegt
- * 					2 = zu wenig phys. Speicherplatz vorhanden
- */
-uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
-{
-	PML4_t *PML4 = context->virtualAddress;
-	PDP_t *PDP;
-	PD_t *PD;
-	PT_t *PT;
-	uint16_t i;
-
-	//Einträge in die Page Tabellen
-	const uint16_t PML4i = PML4_INDEX(vAddress);
-	const uint16_t PDPi = PDP_INDEX(vAddress);
-	const uint16_t PDi = PD_INDEX(vAddress);
-	const uint16_t PTi = PT_INDEX(vAddress);
-
-	InvalidateTLBEntry(vAddress);
-
-	//PML4 Tabelle bearbeiten
-	if((PML4->PML4E[PML4i] & PG_P) == 0)	//PML4 Eintrag vorhanden?
-	{
-		PML4->PML4E[PML4i] &= ~0x1C0;
-		return 1;
-	}
-
-	//PDP mappen
-	PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-
-	//PDP Tabelle bearbeiten
-	if((PDP->PDPE[PDPi] & PG_P) == 0)		//PDP Eintrag vorhanden?
-	{
-		PDP->PDPE[PDPi] &= ~0x1C0;
-		PML4->PML4E[PML4i] &= ~0x1C0;
-		unmap(PDP);
-		return 1;
-	}
-
-	//PD mappen
-	PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-
-	//PD Tabelle bearbeiten
-	if((PD->PDE[PDi] & PG_P) == 0)			//PD Eintrag vorhanden?
-	{
-		PD->PDE[PDi] &= ~0x1C0;
-		PDP->PDPE[PDPi] &= ~0x1C0;
-		PML4->PML4E[PML4i] &= ~0x1C0;
-		unmap(PD);
-		unmap(PDP);
-		return 1;
-	}
-
-	//PT mappen
-	PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX | VMM_FLAGS_WRITE);
-
-	//PT Tabelle bearbeiten
-	if((PT->PTE[PTi] & PG_P) == 1)			//Wenn PT Eintrag vorhanden
-	{										//dann lösche ihn
-		if(free_page)
-		{
-			paddr_t page_addr = PT->PTE[PTi] & PG_ADDRESS;
-			pmm_Free(page_addr);
-		}
-		clearPTEntry(PTi, PT);
-
-		//Wird die PT noch benötigt?
-		for(i = 0; i < PAGE_ENTRIES; i++)
-		{
-			if((PT->PTE[i] & PG_P) || (PG_AVL(PT->PTE[i]) & VMM_UNUSED_PAGE))
-			{
-				PT->PTE[PTi] &= ~0x1C0;
-				PD->PDE[PDi] &= ~0x1C0;
-				PDP->PDPE[PDPi] &= ~0x1C0;
-				PML4->PML4E[PML4i] &= ~0x1C0;
-				unmap(PT);
-				unmap(PD);
-				unmap(PDP);
-				return 0; //Wird die PT noch benötigt, sind wir fertig
-			}
-		}
-		//Ansonsten geben wir den Speicherplatz für die PT frei
-		vmm_SysFree(PT, 1);
-		//und löschen den Eintrag für diese PT in der PD
-
-		clearPDEntry(PDi, PD);
-
-		//Wird die PD noch benötigt?
-		for(i = 0; i < PAGE_ENTRIES; i++)
-		{
-			if(PD->PDE[i] & PG_P)
-			{
-				PD->PDE[PDi] &= ~0x1C0;
-				PDP->PDPE[PDPi] &= ~0x1C0;
-				PML4->PML4E[PML4i] &= ~0x1C0;
-				unmap(PD);
-				unmap(PDP);
-				return 0; //Wid die PD noch benötigt, sind wir fertig
-			}
-		}
-		//Ansonsten geben wir den Speicherplatz für die PD frei
-		vmm_SysFree(PD, 1);
-		//und löschen den Eintrag für diese PD in der PDP
-
-		clearPDPEntry(PDPi, PDP);
-
-		//Wird die PDP noch benötigt?
-		for(i = 0; i < PAGE_ENTRIES; i++)
-		{
-			//Wird die PDP noch benötigt, sind wir fertig
-			if(PDP->PDPE[i] & PG_P)
-			{
-				PDP->PDPE[PDPi] &= ~0x1C0;
-				PML4->PML4E[PML4i] &= ~0x1C0;
-				unmap(PDP);
-				return 0;
-			}
-		}
-		//Ansonsten geben wir den Speicherplatz für die PDP frei
-		vmm_SysFree(PDP, 1);
-		//und löschen den Eintrag für diese PDP in der PML4
-
-		clearPML4Entry(PML4i, PML4);	//PML4 ist immer vorhanden, daher keine Überprüfung
-										//ob sie leer ist (was sehr schlecht sein würde --> PF)
-		//Reserved-Bits zurücksetzen
-		PML4->PML4E[PML4i] &= ~0x1C0;
-		return 0;
-	}
-	else
-	{
-		PT->PTE[PTi] &= ~0x1C0;
-		PD->PDE[PDi] &= ~0x1C0;
-		PDP->PDPE[PDPi] &= ~0x1C0;
-		PML4->PML4E[PML4i] &= ~0x1C0;
-		unmap(PT);
-		unmap(PD);
-		unmap(PDP);
-		return 1;
-	}
 }
 
 /*
@@ -925,7 +717,7 @@ uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page)
  * Rückgabewert:	true = Page ist frei
  * 					false = Page ist belegt
  */
-bool vmm_getPageStatus(void *Address)
+bool vmm_getPageStatus(context_t *context, void *Address)
 {
 	//Einträge in die Page Tabellen
 	const uint16_t PML4i = PML4_INDEX(Address);
@@ -933,15 +725,15 @@ bool vmm_getPageStatus(void *Address)
 	const uint16_t PDi = PD_INDEX(Address);
 	const uint16_t PTi = PT_INDEX(Address);
 
-	const PML4_t *const PML4 = PML4_ADDRESS();
-	const PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	const PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+	const PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
+	const PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
+	const PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
+	const PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 
 	return isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]);
 }
 
-paddr_t vmm_getPhysAddress(void *virtualAddress)
+paddr_t vmm_getPhysAddress(context_t *context, void *virtualAddress)
 {
 	//Einträge in die Page Tabellen
 	const uint16_t PML4i = PML4_INDEX(virtualAddress);
@@ -949,15 +741,15 @@ paddr_t vmm_getPhysAddress(void *virtualAddress)
 	const uint16_t PDi = PD_INDEX(virtualAddress);
 	const uint16_t PTi = PT_INDEX(virtualAddress);
 
-	const PML4_t *const PML4 = PML4_ADDRESS();
-	const PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	const PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+	const PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
+	const PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
+	const PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
+	const PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 
 	return isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) ? 0 : (paddr_t)(PT->PTE[PTi] & PG_ADDRESS);
 }
 
-void vmm_unusePages(void *virt, size_t pages)
+void vmm_unusePages(context_t *context, void *virt, size_t pages)
 {
 	for(void *address = virt; address < virt + pages * VMM_SIZE_PER_PAGE; address += VMM_SIZE_PER_PAGE)
 	{
@@ -967,10 +759,10 @@ void vmm_unusePages(void *virt, size_t pages)
 		const uint16_t PDi = PD_INDEX(address);
 		const uint16_t PTi = PT_INDEX(address);
 
-		const PML4_t *const PML4 = PML4_ADDRESS();
-		const PDP_t *const PDP = PDP_ADDRESS(PML4i);
-		const PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-		PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+		const PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
+		const PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
+		const PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
+		PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 
 		if(!isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE) == 0)
 		{
@@ -983,7 +775,7 @@ void vmm_unusePages(void *virt, size_t pages)
 	}
 }
 
-void vmm_usePages(void *virt, size_t pages)
+void vmm_usePages(context_t *context, void *virt, size_t pages)
 {
 	void *address = (void*)((uintptr_t)virt & ~0xFFF);
 
@@ -995,7 +787,10 @@ void vmm_usePages(void *virt, size_t pages)
 		const uint16_t PDi = PD_INDEX(address);
 		const uint16_t PTi = PT_INDEX(address);
 
-		PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+		const PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
+		const PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
+		const PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
+		PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 
 		uint64_t entry = PT->PTE[PTi];
 		paddr_t pAddr = pmm_Alloc();
@@ -1028,19 +823,17 @@ bool vmm_userspacePointerValid(const void *ptr, const size_t size)
 context_t *createContext()
 {
 	context_t *context = malloc(sizeof(context_t));
-	PML4_t *newPML4 = memset(vmm_SysAlloc(1), 0, MM_BLOCK_SIZE);
+	context->physAddress = pmm_Alloc();
+	PML4_t *newPML4 = memset(MAPPED_PHYS_MEM_GET(context->physAddress), 0, MM_BLOCK_SIZE);
 
 	//Kernel in den Adressraum einbinden
-	PML4_t *const PML4 = PML4_ADDRESS();
+	PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(kernel_context.physAddress);
 
 	for(uint16_t PML4i = 0; PML4i < PML4e; PML4i++)
 		newPML4->PML4E[PML4i] = PML4->PML4E[PML4i];
 
-	context->physAddress = vmm_getPhysAddress(newPML4);
 	//Den letzten Eintrag verwenden wir als Zeiger auf den Anfang der Tabelle. Das ermöglicht das Editieren derselben.
-	setPML4Entry(511, newPML4, 1, 1, 0, 1, 0, 0, 0, 1, (uintptr_t)context->physAddress);
-
-	context->virtualAddress = newPML4;
+	newPML4->PML4E[511] = PML4->PML4E[511];
 
 	return context;
 }
@@ -1051,28 +844,31 @@ context_t *createContext()
 void deleteContext(context_t *context)
 {
 	//Erst alle Pages des Kontextes freigeben
-	PML4_t *PML4 = context->virtualAddress;
+	PML4_t *PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
 	for(uint16_t PML4i = PML4e; PML4i < PAGE_ENTRIES - 1; PML4i++)
 	{
 		//Ist der Eintrag gültig
 		if(PML4->PML4E[PML4i] & PG_P)
 		{
 			//PDP mappen
-			PDP_t *PDP = vmm_Map(NULL, PML4->PML4E[PML4i] & PG_ADDRESS, 1, VMM_FLAGS_NX);
+			paddr_t PDP_phys = PML4->PML4E[PML4i] & PG_ADDRESS;
+			PDP_t *PDP = MAPPED_PHYS_MEM_GET(PDP_phys);
 			for(uint16_t PDPi = 0; PDPi < PAGE_ENTRIES; PDPi++)
 			{
 				//Ist der Eintrag gültig
 				if(PDP->PDPE[PDPi] & PG_P)
 				{
 					//PD mappen
-					PD_t *PD = vmm_Map(NULL, PDP->PDPE[PDPi] & PG_ADDRESS, 1, VMM_FLAGS_NX);
+					paddr_t PD_phys = PDP->PDPE[PDPi] & PG_ADDRESS;
+					PD_t *PD = MAPPED_PHYS_MEM_GET(PD_phys);
 					for(uint16_t PDi = 0; PDi < PAGE_ENTRIES; PDi++)
 					{
 						//Ist der Eintrag gültig
 						if(PD->PDE[PDi] & PG_P)
 						{
 							//PT mappen
-							PT_t *PT = vmm_Map(NULL, PD->PDE[PDi] & PG_ADDRESS, 1, VMM_FLAGS_NX);
+							paddr_t PT_phys = PD->PDE[PDi] & PG_ADDRESS;
+							PT_t *PT = MAPPED_PHYS_MEM_GET(PT_phys);
 							for(uint16_t PTi = 0; PTi < PAGE_ENTRIES; PTi++)
 							{
 								//Ist die Page alloziiert
@@ -1080,20 +876,23 @@ void deleteContext(context_t *context)
 									pmm_Free(PT->PTE[PTi] & PG_ADDRESS);
 							}
 							//PT löschen
-							vmm_SysFree(PT, 1);
+							PD->PDE[PDi] = 0;
+							pmm_Free(PT_phys);
 						}
 					}
 					//PD löschen
-					vmm_SysFree(PD, 1);
+					PDP->PDPE[PDPi] = 0;
+					pmm_Free(PD_phys);
 				}
 			}
 			//PDP löschen
-			vmm_SysFree(PDP, 1);
+			PML4->PML4E[PML4i] = 0;
+			pmm_Free(PDP_phys);
 		}
 	}
 
 	//Restliche Datenstrukturen freigeben
-	vmm_SysFree(context->virtualAddress, 1);
+	pmm_Free(context->physAddress);
 	free(context);
 }
 
@@ -1105,22 +904,22 @@ inline void activateContext(context_t *context)
 	asm volatile("mov %0,%%cr3" : : "r"(context->physAddress));
 }
 
-bool vmm_handlePageFault(void *page, uint64_t errorcode)
+bool vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode)
 {
 	uint16_t PML4i = PML4_INDEX(page);
 	uint16_t PDPi = PDP_INDEX(page);
 	uint16_t PDi = PD_INDEX(page);
 	uint16_t PTi = PT_INDEX(page);
 
-	PML4_t *const PML4 = PML4_ADDRESS();
-	PDP_t *const PDP = PDP_ADDRESS(PML4i);
-	PD_t *const PD = PD_ADDRESS(PML4i, PDPi);
-	PT_t *const PT = PT_ADDRESS(PML4i, PDPi, PDi);
+	const PML4_t *const PML4 = MAPPED_PHYS_MEM_GET(context->physAddress);
+	const PDP_t *const PDP = MAPPED_PHYS_MEM_GET(PML4->PML4E[PML4i] & PG_ADDRESS);
+	const PD_t *const PD = MAPPED_PHYS_MEM_GET(PDP->PDPE[PDPi] & PG_ADDRESS);
+	const PT_t *const PT = MAPPED_PHYS_MEM_GET(PD->PDE[PDi] & PG_ADDRESS);
 
 	//Activate unused pages
 	if(!isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
 	{
-		vmm_usePages(page, 1);
+		vmm_usePages(context, page, 1);
 		return true;
 	}
 	return false;

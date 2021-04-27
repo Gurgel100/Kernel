@@ -110,6 +110,7 @@ void exit(int status)
 #endif
 }
 
+#ifndef BUILD_KERNEL
 double atof(const char* str)
 {
 	char *s = (char*)str;
@@ -210,6 +211,7 @@ double atof(const char* str)
 
 	return value * sign;
 }
+#endif
 
 int atoi(const char *str)
 {
@@ -832,7 +834,8 @@ void free(void *ptr)
 				if(Pages > 0)
 				{
 #ifdef BUILD_KERNEL
-					vmm_unusePages((void*)bottom, Pages);
+					extern context_t kernel_context;
+					vmm_unusePages(&kernel_context, (void*)bottom, Pages);
 #else
 					syscall_unusePages((void*)bottom, Pages);
 #endif

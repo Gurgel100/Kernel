@@ -34,6 +34,7 @@ struct{
 		uint32_t maxextCPUID;	//Maximale erweiterte CPUID-Funktion
 		uint8_t NumCores;
 		bool GlobalPage;		//1: Globale Pages werden unterstützt
+		bool page_size_1gb;
 		bool cpuidAvailable;
 		bool HyperThreading;
 		bool sse3;
@@ -104,7 +105,8 @@ inline void cpu_writeControlRegister(cpu_control_register_t reg, uint64_t val)
 			asm volatile("mov %0, %%cr2":: "r"(val));
 			break;
 		case CPU_CR3:
-			asm volatile("mov %0, %%cr3":: "r"(val));
+			// Tell the compiler to no reorder memory accesses across this instruction as it invalidates the TLB
+			asm volatile("mov %0, %%cr3":: "r"(val): "memory");
 			break;
 		case CPU_CR4:
 			asm volatile("mov %0, %%cr4":: "r"(val));

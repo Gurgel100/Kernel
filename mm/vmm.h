@@ -24,14 +24,13 @@
 
 #define VMM_UNUSED_PAGE		0x4		//Marks page as unused by process
 
-typedef struct{
-	paddr_t physAddress;
-	void *virtualAddress;
-}context_t;
+typedef struct vmm_context context_t;
+
+extern context_t kernel_context;
 
 bool vmm_Init();									//Initialisiert virtuelle Speicherverw.
-void *vmm_Alloc(size_t Size);						//Reserviert eine virtuelle Speicherst.
-void vmm_Free(void *Address, size_t Size);		//Gibt eine Speicherstelle frei
+void *vmm_Alloc(context_t *context, size_t Size);						//Reserviert eine virtuelle Speicherst.
+void vmm_Free(context_t *context, void *Address, size_t Size);		//Gibt eine Speicherstelle frei
 
 void *vmm_SysAlloc(size_t Length);
 void vmm_SysFree(void *vAddress, size_t Length);
@@ -47,34 +46,34 @@ void vmm_getPageTables(void(*callback)(paddr_t));
  *
  * This function locks the vmm_lock lock.
  *
+ * @param context The context of the virtual memory
  * @param vAddress Virtual address to map the memory area to
  * @param pAddress Physical address of the memory area
  * @param pages Number pages the memory area spans
  * @param flags Flags with access rights
  * @return NULL on failure otherwise virtual address
  */
-void *vmm_Map(void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags);
+void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags);
 
 /**
  * \brief Unmaps a memory area.
  *
  * This function locks the vmm_lock lock.
  *
+ * @param context The context of the virtual memory
  * @param vAddress Virtual address of the start of the memory area
  * @param pages Number of pages the memory area spans
  * @param freePages Indicates if the physical memory should be freed
  */
-void vmm_UnMap(void *vAddress, size_t pages, bool freePages);
+void vmm_UnMap(context_t *context, void *vAddress, size_t pages, bool freePages);
 
-paddr_t vmm_getPhysAddress(void *virtualAddress);
+paddr_t vmm_getPhysAddress(context_t *context, void *virtualAddress);
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl);
-uint8_t vmm_ContextMap(context_t *context, void *vAddress, paddr_t pAddress, uint8_t flags, uint16_t avl);
-uint8_t vmm_ContextUnMap(context_t *context, void *vAddress, bool free_page);
 
-bool vmm_getPageStatus(void *Address);
+bool vmm_getPageStatus(context_t *context, void *Address);
 
-void vmm_unusePages(void *virt, size_t pages);
-void vmm_usePages(void *virt, size_t pages);
+void vmm_unusePages(context_t *context, void *virt, size_t pages);
+void vmm_usePages(context_t *context, void *virt, size_t pages);
 
 bool vmm_userspacePointerValid(const void *ptr, const size_t size);
 
@@ -83,6 +82,6 @@ void deleteContext(context_t *context);
 void activateContext(context_t *context);
 
 //Interrupt handler
-bool vmm_handlePageFault(void *page, uint64_t errorcode);
+bool vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode);
 
 #endif /* VMM_H_ */

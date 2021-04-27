@@ -16,4 +16,6 @@ extern void _assert(const char *assertion, const char *file, unsigned int line, 
 #define assert(condition) ((condition) ? ((void)0) : _assert(#condition, __FILE__, __LINE__, ""))
 #endif
 
+#define static_assert   _Static_assert
+
 #endif /* ASSERT_H_ */

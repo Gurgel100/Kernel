@@ -13,15 +13,13 @@
 #include "display.h"
 #include "mm.h"
 #include "string.h"
-#include "stdlib.h"
-#include "lock.h"
 #include "assert.h"
-#ifdef DEBUGMODE
 #include "stdio.h"
-#endif
 
 #define PMM_BITS_PER_ELEMENT	(sizeof(*Map) * 8)
 #define PMM_MAP_ALIGN_SIZE(x)	((x + (sizeof(*Map) - 1)) & ~(sizeof(*Map) - 1))
+#define ROUND_UP_PAGESIZE(x)	(((x) + MM_BLOCK_SIZE - 1) & ~(MM_BLOCK_SIZE - 1))
+#define ROUND_DOWN_PAGESIZE(x)	((x) & ~(MM_BLOCK_SIZE - 1))
 
 #define MAX(a, b)				((a > b) ? a : b)
 #define MIN(a, b)				((a < b) ? a : b)
@@ -35,93 +33,99 @@ static uint64_t pmm_totalPages;			//Gesamtanzahl an phys. Pages
 static uint64_t pmm_freePages;			//Verfügbarer (freier) physischer Speicher (4kb)
 static uint64_t pmm_Kernelsize;			//Grösse des Kernels in Bytes
 
-//32768 byte grosse Bitmap (für die ersten 1GB Speicher)
 //Ein Bit ist gesetzt, wenn die Page frei ist
-static uint64_t tmpMap[4096] __attribute__((aligned(MM_BLOCK_SIZE)));
-static uint64_t *Map = tmpMap;
-static size_t mapSize = 4096;			//Grösse der Bitmap
-
-static void markPageReserved(paddr_t address) {
-	pmm_freePages--;
-	Map[address / (PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE)] &= ~(1ULL << ((address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT));
-}
+static uint64_t *Map;
+static size_t mapSize;			//Grösse der Bitmap
 
 /*
  * Initialisiert die physikalische Speicherverwaltung
  */
 bool pmm_Init()
 {
-	paddr_t phys_kernel_start = vmm_getPhysAddress(&kernel_start);
-	paddr_t phys_kernel_end = vmm_getPhysAddress(&kernel_end);
-	mmap *map;
-	uint32_t mapLength;
-	paddr_t i;
-	paddr_t maxAddress = 0;
-
 	pmm_Kernelsize = &kernel_end - &kernel_start;
-	map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
-	mapLength = MBS->mbs_mmap_length;
+	paddr_t maxAddress = 0;
+	mmap *map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
+	uint32_t mapLength = MBS->mbs_mmap_length;
 
 	//"Nachschauen", wieviel Speicher vorhanden ist
-	uint32_t maxLength = mapLength / sizeof(mmap);
-	pmm_totalMemory = pmm_freePages = 0;
-	for(i = 0; i < maxLength; i++)
+	printf("Provided memory map:\n");
+	for (mmap *m = map; m < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength); m = (mmap*)((uintptr_t)m + m->size + 4))
 	{
-		pmm_totalMemory += map[i].length;
-		maxAddress = MAX(map[i].base_addr + map[i].length, maxAddress);
+		pmm_totalMemory += m->length;
+		maxAddress = MAX(m->base_addr + m->length, maxAddress);
+		printf("%p - %p -> %s (%i)\n", m->base_addr, m->base_addr + m->length - 1, m->type == 1 ? "usable" : "reserved", m->type);
+		
+		// Adjust memory map because we don't want to use the page at address 0 (for reasons...)
+		if (m->base_addr == 0) {
+			m->base_addr = 0x1000;
+			m->length -= 0x1000;
+		}
 	}
 
 	pmm_totalPages = pmm_totalMemory / MM_BLOCK_SIZE;
 	assert(pmm_totalMemory % MM_BLOCK_SIZE == 0);
 
-	i = 0;
+	// Get memory for bitmap
+	// TODO: what if we use a range which is not mapped?
+	size_t required_size = PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8);
+	for (mmap *m = map; m < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength); m = (mmap*)((uintptr_t)m + m->size + 4)) {
+		if (m->type == 1) {
+			uintptr_t base_addr = m->base_addr;
+			size_t size = m->length;
+			if ((base_addr < (uintptr_t)&kernel_start && MIN((uintptr_t)&kernel_start - base_addr, size) >= required_size) || base_addr > (uintptr_t)&kernel_end) {
+				// Take memory from the beginning of the map
+				Map = (uint64_t*)base_addr;
+				mapSize = required_size;
 
-	//Die ersten 1GB eintragen
+				m->base_addr += required_size;
+				m->length -= required_size;
+				break;
+			} else if (base_addr < (uintptr_t)&kernel_end && size - ((uintptr_t)&kernel_end - base_addr) >= required_size) {
+				// Take memory from the end of the map
+				Map = (uint64_t*)(base_addr + size - required_size);
+				mapSize = required_size;
+
+				m->length -= required_size;
+				break;
+			}
+		}
+	}
+
+	if (Map == NULL) {
+		Panic("PMM", "No memory found to place bitmap");
+	}
+	memset(Map, 0, mapSize);
+
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
-	do
+	while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
 	{
-		if(map->type == 1)
-			for(i = map->base_addr; i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-				if(i >= 0x100000 && (i < phys_kernel_start || i > phys_kernel_end))
+		if(map->type == 1 && map->base_addr >= 0x100000) {
+			paddr_t map_start = ROUND_UP_PAGESIZE(map->base_addr);
+			size_t map_end = ROUND_DOWN_PAGESIZE(map->base_addr + map->length);
+			printf("marking as free: %p - %p\n", map_start, map_end);
+			for(paddr_t i = map_start; i < map_end; i += MM_BLOCK_SIZE) {
+				if(i < (paddr_t)&kernel_start || i > (paddr_t)&kernel_end)
 				{
 					pmm_Free(i);
 				}
-		if(i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT)
-			map = (mmap*)((uintptr_t)map + map->size + 4);
-	}
-	while(i < MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT && map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength));
-
-	if(i >= MM_BLOCK_SIZE * mapSize * PMM_BITS_PER_ELEMENT)
-	{
-		//neuen Speicher für die Bitmap anfordern und zwar so viel wie nötig
-		Map = memcpy(calloc(PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8), 1), Map, mapSize * sizeof(*Map));
-		mapSize = PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8) / sizeof(*Map);
-		//Weiter Speicher freigeben
-		while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
-		{
-			if(map->type == 1)
-			{
-				if(i < map->base_addr || i > map->base_addr + map->length)
-					i = map->base_addr;
-				for(; i < map->base_addr + map->length; i += MM_BLOCK_SIZE)
-					if(i >= 0x100000 && (i < phys_kernel_start || i > phys_kernel_end))
-					{
-						pmm_Free(i);
-					}
 			}
-			map = (mmap*)((uintptr_t)map + map->size + 4);
 		}
+		map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
 
 	#ifdef DEBUGMODE
 	printf("    %u MB Speicher gefunden\n    %u GB Speicher gefunden\n", pmm_totalMemory >> 20, pmm_totalMemory >> 30);
 	#endif
 
-	//Liste mit reservierten Pages
-	vmm_getPageTables(markPageReserved);
-
 	SysLog("PMM", "Initialisierung abgeschlossen");
 	return true;
+}
+
+void pmm_markPageReserved(paddr_t address) {
+	size_t i = address / MM_BLOCK_SIZE / PMM_BITS_PER_ELEMENT;
+	uint8_t bit = (address / MM_BLOCK_SIZE) % PMM_BITS_PER_ELEMENT;
+	__sync_fetch_and_and(&Map[i], ~(1ul << bit));
+	__sync_fetch_and_sub(&pmm_freePages, 1);
 }
 
 /*
@@ -269,4 +273,8 @@ uint64_t pmm_getTotalPages()
 uint64_t pmm_getFreePages()
 {
 	return pmm_freePages;
+}
+
+paddr_t pmm_getHighestAddress() {
+	return mapSize * PMM_BITS_PER_ELEMENT * MM_BLOCK_SIZE;
 }
