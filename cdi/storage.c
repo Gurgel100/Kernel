@@ -6,7 +6,6 @@
  */
 
 #include "storage.h"
-#include "vfs.h"
 #include "stdlib.h"
 #include "devicemng.h"
 
@@ -42,7 +41,7 @@ void cdi_storage_driver_destroy(struct cdi_storage_driver* driver)
 	cdi_driver_destroy((struct cdi_driver*)driver);
 }
 
-/** TODO
+/**
  * \german
  * Meldet ein Massenspeichergerät beim Betriebssystem an. Diese Funktion muss
  * aufgerufen werden, nachdem ein Massenspeichertreiber alle notwendigen
