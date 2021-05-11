@@ -14,9 +14,9 @@
 #include "scheduler.h"
 
 //Speicherverwaltung
-bool mm_Init()
+bool mm_Init(const mmap *map, uint32_t map_length)
 {
-	return pmm_Init() && vmm_Init();
+	return pmm_Init(map, map_length) && vmm_Init();
 }
 
 /*

@@ -17,7 +17,7 @@
 
 typedef uintptr_t paddr_t;
 
-bool pmm_Init(void);					//Initialisiert die physikalische Speicherverwaltung
+bool pmm_Init(const mmap *map, uint32_t map_length);					//Initialisiert die physikalische Speicherverwaltung
 void pmm_markPageReserved(paddr_t address);
 paddr_t pmm_Alloc(void);				//Allokiert eine Speicherstelle
 void pmm_Free(paddr_t Address);		//Gibt eine Speicherstelle frei

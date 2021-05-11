@@ -5,7 +5,6 @@
  *      Author: pascal
  */
 
-#include "main.h"
 #include "config.h"
 #include "multiboot.h"
 #include "mm.h"
@@ -17,9 +16,7 @@
 #include "keyboard.h"
 #include "pm.h"
 #include "debug.h"
-#include "elf.h"
 #include "cmos.h"
-#include "lock.h"
 #include "cdi.h"
 #include "vfs.h"
 #include "pit.h"
@@ -27,7 +24,6 @@
 #include "version.h"
 #include "loader.h"
 #include "stdio.h"
-#include "stdlib.h"
 #include "scheduler.h"
 #include "apic.h"
 #include "tss.h"
@@ -36,17 +32,15 @@
 #include "devicemng.h"
 #include "console.h"
 #include "syscalls.h"
-#include "string.h"
 #include <dispatcher.h>
 
 static multiboot_structure static_MBS;
 
-void Init(void);
+multiboot_structure *Init(multiboot_structure *MBS);
 
-void __attribute__((noreturn)) main(void *mbsAdresse)
+void __attribute__((noreturn)) main(multiboot_structure *MBS)
 {
-	MBS = mbsAdresse;
-	Init();		//Initialisiere System
+	MBS = Init(MBS);		//Initialisiere System
 	if(MBS->mbs_flags & 0x1)
 			printf("Bootdevice: %X\n", MBS->mbs_bootdevice);
 
@@ -67,7 +61,7 @@ void __attribute__((noreturn)) main(void *mbsAdresse)
 	while(1) asm volatile("hlt;");	//Wir wollen diese Funktion nicht verlassen
 }
 
-void Init()
+multiboot_structure *Init(multiboot_structure *MBS)
 {
 	Display_Init();		//Anzeige Intialisieren
 	cpu_init(true);		//CPU Initialisieren
@@ -76,8 +70,8 @@ void Init()
 	TSS_Init();			//TSS initialisieren
 
 	//MBS zwischenspeichern, bis Speicherverwaltung initialisiert ist, wenn nötig noch andere Strukturen sichern
-	MBS = memcpy(&static_MBS, MBS, sizeof(multiboot_structure));
-	MBS->mbs_mmap_addr = memcpy(__builtin_alloca(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
+	static_MBS = *MBS;
+	MBS = &static_MBS;
 
 	pit_Init(1000);		//PIT initialisieren mit 1kHz
 	pic_Init();			//PIC initialisieren
@@ -86,7 +80,7 @@ void Init()
 	#ifdef DEBUGMODE
 	Debug_Init();
 	#endif
-	if(!mm_Init())		//Speicherverwaltung initialisieren
+	if(!mm_Init((mmap*)(uintptr_t)MBS->mbs_mmap_addr, MBS->mbs_mmap_length))		//Speicherverwaltung initialisieren
 		SysLogError("MM", "Fehler beim Initialisieren der Speicherverwaltung");
 	#ifdef DEBUGMODE
 	asm volatile("int $0x1");
@@ -102,9 +96,6 @@ void Init()
 	console_Init();
 	dispatcher_init(100);
 
-	//MBS an einen richtigen Ort sichern
-	MBS->mbs_mmap_addr = memcpy(malloc(MBS->mbs_mmap_length), MBS->mbs_mmap_addr, MBS->mbs_mmap_length);
-
 	SysLog("SYSTEM", "Initialisierung abgeschlossen");
 	setColor(BG_BLACK | CL_WHITE);
 	#ifdef DEBUGMODE
@@ -112,4 +103,5 @@ void Init()
 	#endif
 	asm volatile("sti");	//Interrupts aktivieren
 	cdi_init();			//CDI und -Treiber initialisieren
+	return MBS;
 }

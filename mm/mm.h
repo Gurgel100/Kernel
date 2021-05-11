@@ -11,9 +11,10 @@
 #include "stdint.h"
 #include "paging.h"
 #include "stdbool.h"
+#include "multiboot.h"
 
 //Speicherverwaltung
-bool mm_Init(void);
+bool mm_Init(const mmap *map, uint32_t map_length);
 void *mm_Alloc(uint64_t Size);
 void mm_Free(void *Address, uint64_t Size);
 

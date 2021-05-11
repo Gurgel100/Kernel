@@ -50,6 +50,4 @@ typedef struct
 		uint16_t	mbs_vbe_interface_len;		//11
 }multiboot_structure;
 
-multiboot_structure *MBS;
-
 #endif /* MULTIBOOT_H_ */

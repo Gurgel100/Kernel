@@ -9,7 +9,6 @@
 #include "config.h"
 #include "vmm.h"
 #include "memory.h"
-#include "multiboot.h"
 #include "display.h"
 #include "mm.h"
 #include "string.h"
@@ -40,16 +39,14 @@ static size_t mapSize;			//Grösse der Bitmap
 /*
  * Initialisiert die physikalische Speicherverwaltung
  */
-bool pmm_Init()
+bool pmm_Init(const mmap *map, uint32_t map_length)
 {
 	pmm_Kernelsize = &kernel_end - &kernel_start;
 	paddr_t maxAddress = 0;
-	mmap *map = (mmap*)(uintptr_t)MBS->mbs_mmap_addr;
-	uint32_t mapLength = MBS->mbs_mmap_length;
 
 	//"Nachschauen", wieviel Speicher vorhanden ist
 	printf("Provided memory map:\n");
-	for (mmap *m = map; m < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength); m = (mmap*)((uintptr_t)m + m->size + 4))
+	for (mmap *m = map; m < (mmap*)((uintptr_t)map + map_length); m = (mmap*)((uintptr_t)m + m->size + 4))
 	{
 		pmm_totalMemory += m->length;
 		maxAddress = MAX(m->base_addr + m->length, maxAddress);
@@ -68,7 +65,7 @@ bool pmm_Init()
 	// Get memory for bitmap
 	// TODO: what if we use a range which is not mapped?
 	size_t required_size = PMM_MAP_ALIGN_SIZE(maxAddress / MM_BLOCK_SIZE / 8);
-	for (mmap *m = map; m < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength); m = (mmap*)((uintptr_t)m + m->size + 4)) {
+	for (mmap *m = map; m < (mmap*)((uintptr_t)map + map_length); m = (mmap*)((uintptr_t)m + m->size + 4)) {
 		if (m->type == 1) {
 			uintptr_t base_addr = m->base_addr;
 			size_t size = m->length;
@@ -97,11 +94,11 @@ bool pmm_Init()
 	memset(Map, 0, mapSize);
 
 	//Map analysieren und entsprechende Einträge in die Speicherverwaltung machen
-	while(map < (mmap*)(uintptr_t)(MBS->mbs_mmap_addr + mapLength))
+	for (mmap *m = map; m < (mmap*)((uintptr_t)map + map_length); m = (mmap*)((uintptr_t)m + m->size + 4))
 	{
-		if(map->type == 1 && map->base_addr >= 0x100000) {
-			paddr_t map_start = ROUND_UP_PAGESIZE(map->base_addr);
-			size_t map_end = ROUND_DOWN_PAGESIZE(map->base_addr + map->length);
+		if(m->type == 1 && m->base_addr >= 0x100000) {
+			paddr_t map_start = ROUND_UP_PAGESIZE(m->base_addr);
+			size_t map_end = ROUND_DOWN_PAGESIZE(m->base_addr + m->length);
 			printf("marking as free: %p - %p\n", map_start, map_end);
 			for(paddr_t i = map_start; i < map_end; i += MM_BLOCK_SIZE) {
 				if(i < (paddr_t)&kernel_start || i > (paddr_t)&kernel_end)
@@ -110,7 +107,6 @@ bool pmm_Init()
 				}
 			}
 		}
-		map = (mmap*)((uintptr_t)map + map->size + 4);
 	}
 
 	#ifdef DEBUGMODE
