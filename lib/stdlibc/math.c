@@ -1152,7 +1152,10 @@ float nextafterf(float from, float to) {
 	if (isnan(from) || isnan(to)) return NAN;
 	float_struct_t cvt;
 	cvt.f = from;
-    if (signbit(from)) {
+	if (from == 0) {
+		cvt.i = 1;
+		cvt.sign = signbit(to);
+	} else if (signbit(from)) {
         cvt.i += to > from ? -1 : 1;
     } else {
         cvt.i += to > from ? 1 : -1;
@@ -1165,7 +1168,10 @@ double nextafter(double from, double to) {
 	if (isnan(from) || isnan(to)) return NAN;
 	double_struct_t cvt;
 	cvt.f = from;
-    if (signbit(from)) {
+	if (from == 0) {
+		cvt.i = 1;
+		cvt.sign = signbit(to);
+	} else if (signbit(from)) {
         cvt.i += to > from ? -1 : 1;
     } else {
         cvt.i += to > from ? 1 : -1;
@@ -1178,7 +1184,10 @@ long double nextafterl(long double from, long double to) {
 	if (isnan(from) || isnan(to)) return NAN;
 	long_double_struct_t cvt;
 	cvt.f = from;
-    if (signbit(from)) {
+	if (from == 0) {
+		cvt.i = 1;
+		cvt.sign = signbit(to);
+	} else if (signbit(from)) {
         cvt.i += to > from ? -1 : 1;
     } else {
         cvt.i += to > from ? 1 : -1;
