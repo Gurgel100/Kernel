@@ -115,7 +115,7 @@ int partition_getPartitions(const char *dev_name, void(*partition_callback)(void
 {
 	char *path = NULL;
 	asprintf(&path, ":devfs/%s", dev_name);
-	ERROR_TYPE_POINTER(vfs_stream_t) dev_stream_ret = vfs_Open(path, VFS_MODE_READ);
+	ERROR_TYPE_POINTER(vfs_stream_t) dev_stream_ret = vfs_Open(path, VFS_MODE_READ | VFS_MODE_WRITE);
 	free(path);
 	if(ERROR_DETECT(dev_stream_ret))
 		return 1;
