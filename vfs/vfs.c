@@ -731,7 +731,7 @@ static bool findRootDev(vfs_node_t *node, void* context)
 		{
 			printf("Mounted device: %s\n", node->name);
 			ERROR_TYPE_POINTER(vfs_stream_t) file = vfs_Open("/kernel", VFS_MODE_READ);
-			if(ERROR_DETECT(file))
+			if(!ERROR_DETECT(file))
 			{
 				vfs_Close(ERROR_GET_VALUE(file));
 				printf("Found root device: %s\n", node->name);
