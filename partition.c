@@ -121,15 +121,15 @@ int partition_getPartitions(const char *dev_name, void(*partition_callback)(void
 		return 1;
 	vfs_stream_t *dev_stream = ERROR_GET_VALUE(dev_stream_ret);
 	//Ersten Sektor auslesen
-	void *buffer = malloc(512);
-	if(vfs_Read(dev_stream, 0, 512, buffer) == 0)
+	uint8_t buffer[512];
+	if(vfs_Read(dev_stream, 0, sizeof(buffer), buffer) == 0)
 	{
 		vfs_Close(dev_stream);
 		return 1;
 	}
 
 	//Gültige Partitionstabelle?
-	uint16_t *sig = buffer + 0x1FE;
+	uint16_t *sig = (uint16_t*)(buffer + 0x1FE);
 	if(*sig != 0xAA55)
 	{
 		vfs_Close(dev_stream);
@@ -138,7 +138,7 @@ int partition_getPartitions(const char *dev_name, void(*partition_callback)(void
 
 	//Partitionstabelle durchsuchen
 	size_t foundPartitions = 0;
-	PartitionTable_t *ptable = buffer + 0x1BE;
+	PartitionTable_t *ptable = (PartitionTable_t*)(buffer + 0x1BE);
 	uint8_t i;
 	for(i = 0; i < 4; i++)
 	{
