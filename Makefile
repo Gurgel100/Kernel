@@ -1,7 +1,6 @@
-
-CC = $(CROSSTOOL_PREFIX)gcc
-LD = $(CROSSTOOL_PREFIX)gcc
-AS = $(CROSSTOOL_PREFIX)as
+CC = x86_64-elf-gcc
+LD = x86_64-elf-gcc
+AS = x86_64-elf-as
 RM = rm -rf
 
 OUTPUT_DIR = build
