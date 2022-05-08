@@ -1005,33 +1005,31 @@ void *realloc(void *ptr, size_t size)
 	return Address;
 }
 
-int abs(int x)
-{
-	return (x < 0) ? -x : x;
+#define ABS_IMPL(T, name)						\
+T name(T x) {									\
+	return (x < 0) ? -x : x;					\
 }
 
-long labs(long x)
-{
-	return (x < 0) ? -x : x;
+ABS_IMPL(int, abs)
+ABS_IMPL(long, labs)
+ABS_IMPL(long long, llabs)
+
+#undef ABS_IMPL
+
+#define DIV_IMPL(Tr, Tp, name)	\
+Tr name(Tp numer, Tp denom) {	\
+	Tr res = {					\
+		.quot = numer / denom,	\
+		.rem = numer % denom	\
+	};							\
+	return res;					\
 }
 
-div_t div(int numer, int denom)
-{
-	div_t res = {
-		.quot = numer / denom,
-		.rem = numer % denom
-	};
-	return res;
-}
+DIV_IMPL(div_t, int, div)
+DIV_IMPL(ldiv_t, long, ldiv)
+DIV_IMPL(lldiv_t, long long, lldiv)
 
-ldiv_t ldiv(long int numer, long int denom)
-{
-	ldiv_t res = {
-		.quot = numer / denom,
-		.rem = numer % denom
-	};
-	return res;
-}
+#undef DIV_IMPL
 
 int32_t rand()
 {

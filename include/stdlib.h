@@ -29,6 +29,11 @@ typedef struct{
 		long rem;
 }ldiv_t;
 
+typedef struct{
+		long long quot;
+		long long rem;
+}lldiv_t;
+
 extern double atof(const char* str);
 extern int atoi(const char *str);
 extern long atol(const char *str);
@@ -45,9 +50,11 @@ extern int atexit(void (*func)(void));
 extern void exit(int status) __attribute__((noreturn));
 
 extern int abs(int x);
-extern long int labs(long int x);
+extern long labs(long x);
+extern long long llabs(long long x);
 extern div_t div(int numer, int denom);
-extern ldiv_t ldiv(long int numer, long int denom);
+extern ldiv_t ldiv(long numer, long denom);
+extern lldiv_t lldiv(long long numer, long long denom);
 extern int rand(void);
 extern long lrand(void);
 extern void srand(unsigned int seed);
