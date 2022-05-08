@@ -243,6 +243,25 @@ static void destroyNode(const void *obj)
 	node->destroy(node);
 }
 
+static void destroyDirNode(struct vfs_node *n) {
+	cdifs_vfs_node_dir_t *node = CAST_NODE(cdifs_vfs_node_dir_t, n);
+	hashmap_destroy(node->childs);
+	vfs_node_dir_deinit(&node->vfs_node);
+	free(node);
+}
+
+static void destroyFileNode(struct vfs_node *n) {
+	cdifs_vfs_node_file_t *node = CAST_NODE(cdifs_vfs_node_file_t, n);
+	vfs_node_file_deinit(&node->vfs_node);
+	free(node);
+}
+
+static void destroyLinkNode(struct vfs_node *n) {
+	cdifs_vfs_node_link_t *node = CAST_NODE(cdifs_vfs_node_link_t, n);
+	vfs_node_link_deinit(&node->vfs_node);
+	free(node);
+}
+
 static vfs_node_t *createNode(cdifs_vfs_node_dir_t *parent, struct cdi_fs_stream *stream)
 {
 	if(loadRes(stream))
@@ -259,6 +278,7 @@ static vfs_node_t *createNode(cdifs_vfs_node_dir_t *parent, struct cdi_fs_stream
 		node->vfs_node.visitChilds = dir_visitChilds;
 		node->vfs_node.findChild = dir_findChild;
 		node->vfs_node.createChild = dir_createChild;
+		node->vfs_node.base.destroy = destroyDirNode;
 
 		n = &node->vfs_node.base;
 	}
@@ -271,6 +291,7 @@ static vfs_node_t *createNode(cdifs_vfs_node_dir_t *parent, struct cdi_fs_stream
 		node->vfs_node.read = file_read;
 		node->vfs_node.write = file_write;
 		node->vfs_node.truncate = file_truncate;
+		node->vfs_node.base.destroy = destroyFileNode;
 
 		n = &node->vfs_node.base;
 	}
@@ -280,8 +301,11 @@ static vfs_node_t *createNode(cdifs_vfs_node_dir_t *parent, struct cdi_fs_stream
 		if(vfs_node_link_init(&node->vfs_node, stream->res->name))
 			return NULL;
 		node->base.stream = *stream;
+		node->vfs_node.base.destroy = destroyLinkNode;
 
 		n = &node->vfs_node.base;
+	} else {
+		assert("cdifs: Filetype not supported");
 	}
 
 	n->parent = &parent->vfs_node;
