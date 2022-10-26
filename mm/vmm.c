@@ -328,7 +328,7 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 	// Check if we still need this page table
 	if (level > 0) {
 		for (uint16_t i = 0; i < PAGE_ENTRIES; i++) {
-			if (table[i].P || (PG_AVL(table[i].entry) & VMM_UNUSED_PAGE)) {
+			if (VMM_ALLOCATED(table[i].entry)) {
 				return FLAG_CLEAR_FULL_FLAG;
 			}
 		}
