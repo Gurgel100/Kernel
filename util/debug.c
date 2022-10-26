@@ -260,6 +260,6 @@ uint64_t traceStackToString(uint64_t rsp, uint64_t *rbp, uint8_t length, char *o
 		offset += sprintf(out + offset, "0x%08lX(%zu)%s", rip, size, (i % 2 == 0) ? "\n" : "                ");
 		rbp = (uint64_t*)rsp;
 	}
-	if(i % 2) offset += sprintf(out + offset, "\n");
+	if(i % 2 == 0) offset += sprintf(out + offset, "\n");
 	return offset;
 }
