@@ -297,14 +297,13 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 		bool instruction = ihs->error & (1 << 4);
 		system_panic_enter();
 		uint64_t offset = 0;
-		offset += sprintf(system_panic_buffer, "Exception 14: Page Fault  ");
+		offset += sprintf(system_panic_buffer, "Exception 14: Page Fault ");
+		if (status == 2) {
+			offset += sprintf(system_panic_buffer + offset, "(Access on guard page)");
+		}
 		offset += sprintf(system_panic_buffer + offset, "\nErrorcode: 0x%lX", ihs->error);
 		offset += sprintf(system_panic_buffer + offset, "\t%c %s %s %c %c\n",
 			present ? 'P' : 'p', write ? "WR" : "RD", userspace ? "US" : "KS", reserved ? 'R' : 'r', instruction ? 'I' : 'D');
-
-		if (status == 2) {
-			offset += sprintf(system_panic_buffer + offset, "Access on guard page, ");
-		}
 		offset += sprintf(system_panic_buffer + offset, "CR2: 0x%lX\n", address);
 
 		offset += traceRegistersToString(ihs, system_panic_buffer + offset);
