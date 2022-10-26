@@ -609,7 +609,7 @@ static void unmapPages(context_t *context, void *vAddress, size_t pages, bool fr
 		for(size_t i = 0; i < pages; i++)
 		{
 			paddr_t pAddress = unmap(context, vAddress + i * VMM_SIZE_PER_PAGE);
-			if(freePages && !(guard && (i < MM_GUARD_PAGES || i >= pages - MM_GUARD_PAGES)))
+			if(freePages && pAddress != 0)
 				pmm_Free(pAddress);
 		}
 	});
