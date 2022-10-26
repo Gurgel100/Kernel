@@ -6,9 +6,11 @@
  */
 
 #include "idt.h"
+#include "tss.h"
 #include "display.h"
 
 static uint128_t idt[IDT_ENTRIES];	//Jeder Eintrag ist 16-Byte (128-Bit) gross
+static uint8_t page_fault_stack[4096] __attribute__((aligned(4096)));
 
 //Exception Handler
 extern int0;
@@ -68,7 +70,7 @@ void IDT_Init(void)
 	IDT_SetEntry(11, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int11);
 	IDT_SetEntry(12, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int12);
 	IDT_SetEntry(13, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int13);
-	IDT_SetEntry(14, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int14);
+	IDT_SetEntry(14, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT | IDT_IST_1, (uintptr_t)&int14);
 	IDT_SetEntry(16, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int16);
 	IDT_SetEntry(17, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int17);
 	IDT_SetEntry(18, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_KERNEL | IDT_PRESENT, (uintptr_t)&int18);
@@ -94,6 +96,8 @@ void IDT_Init(void)
 
 	//Syscall
 	IDT_SetEntry(255, 0x8, IDT_TYPE_INTERRUPT | IDT_DPL_USER | IDT_PRESENT, (uintptr_t)&int255);
+
+	TSS_setIST(1, page_fault_stack + 4096);
 
 	idtr.limit = sizeof(idt) - 1;
 	idtr.pointer = idt;

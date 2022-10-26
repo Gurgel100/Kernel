@@ -21,6 +21,8 @@
 
 #define IDT_PRESENT			0x8000
 
+#define IDT_IST_1		1
+
 typedef struct{
 		uint16_t	limit;
 		void 		*pointer;
