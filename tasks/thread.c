@@ -59,15 +59,17 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 			//Interrupt ist beim Schedulen 32
 			.interrupt = 32
 	};
+	
 	//Kernelstack vorbereiten
-	if(!kernel)
-	{
-		assert(MM_KERN_STACK_SIZE % MM_BLOCK_SIZE == 0);
-		thread->kernelStackBottom = vmm_Map(&kernel_context, NULL, 0, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_WRITE | VMM_FLAGS_ALLOCATE);
-		thread->kernelStack = thread->kernelStackBottom + MM_KERN_STACK_SIZE;
-		thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
-		memcpy(thread->State, &new_state, sizeof(ihs_t));
+	assert(MM_KERN_STACK_SIZE % MM_BLOCK_SIZE == 0);
+	thread->kernelStackBottom = vmm_MapGuarded(&kernel_context, NULL, 0, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_GLOBAL | VMM_FLAGS_WRITE | VMM_FLAGS_ALLOCATE);
+	if (thread->kernelStackBottom == NULL) {
+		return ERROR_RETURN_POINTER_ERROR(thread_t, E_NO_MEMORY);
 	}
+	thread->kernelStack = thread->kernelStackBottom + MM_KERN_STACK_SIZE;
+	thread->State = (ihs_t*)(thread->kernelStack - sizeof(ihs_t));
+	if (kernel) new_state.rsp = (uintptr_t)thread->kernelStackBottom + MM_KERN_STACK_SIZE;
+	memcpy(thread->State, &new_state, sizeof(ihs_t));
 
 	thread->fpuState = vmm_Map(&kernel_context, NULL, 0, 1, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	thread->fpuInitialised = false;
@@ -83,13 +85,6 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
 		process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 	}
-	else
-	{
-		thread->kernelStackBottom = mm_SysAlloc(1);
-		new_state.rsp = (uintptr_t)thread->kernelStackBottom + MM_BLOCK_SIZE;
-		thread->State = (ihs_t*)(new_state.rsp - sizeof(ihs_t));
-		memcpy(thread->State, &new_state, sizeof(ihs_t));
-	}
 
 	avl_add(&process->threads, thread, tid_cmp);
 
@@ -98,7 +93,7 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 
 void thread_destroy(thread_t *thread)
 {
-	vmm_UnMap(&kernel_context, thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
+	vmm_UnMapGuarded(&kernel_context, thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
 
 	//Thread aus Liste entfernen
 	LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
