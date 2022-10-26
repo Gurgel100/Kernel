@@ -27,6 +27,7 @@
 
 //Flags für AVL Bits
 #define VMM_PAGE_FULL			(1 << 0)
+#define VMM_GUARD_PAGE			(1 << 1)
 
 #define VMM_PAGES_PER_PML4		VMM_PAGES_PER_PDP * PAGE_ENTRIES
 #define VMM_PAGES_PER_PDP		VMM_PAGES_PER_PD * PAGE_ENTRIES
@@ -35,7 +36,7 @@
 
 #define VMM_EXTEND(address)	((int64_t)((address) << 16) >> 16)
 #define VMM_GET_ADDRESS(PML4i, PDPi, PDi, PTi)	(void*)VMM_EXTEND(((uint64_t)PML4i << 39) | ((uint64_t)PDPi << 30) | (PDi << 21) | (PTi << 12))
-#define VMM_ALLOCATED(entry) ((entry & PG_P) || (PG_AVL(entry) & VMM_UNUSED_PAGE))	//Prüft, ob diese Page schon belegt ist
+#define VMM_ALLOCATED(entry) ((entry & PG_P) || (PG_AVL(entry) & (VMM_UNUSED_PAGE | VMM_GUARD_PAGE)))	//Prüft, ob diese Page schon belegt ist
 
 #define PAGE_TABLE_INDEX(address, level)	(((uintptr_t)(address) >> (12 + (3 - (level)) * 9)) & 0x1FF)
 #define PML4_INDEX(address)					PAGE_TABLE_INDEX(address, 0)
@@ -101,7 +102,7 @@ static uint8_t map_entry(void *vAddress, paddr_t pAddress, uint8_t flags, uint16
 		table[index].entry = 0;
 
 		if(level == 3) {
-			table[index].P = !(avl & VMM_UNUSED_PAGE);
+			table[index].P = !(avl & (VMM_UNUSED_PAGE | VMM_GUARD_PAGE));
 			table[index].RW = flags & VMM_FLAGS_WRITE;
 			table[index].US = flags & VMM_FLAGS_USER;
 			table[index].PWT = flags & VMM_FLAGS_PWT;
@@ -540,19 +541,17 @@ void vmm_getPageTables(void(*callback)(paddr_t)) {
 }
 
 //----------------------Allgemeine Funktionen------------------------
-void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags)
-{
-	uint8_t res = 1;
+static void *mapPages(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags, bool guard) {
 	bool unused = pAddress == 0;
 	bool allocate = flags & VMM_FLAGS_ALLOCATE;
 	uint16_t avl = (unused && !allocate) ? VMM_UNUSED_PAGE : 0;
 
-	if(pages == 0)
-		return NULL;
+	if (pages == 0) return NULL;
+
+	if (guard) pages += MM_GUARD_PAGES * 2;
 
 	return LOCKED_RESULT(vmm_lock, {
-		if(vAddress == NULL)
-		{
+		if (vAddress == NULL) {
 			void *start = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_START : KERNELSPACE_START);
 			void *end = (void*)((flags & VMM_FLAGS_USER) ? USERSPACE_END : KERNELSPACE_END);
 			vAddress = getFreePages(context, start, end, pages);
@@ -560,57 +559,68 @@ void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages
 
 		bool error = false;
 		size_t i;
-		for(i = 0; i < pages; i++)
-		{
-			paddr_t paddr;
+		for (i = 0; i < pages; i++) {
+			paddr_t paddr = 0;
 			uintptr_t currentOffset = i * VMM_SIZE_PER_PAGE;
-			if(allocate)
-			{
+			uint16_t actual_avl = avl;
+			uint8_t actual_flags = flags;
+			bool is_guard_page = guard && (i < MM_GUARD_PAGES || i >= pages - MM_GUARD_PAGES);
+			if (is_guard_page) {
+				actual_avl = VMM_GUARD_PAGE;
+				actual_flags = 0;
+			} else if (allocate) {
 				paddr = pmm_Alloc();
-				if(paddr == 1)
-				{
+				if (paddr == 1) {
 					error = true;
 					break;
 				}
-			}
-			else
-			{
+			} else {
 				paddr = pAddress + currentOffset * !unused;
 			}
 
-			if((res = map(context, vAddress + currentOffset, paddr, flags, avl)) != 0)
-			{
+			if (map(context, vAddress + currentOffset, paddr, actual_flags, actual_avl) != 0) {
 				error = true;
 				break;
 			}
-
-			if(allocate)
-				clearPage(vAddress + currentOffset);
+			if (allocate && !is_guard_page) clearPage(vAddress + currentOffset);
 		}
 
-		if(error)
-		{
-			for(size_t j = 0; j < i; j++)
-			{
+		if (error) {
+			for (size_t j = 0; j < i; j++) {
 				paddr_t paddr = unmap(context, vAddress + j * VMM_SIZE_PER_PAGE);
-				if(allocate)
-					pmm_Free(paddr);
+				if (allocate) pmm_Free(paddr);
 			}
 		}
-		res == 0 ? vAddress : NULL;
+		error ? NULL : (vAddress + guard * MM_GUARD_PAGES * VMM_SIZE_PER_PAGE);
 	});
 }
 
-void vmm_UnMap(context_t *context, void *vAddress, size_t pages, bool freePages)
-{
+void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags) {
+	return mapPages(context, vAddress, pAddress, pages, flags, false);
+}
+
+void *vmm_MapGuarded(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags) {
+	return mapPages(context, vAddress, pAddress, pages, flags, true);
+}
+
+static void unmapPages(context_t *context, void *vAddress, size_t pages, bool freePages, bool guard) {
+	pages += guard ? MM_GUARD_PAGES * 2 : 0;
 	LOCKED_TASK(vmm_lock, {
 		for(size_t i = 0; i < pages; i++)
 		{
 			paddr_t pAddress = unmap(context, vAddress + i * VMM_SIZE_PER_PAGE);
-			if(freePages)
+			if(freePages && !(guard && (i < MM_GUARD_PAGES || i >= pages - MM_GUARD_PAGES)))
 				pmm_Free(pAddress);
 		}
 	});
+}
+
+void vmm_UnMap(context_t *context, void *vAddress, size_t pages, bool freePages) {
+	return unmapPages(context, vAddress, pages, freePages, false);
+}
+
+void vmm_UnMapGuarded(context_t *context, void *vAddress, size_t pages, bool freePages) {
+	return unmapPages(context, vAddress, pages, freePages, true);
 }
 
 /*
@@ -904,7 +914,7 @@ inline void activateContext(context_t *context)
 	asm volatile("mov %0,%%cr3" : : "r"(context->physAddress));
 }
 
-bool vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode)
+int vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode)
 {
 	uint16_t PML4i = PML4_INDEX(page);
 	uint16_t PDPi = PDP_INDEX(page);
@@ -920,7 +930,10 @@ bool vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode)
 	if(!isPageFree(&PML4->PML4E[PML4i], &PDP->PDPE[PDPi], &PD->PDE[PDi], &PT->PTE[PTi]) && (PG_AVL(PT->PTE[PTi]) & VMM_UNUSED_PAGE))
 	{
 		vmm_usePages(context, page, 1);
-		return true;
+		return 0;
 	}
-	return false;
+	if (PG_AVL(PT->PTE[PTi]) & VMM_GUARD_PAGE) {
+		return 2;
+	}
+	return 1;
 }

@@ -56,6 +56,23 @@ void vmm_getPageTables(void(*callback)(paddr_t));
 void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags);
 
 /**
+ * \brief Maps a memory area with surrounding guard pages.
+ *
+ * If vAddress is NULL then it allocates a virtual memory area big enough to hold pages pages.
+ * If pAddress is 0 it will map the memory area with the VMM_UNUSED_PAGE flag so that a physical page will be allocated on the first access.
+ *
+ * This function locks the vmm_lock lock.
+ *
+ * @param context The context of the virtual memory
+ * @param vAddress Virtual address to map the memory area to
+ * @param pAddress Physical address of the memory area
+ * @param pages Number pages the memory area spans
+ * @param flags Flags with access rights
+ * @return NULL on failure otherwise virtual address
+ */
+void *vmm_MapGuarded(context_t *context, void *vAddress, paddr_t pAddress, size_t pages, uint8_t flags);
+
+/**
  * \brief Unmaps a memory area.
  *
  * This function locks the vmm_lock lock.
@@ -66,6 +83,18 @@ void *vmm_Map(context_t *context, void *vAddress, paddr_t pAddress, size_t pages
  * @param freePages Indicates if the physical memory should be freed
  */
 void vmm_UnMap(context_t *context, void *vAddress, size_t pages, bool freePages);
+
+/**
+ * \brief Unmaps a memory area with surrounding guard pages.
+ *
+ * This function locks the vmm_lock lock.
+ *
+ * @param context The context of the virtual memory
+ * @param vAddress Virtual address of the start of the memory area
+ * @param pages Number of pages the memory area spans
+ * @param freePages Indicates if the physical memory should be freed
+ */
+void vmm_UnMapGuarded(context_t *context, void *vAddress, size_t pages, bool freePages);
 
 paddr_t vmm_getPhysAddress(context_t *context, void *virtualAddress);
 uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl);
@@ -82,6 +111,6 @@ void deleteContext(context_t *context);
 void activateContext(context_t *context);
 
 //Interrupt handler
-bool vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode);
+int vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode);
 
 #endif /* VMM_H_ */

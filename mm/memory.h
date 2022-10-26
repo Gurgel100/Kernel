@@ -22,6 +22,8 @@
 #define MM_USER_STACK		USERSPACE_END			//Stackaddresse für Prozesse
 #define MM_USER_STACK_SIZE	(4 * MM_BLOCK_SIZE)		//Stackgrösse
 
+#define MM_GUARD_PAGES      1                       // Number of guard pages
+
 #define MM_BLOCK_SIZE		4096						//Eine Blockgrösse
 
 #endif /* MEMORY_H_ */

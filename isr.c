@@ -287,8 +287,8 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 	asm volatile("mov %%cr2,%0" : "=r"(address));
 
 	//Try to handle page fault else panic
-	if(!vmm_handlePageFault((currentProcess ?: &kernel_process)->Context, address, ihs->error))
-	{
+	int status = vmm_handlePageFault((currentProcess ?: &kernel_process)->Context, address, ihs->error);
+	if (status != 0) {
 #ifndef DEBUGMODE
 		bool present = ihs->error & 1;
 		bool write = ihs->error & (1 << 1);
@@ -302,6 +302,9 @@ static ihs_t *exception_PageFault(ihs_t *ihs)
 		offset += sprintf(system_panic_buffer + offset, "\t%c %s %s %c %c\n",
 			present ? 'P' : 'p', write ? "WR" : "RD", userspace ? "US" : "KS", reserved ? 'R' : 'r', instruction ? 'I' : 'D');
 
+		if (status == 2) {
+			offset += sprintf(system_panic_buffer + offset, "Access on guard page, ");
+		}
 		offset += sprintf(system_panic_buffer + offset, "CR2: 0x%lX\n", address);
 
 		offset += traceRegistersToString(ihs, system_panic_buffer + offset);
