@@ -117,6 +117,12 @@ static void child_terminated(process_t *parent, process_t *process)
 	});
 }
 
+static void terminated_child_free(void *c) {
+	process_t *child = c;
+	// TODO: For now we just destroy terminated childs
+	pm_DestroyTask(child);
+}
+
 /*
  * Prozessverwaltung initialisieren
  */
@@ -167,6 +173,9 @@ ERROR_TYPE_POINTER(process_t) pm_InitTask(process_t *parent, void *entry, char* 
 	if(!vfs_initUserspace(parent, newProcess, stdin, stdout, stderr))
 	{
 		//Fehler
+		list_destroy(newProcess->terminated_childs, terminated_child_free);
+		list_destroy(newProcess->waiting_threads, NULL);
+		list_destroy(newProcess->waiting_threads_pid, free);
 		deleteContext(newProcess->Context);
 		free(newProcess->cmd);
 		free(newProcess);
@@ -198,6 +207,9 @@ ERROR_TYPE_POINTER(process_t) pm_InitTask(process_t *parent, void *entry, char* 
 	if(ERROR_DETECT(thread_ret))
 	{
 		vfs_deinitUserspace(newProcess);
+		list_destroy(newProcess->terminated_childs, terminated_child_free);
+		list_destroy(newProcess->waiting_threads, NULL);
+		list_destroy(newProcess->waiting_threads_pid, free);
 		deleteContext(newProcess->Context);
 		free(newProcess->cmd);
 		free(newProcess);
@@ -225,6 +237,9 @@ void pm_DestroyTask(process_t *process)
 	{
 		//free all resources of the process
 		avl_free(process->threads, thread_destroy_action);
+		list_destroy(process->terminated_childs, terminated_child_free);
+		list_destroy(process->waiting_threads, NULL);
+		list_destroy(process->waiting_threads_pid, free);
 		deleteContext(process->Context);
 		free(process->cmd);
 		free(process);

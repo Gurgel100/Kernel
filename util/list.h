@@ -41,7 +41,7 @@ list_t list_create(void);
  * Gibt eine Liste frei (Werte der Listenglieder müssen bereits
  * freigegeben sein)
  */
-void list_destroy(list_t list);
+void list_destroy(list_t list, void(*free_entry)(void*));
 
 /*
  * Fuegt ein neues Element am Anfang (Index 0) der Liste ein

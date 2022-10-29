@@ -38,11 +38,14 @@ list_t list_create(void)
  * Gibt eine Liste frei (Werte der Listenglieder müssen bereits
  * freigegeben sein)
  */
-void list_destroy(list_t list)
+void list_destroy(list_t list, void(*free_entry)(void*))
 {
 	assert(list != NULL);
-	//Liste leeren (vorsichtshalber)
-	while(list_pop(list) != NULL);
+	//Liste leeren
+	void *entry;
+	while((entry = list_pop(list)) != NULL) {
+		if (free_entry) free_entry(entry);
+	}
 	//Speicher freigeben
 	free(list);
 }

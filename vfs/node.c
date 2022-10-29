@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vfs/node.h>
+#include <vfs.h>
 
 static uint64_t mode_hash(const void *key, __attribute__((unused)) void *context)
 {
@@ -76,9 +77,13 @@ int vfs_node_dir_init(vfs_node_dir_t *node, const char *name)
 	return 0;
 }
 
+static void unmount_fs(void *fs) {
+	REFCOUNT_RELEASE((vfs_filesystem_t*)fs);
+}
+
 void vfs_node_dir_deinit(vfs_node_dir_t *node)
 {
-	list_destroy(node->mounts);
+	list_destroy(node->mounts, unmount_fs);
 	vfs_node_deinit(&node->base);
 }
 
