@@ -28,9 +28,10 @@ void thread_Init()
 
 ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size_t data_length, void *data, bool kernel)
 {
+	if (data_length >= MM_USER_STACK_SIZE) return ERROR_RETURN_POINTER_ERROR(thread_t, E_NO_MEMORY);
+
 	thread_t *thread = (thread_t*)malloc(sizeof(thread_t));
-	if(thread == NULL || data_length >= MM_USER_STACK_SIZE)
-		return ERROR_RETURN_POINTER_ERROR(thread_t, E_NO_MEMORY);
+	if (thread == NULL) return ERROR_RETURN_POINTER_ERROR(thread_t, E_NO_MEMORY);
 
 	thread->isMainThread = (process != currentProcess);
 
@@ -64,6 +65,7 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 	assert(MM_KERN_STACK_SIZE % MM_BLOCK_SIZE == 0);
 	thread->kernelStackBottom = vmm_MapGuarded(&kernel_context, NULL, 0, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, VMM_FLAGS_NX | VMM_FLAGS_GLOBAL | VMM_FLAGS_WRITE | VMM_FLAGS_ALLOCATE);
 	if (thread->kernelStackBottom == NULL) {
+		free(thread);
 		return ERROR_RETURN_POINTER_ERROR(thread_t, E_NO_MEMORY);
 	}
 	thread->kernelStack = thread->kernelStackBottom + MM_KERN_STACK_SIZE;
