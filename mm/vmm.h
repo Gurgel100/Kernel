@@ -97,7 +97,7 @@ void vmm_UnMap(context_t *context, void *vAddress, size_t pages, bool freePages)
 void vmm_UnMapGuarded(context_t *context, void *vAddress, size_t pages, bool freePages);
 
 paddr_t vmm_getPhysAddress(context_t *context, void *virtualAddress);
-uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl);
+uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags);
 
 bool vmm_getPageStatus(context_t *context, void *Address);
 

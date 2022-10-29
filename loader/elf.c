@@ -230,7 +230,7 @@ ERROR_TYPE(pid_t) elfLoad(vfs_stream_t *file, const char *cmd, const char **env,
 			flags |= VMM_FLAGS_NX;
 
 		//Speicherbereich an die richtige Addresse mappen
-		vmm_ReMap(&kernel_context, dest, task->Context, (void*)ProgramHeader[i].p_vaddr, pages, flags, 0);
+		vmm_ReMap(&kernel_context, dest, task->Context, (void*)ProgramHeader[i].p_vaddr, pages, flags);
 	}
 
 	//Temporäre Daten wieder freigeben

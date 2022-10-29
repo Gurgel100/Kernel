@@ -82,7 +82,7 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 		thread->userStackBottom = process->nextThreadStack - MM_USER_STACK_SIZE;
 		memcpy(stack + MM_USER_STACK_SIZE - data_length, data, data_length);
 		vmm_ReMap(&kernel_context, stack, process->Context, thread->userStackBottom, MM_USER_STACK_SIZE / MM_BLOCK_SIZE,
-				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX, 0);
+				VMM_FLAGS_WRITE | VMM_FLAGS_USER | VMM_FLAGS_NX);
 		process->nextThreadStack -= MM_USER_STACK_SIZE + MM_BLOCK_SIZE;
 	}
 

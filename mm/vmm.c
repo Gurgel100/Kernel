@@ -51,6 +51,11 @@ struct vmm_context {
 	paddr_t physAddress;
 };
 
+struct unmap_result {
+	paddr_t paddr;
+	uint16_t avl;
+};
+
 const uint16_t PML4e = PML4_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PDPe = PDP_INDEX(KERNELSPACE_END) + 1;
 const uint16_t PDe = PD_INDEX(KERNELSPACE_END) + 1;
@@ -295,7 +300,7 @@ static void *getFreePages(context_t *context, void *start, void *end, size_t pag
 	return NULL;
 }
 
-static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, paddr_t *pAddress) {
+static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, struct unmap_result *unmap_res) {
 	const uint8_t FLAG_CLEAR_FULL_FLAG = 1 << 0;
 	const uint8_t FLAG_DELETE_TABLE = 1 << 1;
 
@@ -305,7 +310,7 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 		if (!table[index].P) return FLAG_CLEAR_FULL_FLAG;
 
 		PageTable_t next_table = MAPPED_PHYS_MEM_GET(table[index].Address << 12);
-		uint8_t res = unmap_entry(vAddress, next_table, level + 1, pAddress);
+		uint8_t res = unmap_entry(vAddress, next_table, level + 1, unmap_res);
 		if (res & FLAG_DELETE_TABLE) {
 			pmm_Free(table[index].Address << 12);
 		} else {
@@ -317,7 +322,8 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 			return res;
 		}
 	} else {
-		*pAddress = table[index].Address << 12;
+		unmap_res->paddr = table[index].Address << 12;
+		unmap_res->avl = PG_AVL(table[index].entry);
 	}
 
 	table[index].entry = 0;
@@ -337,11 +343,11 @@ static uint8_t unmap_entry(void *vAddress, PageTable_t table, uint32_t level, pa
 	return FLAG_DELETE_TABLE | FLAG_CLEAR_FULL_FLAG;
 }
 
-static paddr_t unmap(context_t *context, void *vAddress)
+static struct unmap_result unmap(context_t *context, void *vAddress)
 {
-	paddr_t pAddress = 0;
-	unmap_entry(vAddress, MAPPED_PHYS_MEM_GET(context->physAddress), 0, &pAddress);
-	return pAddress;
+	struct unmap_result res = {};
+	unmap_entry(vAddress, MAPPED_PHYS_MEM_GET(context->physAddress), 0, &res);
+	return res;
 }
 
 /*
@@ -587,7 +593,7 @@ static void *mapPages(context_t *context, void *vAddress, paddr_t pAddress, size
 
 		if (error) {
 			for (size_t j = 0; j < i; j++) {
-				paddr_t paddr = unmap(context, vAddress + j * VMM_SIZE_PER_PAGE);
+				paddr_t paddr = unmap(context, vAddress + j * VMM_SIZE_PER_PAGE).paddr;
 				if (allocate) pmm_Free(paddr);
 			}
 		}
@@ -608,7 +614,7 @@ static void unmapPages(context_t *context, void *vAddress, size_t pages, bool fr
 	LOCKED_TASK(vmm_lock, {
 		for(size_t i = 0; i < pages; i++)
 		{
-			paddr_t pAddress = unmap(context, vAddress + i * VMM_SIZE_PER_PAGE);
+			paddr_t pAddress = unmap(context, vAddress + i * VMM_SIZE_PER_PAGE).paddr;
 			if(freePages && pAddress != 0)
 				pmm_Free(pAddress);
 		}
@@ -689,16 +695,13 @@ uint8_t vmm_ChangeMap(context_t *context, void *vAddress, paddr_t pAddress, uint
  * 					1 = zu wenig phys. Speicherplatz vorhanden
  * 					2 = Destinationaddresse ist schon belegt
  *///TODO: Bei Fehler alles Rückgängig machen
-//FIXME: correctly handle pages which are allocated but have not been mapped yet (VMM_UNUSED_PAGE)
-uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags, uint16_t avl)
+uint8_t vmm_ReMap(context_t *src_context, void *src, context_t *dst_context, void *dst, size_t length, uint8_t flags)
 {
-	size_t i;
-	for(i = 0; i < length; i++)
-	{
+	for (size_t i = 0; i < length; i++) {
+		struct unmap_result res = unmap(src_context, src + i * VMM_SIZE_PER_PAGE);
 		uint8_t r;
-		if((r = map(dst_context, dst + i * VMM_SIZE_PER_PAGE, vmm_getPhysAddress(src_context, src + i * VMM_SIZE_PER_PAGE) ? : pmm_Alloc(), flags, avl)) != 0)
+		if ((r = map(dst_context, dst + i * VMM_SIZE_PER_PAGE, res.paddr, flags, res.avl)) != 0)
 			return r;
-		unmap(src_context, src + i * VMM_SIZE_PER_PAGE);
 	}
 	return 0;
 }
