@@ -73,7 +73,7 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 	if (kernel) new_state.rsp = (uintptr_t)thread->kernelStackBottom + MM_KERN_STACK_SIZE;
 	memcpy(thread->State, &new_state, sizeof(ihs_t));
 
-	thread->fpuState = vmm_Map(&kernel_context, NULL, 0, 1, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
+	thread->fpuState = vmm_Map(&kernel_context, NULL, 0, (cpuInfo.xsave_area_size + MM_BLOCK_SIZE - 1) / MM_BLOCK_SIZE, VMM_FLAGS_ALLOCATE | VMM_FLAGS_NX | VMM_FLAGS_WRITE);
 	thread->fpuInitialised = false;
 
 	//Stack mappen
