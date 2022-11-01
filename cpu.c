@@ -190,11 +190,16 @@ void cpu_init(bool isBSP)
 	cpu_writeControlRegister(CPU_CR0, cr0);
 	cpu_writeControlRegister(CPU_CR4, cr4);
 
-	if(cpuInfo.xsave)
-	{
+	if(cpuInfo.xsave) {
+		cpu_cpuid_result_t cpuid = cpu_cpuid(0x0D);
+		uint64_t supported_state_components = ((uint64_t)cpuid.edx << 32) | cpuid.eax;
+
 		//Activate all supported features
-		uint64_t mask = 0b11 | (cpuInfo.avx << 2);
-		cpu_writeControlRegister(CPU_XCR0, mask);
+		uint64_t mask = 0b111;	// AVX(2), SSE(1), x87(0)
+		cpu_writeControlRegister(CPU_XCR0, mask & supported_state_components);
+
+		// Determine xsave area size containing all state components corresponding to bits currently set in XCR0
+		cpuInfo.xsave_area_size = cpu_cpuid(0x0D).ebx;
 	}
 
 	//Setze NX-Bit (Bit 11 im EFER), wenn verfügbar

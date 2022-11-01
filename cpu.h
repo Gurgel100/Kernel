@@ -47,6 +47,7 @@ struct{
 		bool nx;
 		bool syscall;
 		bool xsave;				//XGETBV, XRSTOR, XSAVE, XSETBV
+		uint32_t xsave_area_size;
 }cpuInfo;
 
 typedef enum{
