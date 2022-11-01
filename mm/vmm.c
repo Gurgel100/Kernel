@@ -912,9 +912,8 @@ void deleteContext(context_t *context)
 /*
  * Aktiviert einen virtuellen Adressraum
  */
-inline void activateContext(context_t *context)
-{
-	asm volatile("mov %0,%%cr3" : : "r"(context->physAddress));
+void activateContext(const context_t *context) {
+	cpu_writeControlRegister(CPU_CR3, context->physAddress);
 }
 
 int vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode)

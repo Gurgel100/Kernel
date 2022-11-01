@@ -283,8 +283,7 @@ static ihs_t *exception_GeneralProtection(ihs_t *ihs)
 //Page fault
 static ihs_t *exception_PageFault(ihs_t *ihs)
 {
-	void *address;
-	asm volatile("mov %%cr2,%0" : "=r"(address));
+	void *address = (void*)cpu_readControlRegister(CPU_CR2);
 
 	//Try to handle page fault else panic
 	int status = vmm_handlePageFault((currentProcess ?: &kernel_process)->Context, address, ihs->error);

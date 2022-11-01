@@ -119,7 +119,6 @@ void InvalidateTLBEntry(void *Address)
 	asm volatile("invlpg (%0)" : :"r" (Address));
 }
 
-inline void FlushTLB()
-{
-	asm volatile("mov %%cr3,%%rax; mov %%rax,%%cr3;" : : :"rax");
+inline void FlushTLB() {
+	cpu_writeControlRegister(CPU_CR3, cpu_readControlRegister(CPU_CR3));
 }

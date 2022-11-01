@@ -58,7 +58,7 @@ void __attribute__((noreturn)) main(multiboot_structure *MBS)
 	}
 
 	//Der Kernel wird durch ein Interrupt aufgeweckt
-	while(1) asm volatile("hlt;");	//Wir wollen diese Funktion nicht verlassen
+	while(1) CPU_HALT();	//Wir wollen diese Funktion nicht verlassen
 }
 
 multiboot_structure *Init(multiboot_structure *MBS)
@@ -101,7 +101,7 @@ multiboot_structure *Init(multiboot_structure *MBS)
 	#ifdef DEBUGMODE
 	printf("Aktiviere Interrupts\n\r");
 	#endif
-	asm volatile("sti");	//Interrupts aktivieren
+	CPU_ENABLE_INTERRUPTS();
 	cdi_init();			//CDI und -Treiber initialisieren
 	return MBS;
 }

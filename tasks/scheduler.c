@@ -63,7 +63,7 @@ bool scheduler_try_add(thread_t *thread)
  */
 void scheduler_add(thread_t *thread)
 {
-	while(!scheduler_try_add(thread)) asm volatile("pause");
+	while(!scheduler_try_add(thread)) CPU_PAUSE();
 }
 
 /*
@@ -119,10 +119,9 @@ ihs_t *scheduler_schedule(ihs_t *state)
 			}
 			else
 			{
-				uint64_t cr0;
-				asm volatile("mov %%cr0,%0;": "=r"(cr0));
-				cr0 |= (1 << 3);							//TS-Bit setzen
-				asm volatile("mov %0,%%cr0": : "r"(cr0));
+				//TS-Bit setzen
+				uint64_t cr0 = cpu_readControlRegister(CPU_CR0);							
+				cpu_writeControlRegister(CPU_CR0, cr0 | (1 << 3));
 			}
 		}
 	}

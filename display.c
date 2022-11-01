@@ -11,6 +11,7 @@
 #include "console.h"
 #include "pm.h"
 #include "stdio.h"
+#include "cpu.h"
 
 #define GRAFIKSPEICHER 0xB8000
 
@@ -80,7 +81,7 @@ void Panic(char *Device, char *Text)
 {
 	printf("\e[41;37m[ %s ] %s", Device, Text);
 	console_switch(0);
-	asm("cli;hlt");
+	CPU_STOP();
 }
 
 void hideCursor()

@@ -47,7 +47,7 @@ static lock_t pm_lock = LOCK_INIT;
  */
 static void idle(void)
 {
-	while(1) asm volatile("hlt");
+	while(1) CPU_HALT();
 }
 
 static int pid_cmp(const void *a, const void *b, void *c)

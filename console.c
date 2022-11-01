@@ -834,7 +834,7 @@ char console_getch(console_t *console)
 	{
 		if(console->id == 0)
 		{
-			while(console->inputBufferStart == console->inputBufferEnd) asm volatile("hlt");
+			while(console->inputBufferStart == console->inputBufferEnd) CPU_HALT();
 		}
 		else if(console->inputBufferStart == console->inputBufferEnd)
 		{

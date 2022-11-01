@@ -108,7 +108,7 @@ bool vmm_userspacePointerValid(const void *ptr, const size_t size);
 
 context_t *createContext(void);
 void deleteContext(context_t *context);
-void activateContext(context_t *context);
+void activateContext(const context_t *context);
 
 //Interrupt handler
 int vmm_handlePageFault(context_t *context, void *page, uint64_t errorcode);

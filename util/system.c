@@ -35,8 +35,7 @@ void system_panic_enter()
 	static lock_node_t lock_node;
 	if(!try_lock(&panic_buffer_lock, &lock_node))
 	{
-		asm volatile("cli;hlt");
-		__builtin_unreachable();
+		CPU_STOP();
 	}
 }
 
@@ -47,6 +46,5 @@ void system_panic()
 	if(currentThread != NULL)
 		printf("process: %lu(%.20s), tid: %lu", currentProcess->PID, currentProcess->cmd, currentThread->tid);
 	printf("\n\nThe following error occurred:\n%s", system_panic_buffer);
-	asm volatile("cli;hlt");
-	__builtin_unreachable();
+	CPU_STOP();
 }

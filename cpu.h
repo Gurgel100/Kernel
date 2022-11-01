@@ -11,6 +11,12 @@
 #include "stdint.h"
 #include "stdbool.h"
 
+#define CPU_DISABLE_INTERRUPTS()	asm volatile("cli")
+#define CPU_ENABLE_INTERRUPTS()		asm volatile("sti")
+#define CPU_HALT()					asm volatile("hlt")
+#define CPU_STOP()					asm volatile("cli;hlt"); __builtin_unreachable()
+#define CPU_PAUSE()					asm volatile("pause")
+
 #define INTEL	200
 #define AMD		201
 #define UNKN	202
