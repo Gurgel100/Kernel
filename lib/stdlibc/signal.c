@@ -46,8 +46,7 @@ void (*signal(int sig, void (*handler)(int)))(int)
 {
 	if(sig > 5)
 		return SIG_ERR;
-	asm volatile("xchg %0,%1": "+r"(handler): "m"(signal_handlers[sig]): "memory");
-	return handler;
+	return __atomic_exchange_n(&signal_handlers[sig], handler, __ATOMIC_SEQ_CST);
 }
 
 int raise(int sig)
