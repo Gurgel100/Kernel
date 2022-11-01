@@ -206,38 +206,3 @@ void cpu_init(bool isBSP)
 	if(cpuInfo.nx)
 		cpu_MSRwrite(0xC0000080, cpu_MSRread(0xC0000080) | 0x800);
 }
-
-cpu_cpuid_result_t cpu_cpuidSubleaf(uint32_t function, uint32_t subleaf)
-{
-	cpu_cpuid_result_t result;
-	asm volatile("cpuid": "=a"(result.eax), "=b"(result.ebx), "=c"(result.ecx), "=d"(result.edx): "a"(function), "c"(subleaf));
-	return result;
-}
-
-cpu_cpuid_result_t cpu_cpuid(uint32_t function)
-{
-	return cpu_cpuidSubleaf(function, 0);
-}
-
-/*
- * Liest den Wert aus dem angegeben MSR (Model spezific register) aus
- * Parameter:	msr = Nummer des MSR
- */
-uint64_t cpu_MSRread(uint32_t msr)
-{
-	uint32_t low, high;
-	asm volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr));
-	return ((uint64_t)high << 32) | low;
-}
-
-/*
- * Schreibt den Wert in das angegebe MSR
- * Parameter:	msr = Nummer des MSR
- * 				Value = Wert, der in das MSR geschrieben werden soll
- */
-void cpu_MSRwrite(uint32_t msr, uint64_t Value)
-{
-	uint32_t low = Value &0xFFFFFFFF;
-	uint32_t high = Value >> 32;
-	asm volatile("wrmsr" : : "a" (low), "c" (msr), "d" (high));
-}
