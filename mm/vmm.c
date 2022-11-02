@@ -610,7 +610,8 @@ void *vmm_MapGuarded(context_t *context, void *vAddress, paddr_t pAddress, size_
 }
 
 static void unmapPages(context_t *context, void *vAddress, size_t pages, bool freePages, bool guard) {
-	pages += guard ? MM_GUARD_PAGES * 2 : 0;
+	pages += guard * MM_GUARD_PAGES * 2;
+	vAddress -= guard * MM_GUARD_PAGES * VMM_SIZE_PER_PAGE;
 	LOCKED_TASK(vmm_lock, {
 		for(size_t i = 0; i < pages; i++)
 		{
