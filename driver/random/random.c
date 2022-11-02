@@ -8,6 +8,7 @@
 #include "random.h"
 #include <stdlib.h>
 #include <string.h>
+#include <immintrin.h>
 #include "cpu.h"
 
 struct random_device *random_device_init(struct cdi_driver *driver, const char *name, rand_func rand, seed_func seed)
@@ -54,10 +55,9 @@ int random_write_blocks(struct cdi_storage_device *device, uint64_t block __attr
 	return 0;
 }
 
-asm("_prev_read_rdrand:"
-	"pause;"
-	".global read_rdrand;"
-	"read_rdrand:"
-	"rdrand %rax;"
-	"jnc _prev_read_rdrand;"
-	"retq;");
+__attribute__((target("rdrnd")))
+uint64_t read_rdrand() {
+	uint64_t res;
+	while (!_rdrand64_step(&res)) CPU_PAUSE();
+	return res;
+}
