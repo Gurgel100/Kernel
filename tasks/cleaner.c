@@ -28,7 +28,7 @@ void __attribute__((noreturn)) cleaner()
 				break;
 				case CL_THREAD:
 					while(((thread_t*)entry->data)->Status.status != THREAD_BLOCKED) yield();
-					thread_destroy(entry->data);
+					thread_destroy(entry->data, true);
 			}
 			free(entry);
 		}

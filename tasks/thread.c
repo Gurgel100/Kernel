@@ -93,12 +93,14 @@ ERROR_TYPE_POINTER(thread_t) thread_create(process_t *process, void *entry, size
 	return ERROR_RETURN_POINTER_VALUE(thread_t, thread);
 }
 
-void thread_destroy(thread_t *thread)
+void thread_destroy(thread_t *thread, bool remove_from_process)
 {
 	vmm_UnMapGuarded(&kernel_context, thread->kernelStackBottom, MM_KERN_STACK_SIZE / MM_BLOCK_SIZE, true);
 
-	//Thread aus Liste entfernen
-	LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
+	if (remove_from_process) {
+		//Thread aus Liste entfernen
+		LOCKED_TASK(thread->process->lock, avl_remove(&thread->process->threads, thread, tid_cmp));
+	}
 
 	//Userstack freigeben
 	vmm_UnMap(thread->process->Context, thread->userStackBottom, MM_USER_STACK_SIZE / MM_BLOCK_SIZE, true);

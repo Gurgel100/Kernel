@@ -88,7 +88,7 @@ static void thread_unblock_visitor(const void *a)
 static void thread_destroy_action(void *a)
 {
 	thread_t *thread = a;
-	thread_destroy(thread);
+	thread_destroy(thread, false);
 }
 
 static void child_terminated(process_t *parent, process_t *process)
