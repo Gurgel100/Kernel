@@ -47,7 +47,7 @@
 typedef struct lock_node {
     struct lock_node *next;
     bool locked;
-} lock_node_t __attribute__((aligned(64)));
+} lock_node_t;
 
 typedef lock_node_t *lock_t;
 
